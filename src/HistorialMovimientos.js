@@ -375,7 +375,15 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
     { key: 'editado_por', label: 'Editado por' },
   ];
 
-  const PanelEditar = () => (
+  // FIX: esto era `const PanelEditar = () => (...)` — al ser una función
+  // definida dentro del render, React la trataba como un componente NUEVO
+  // en cada tecleo (cada setForm re-renderiza el padre), remontando el
+  // panel entero y haciendo que los inputs/textarea perdieran el foco
+  // después de cada letra (el motivo de cancelación era el más notorio,
+  // por ser el único campo de texto libre largo). Ahora es una constante
+  // con el JSX ya armado — sigue siendo el mismo árbol de elementos en
+  // cada render, así que React solo actualiza, no remonta.
+  const panelEditar = (
     <div style={{ position: 'fixed', top: 0, right: 0, width: isMobile ? '100%' : '400px', height: '100dvh', background: '#fff', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ fontSize: '16px', fontWeight: '500', margin: 0 }}>Editar Movimiento</h3>
@@ -818,7 +826,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       )}
 
       {movDetalle && isMobile && <PanelDetalle m={movDetalle} />}
-      {editando && puedeEditar && <PanelEditar />}
+      {editando && puedeEditar && panelEditar}
     </div>
   );
 }
