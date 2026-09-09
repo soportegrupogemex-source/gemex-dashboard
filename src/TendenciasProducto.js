@@ -13,14 +13,17 @@ function useIsMobile() {
   return isMobile;
 }
 
+const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
+
 // FIX: reporte nuevo — qué producto (unidad/tipología) se está enseñando
 // más y cuáles están "frías" (nunca cotizadas), más quiénes son los
 // agentes más activos cotizando. Se alimenta de cotizaciones_log, que se
 // llena solo cuando el agente tiene un contacto asignado en el Cotizador
 // y descarga o comparte el PDF (ver registrarLog en Cotizador.js) — abrir
-// el cotizador a mirar precios no cuenta. Solo Super Admin puede ver
-// esto — la RLS de cotizaciones_log ya lo restringe también a nivel de base.
-export default function TendenciasProducto() {
+// el cotizador a mirar precios no cuenta. Lo ve Super Admin (todo) y
+// Gerente Editor/Operador (solo sus desarrollos a cargo — la RLS de
+// cotizaciones_log ya lo restringe también a nivel de base).
+export default function TendenciasProducto({ miRol, miAgente }) {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState('productos');
   const [loading, setLoading] = useState(true);
@@ -34,9 +37,16 @@ export default function TendenciasProducto() {
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [showFiltros, setShowFiltros] = useState(false);
 
+  // FIX: Gerente Editor/Operador solo ven sus desarrollos_cargo — mismo
+  // patrón que Objetivos.js/Titulacion.js/Cobranza.js.
+  const desarrollosPermitidos = ROLES_GERENTE.includes(miRol)
+    ? desarrollos.filter(d => (miAgente?.desarrollos_cargo || []).includes(d.nombre))
+    : desarrollos;
+  const nombresPermitidos = desarrollosPermitidos.map(d => d.nombre);
+
   useEffect(() => { cargarDesarrollos(); cargarAgentesEquipo(); }, []);
-  useEffect(() => { cargarLogs(); cargarConversiones(); }, [filtroDesarrollo, filtroFechaDesde, filtroFechaHasta]);
-  useEffect(() => { cargarInventarioLibre(); }, [filtroDesarrollo]);
+  useEffect(() => { cargarLogs(); cargarConversiones(); }, [filtroDesarrollo, filtroFechaDesde, filtroFechaHasta, miAgente]);
+  useEffect(() => { cargarInventarioLibre(); }, [filtroDesarrollo, miAgente]);
 
   const cargarDesarrollos = async () => {
     const { data } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
@@ -80,8 +90,10 @@ export default function TendenciasProducto() {
   // "Productos" se distingue lo que solo GENERA interés (se cotiza mucho)
   // de lo que además CONVIERTE de verdad.
   const cargarConversiones = async () => {
+    if (ROLES_GERENTE.includes(miRol) && desarrollosPermitidos.length === 0) { setUnidadesConvertidas(new Set()); return; }
     let query = supabase.from('movimientos').select('unidad_id').in('tipo', ['Apartado', 'Vendida']);
     if (filtroDesarrollo) query = query.eq('desarrollo_nombre', filtroDesarrollo);
+    else if (ROLES_GERENTE.includes(miRol)) query = query.in('desarrollo_nombre', nombresPermitidos);
     const { data } = await query.limit(10000);
     setUnidadesConvertidas(new Set((data || []).map(m => m.unidad_id).filter(Boolean)));
   };
@@ -95,6 +107,10 @@ export default function TendenciasProducto() {
       const dev = desarrollos.find(d => d.nombre === filtroDesarrollo);
       if (dev) query = query.eq('desarrollo_id', dev.id);
       else { setInventarioLibre([]); return; }
+    } else if (ROLES_GERENTE.includes(miRol)) {
+      const ids = desarrollosPermitidos.map(d => d.id);
+      if (ids.length === 0) { setInventarioLibre([]); return; }
+      query = query.in('desarrollo_id', ids);
     }
     const { data } = await query.limit(5000);
     setInventarioLibre(data || []);
@@ -200,7 +216,7 @@ export default function TendenciasProducto() {
               <select value={filtroDesarrollo} onChange={e => setFiltroDesarrollo(e.target.value)}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }}>
                 <option value=''>Todos los desarrollos</option>
-                {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+                {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
               </select>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input type='date' value={filtroFechaDesde} onChange={e => setFiltroFechaDesde(e.target.value)}
@@ -220,7 +236,7 @@ export default function TendenciasProducto() {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <select value={filtroDesarrollo} onChange={e => setFiltroDesarrollo(e.target.value)} style={filtroStyle}>
             <option value=''>Todos los desarrollos</option>
-            {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+            {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
           </select>
           <span style={{ fontSize: '12px', color: '#888' }}>Desde:</span>
           <input type='date' value={filtroFechaDesde} onChange={e => setFiltroFechaDesde(e.target.value)} style={filtroStyle} />
@@ -261,11 +277,13 @@ export default function TendenciasProducto() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ fontSize: '15px', fontWeight: '700', color: '#F97316' }}>{u.count}</div>
-                      <button onClick={() => handleEliminarUnidad(u.unidad_id, u.unidad_numero)} disabled={eliminando === u.unidad_id}
-                        title="Eliminar registros de esta unidad (limpiar prueba)"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>
-                        {eliminando === u.unidad_id ? '...' : '🗑'}
-                      </button>
+                      {miRol === 'Super Admin' && (
+                        <button onClick={() => handleEliminarUnidad(u.unidad_id, u.unidad_numero)} disabled={eliminando === u.unidad_id}
+                          title="Eliminar registros de esta unidad (limpiar prueba)"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>
+                          {eliminando === u.unidad_id ? '...' : '🗑'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

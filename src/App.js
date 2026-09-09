@@ -163,7 +163,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
               if (miRol === 'Construcción') return s.id === 'construccion';
               if (miRol === 'Tesorería') return s.id === 'cobranza';
               if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-              if (s.id === 'tendencias_producto') return miRol === 'Super Admin';
+              if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               return true;
             });
@@ -743,7 +743,7 @@ function App() {
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
-      case 'tendencias_producto': return miRol === 'Super Admin' ? <TendenciasProducto /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
+      case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
         return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador')
           ? <BuyerPersona miRol={miRol} miAgente={miAgente} />
