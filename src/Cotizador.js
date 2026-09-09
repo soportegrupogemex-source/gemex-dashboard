@@ -60,9 +60,39 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
         contacto_nombre: `${contactoSeleccionado.nombres} ${contactoSeleccionado.apellidos}`.trim(),
       }));
       if (filas.length > 0) await supabase.from('cotizaciones_log').insert(filas);
+      await crearNegociosCotizacion(agenteCorreo, agenteNombre);
     } catch (err) {
       // el log nunca debe bloquear la cotización si falla
     }
+  };
+
+  // FIX: además del log, cada unidad cotizada (con contacto asignado) crea
+  // su propio negocio en la etapa "Cotización" — uno por combinación
+  // contacto+unidad, para no duplicar si ya existe (aunque haya avanzado
+  // a otra etapa, no se toca: esto solo CREA, nunca revierte etapa).
+  const crearNegociosCotizacion = async (agenteCorreo, agenteNombre) => {
+    const unidadIds = listaUnidades.map(u => u.id).filter(Boolean);
+    if (unidadIds.length === 0) return;
+    const { data: existentes } = await supabase.from('negocios')
+      .select('unidad_id')
+      .eq('contacto_id', contactoSeleccionado.id)
+      .in('unidad_id', unidadIds);
+    const yaExisten = new Set((existentes || []).map(n => n.unidad_id));
+    const nombreContacto = `${contactoSeleccionado.nombres} ${contactoSeleccionado.apellidos}`.trim();
+    const nuevos = listaUnidades.filter(u => u.id && !yaExisten.has(u.id)).map(u => ({
+      nombre: nombreContacto,
+      contacto_id: contactoSeleccionado.id,
+      valor: u.precio_lista || 0,
+      etapa: 'Cotización',
+      desarrollo: desarrollo.nombre,
+      unidad_id: u.id,
+      unidad_numero: u.numero,
+      fuente_medio: contactoSeleccionado.fuente_medio || null,
+      asesor_ventas: agenteNombre,
+      asesor_correo: agenteCorreo,
+      creado_por: agenteCorreo,
+    }));
+    if (nuevos.length > 0) await supabase.from('negocios').insert(nuevos);
   };
 
   const cargarPlanes = async () => {
@@ -109,7 +139,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     const cargo = miAgenteData.desarrollos_cargo || [];
     const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 
-    let query = supabase.from('contactos').select('id, nombres, apellidos, correo, telefono').order('nombres');
+    let query = supabase.from('contactos').select('id, nombres, apellidos, correo, telefono, fuente_medio').order('nombres');
 
     if (ROLES_VER_TODOS.includes(rol)) {
       // sin filtro — ve todos

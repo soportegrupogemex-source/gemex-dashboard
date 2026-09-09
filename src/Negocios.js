@@ -75,7 +75,6 @@ export default function Negocios() {
 
   useEffect(() => {
     cargarMiAgente();
-    cargarContactos();
     cargarAgentes();
   }, []);
 
@@ -83,6 +82,18 @@ export default function Negocios() {
   // limitar el dropdown a los desarrollos a cargo de un Gerente.
   useEffect(() => {
     if (miRol !== null) cargarDesarrollos();
+  }, [miRol, miAgente]);
+
+  // FIX: cargarContactos ahora también depende de miRol/miAgente — antes
+  // traía TODOS los contactos del sistema sin importar quién los ve,
+  // dejando elegir en el selector "Contacto" al crear un negocio a
+  // clientes de otros asesores. Mismo filtro que ya usa Cotizador.js:
+  // Agente/Desarrollador → los suyos; Mesa de Control → él + su equipo,
+  // dentro de sus desarrollos a cargo; Gerente Editor/Operador → los
+  // suyos + los de sus desarrollos a cargo; Super Admin/Admin/Sub Admin
+  // → todos.
+  useEffect(() => {
+    if (miRol !== null) cargarContactos();
   }, [miRol, miAgente]);
 
   useEffect(() => {
@@ -112,7 +123,35 @@ export default function Negocios() {
   };
 
   const cargarContactos = async () => {
-    const { data } = await supabase.from('contactos').select('id, nombres, apellidos').order('nombres');
+    const correo = miAgente?.correo || '';
+    const nombreCompleto = miAgente ? `${miAgente.nombre || ''} ${miAgente.apellidos || ''}`.trim() : '';
+    const cargo = miAgente?.desarrollos_cargo || [];
+
+    let query = supabase.from('contactos').select('id, nombres, apellidos').order('nombres');
+
+    if (ROLES_VER_TODOS.includes(miRol)) {
+      // sin filtro — ve todos
+    } else if (miRol === 'Mesa de Control') {
+      const agentesCargoCorreos = miAgente?.agentes_cargo || [];
+      const { data: equipo } = agentesCargoCorreos.length > 0
+        ? await supabase.from('agentes').select('nombre, apellidos').in('correo', agentesCargoCorreos)
+        : { data: [] };
+      const nombresEquipo = (equipo || []).map(a => `${a.nombre} ${a.apellidos}`.trim());
+      const nombresFiltro = [nombreCompleto, ...nombresEquipo].filter(Boolean);
+      query = nombresFiltro.length > 0
+        ? query.or(`creado_por.eq.${correo},asesor_ventas.in.(${nombresFiltro.map(n => `"${n}"`).join(',')})`)
+        : query.eq('creado_por', correo);
+      if (cargo.length > 0) query = query.in('desarrollo', cargo);
+    } else if (ROLES_GERENTE.includes(miRol)) {
+      query = cargo.length > 0
+        ? query.or(`creado_por.eq.${correo},desarrollo.in.(${cargo.map(d => `"${d}"`).join(',')})`)
+        : query.eq('creado_por', correo);
+    } else {
+      // Agente, Desarrollador, o cualquier otro rol: solo lo suyo
+      query = query.or(`creado_por.eq.${correo},asesor_ventas.eq.${nombreCompleto}`);
+    }
+
+    const { data } = await query;
     setContactos(data || []);
   };
 
