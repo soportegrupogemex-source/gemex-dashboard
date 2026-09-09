@@ -13,6 +13,9 @@ const ETAPAS = [
 ];
 
 const TIEMPO_COMPRA_OPCIONES = ['Inmediato', '1 a 3 meses', '3 a 6 meses', '6 a 12 meses', 'Más de 1 año'];
+// FIX: mismo catálogo que ya usa Contactos (MEDIO_OPCIONES en contactos.js)
+// para que "Fuente de medio" sea consistente en todo el sistema.
+const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
@@ -52,12 +55,21 @@ export default function Negocios() {
   const [form, setForm] = useState(formVacio());
   const [dragOver, setDragOver] = useState(null);
   const dragItem = useRef(null);
+  const [unidadesForm, setUnidadesForm] = useState([]);
+  // FIX: tareas del negocio abierto en el panel de detalle — lista +
+  // captura de una nueva (descripción, fecha y hora opcionales). El
+  // aviso push (5 min antes y al llegar la hora) lo dispara un cron en
+  // la base de datos (revisar_tareas_negocios), no el navegador.
+  const [tareas, setTareas] = useState([]);
+  const [nuevaTarea, setNuevaTarea] = useState({ descripcion: '', fecha: '', hora: '' });
+  const [guardandoTarea, setGuardandoTarea] = useState(false);
 
   function formVacio() {
     return {
       nombre: '', contacto_id: '', valor: '', etapa: 'Cotización',
       fecha_cierre: '', asesor_ventas: '', asesor_correo: '',
-      desarrollo: '', tiempo_compra: '', descripcion: ''
+      desarrollo: '', tiempo_compra: '', descripcion: '',
+      fuente_medio: '', unidad_id: '', unidad_numero: '',
     };
   }
 
@@ -76,6 +88,19 @@ export default function Negocios() {
   useEffect(() => {
     if (miRol !== null) cargarNegocios();
   }, [miRol, miAgente, buscar, filtroDesarrollo, filtroAsesor]);
+
+  // FIX: unidades del formulario dependen del desarrollo elegido ahí —
+  // se recargan cada vez que cambia, y se limpian si no hay desarrollo.
+  useEffect(() => {
+    if (showForm && form.desarrollo) cargarUnidadesForm(form.desarrollo);
+    else setUnidadesForm([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, form.desarrollo]);
+
+  useEffect(() => {
+    if (negocioDetalle?.id) cargarTareas(negocioDetalle.id);
+    else setTareas([]);
+  }, [negocioDetalle?.id]);
 
   const cargarMiAgente = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -107,6 +132,45 @@ export default function Negocios() {
   const cargarAgentes = async () => {
     const { data } = await supabase.from('agentes').select('id, nombre, apellidos, correo, rol').eq('activo', true).order('nombre');
     setAgentes(data || []);
+  };
+
+  const cargarUnidadesForm = async (desarrolloNombre) => {
+    const dev = desarrollos.find(d => d.nombre === desarrolloNombre);
+    if (!dev) { setUnidadesForm([]); return; }
+    const { data } = await supabase.from('inventario').select('id, numero').eq('desarrollo_id', dev.id).order('numero');
+    setUnidadesForm(data || []);
+  };
+
+  const cargarTareas = async (negocioId) => {
+    const { data } = await supabase.from('negocio_tareas').select('*').eq('negocio_id', negocioId).order('created_at');
+    setTareas(data || []);
+  };
+
+  const handleAgregarTarea = async () => {
+    if (!nuevaTarea.descripcion.trim() || !negocioDetalle) return;
+    setGuardandoTarea(true);
+    const { data, error } = await supabase.from('negocio_tareas').insert([{
+      negocio_id: negocioDetalle.id,
+      descripcion: nuevaTarea.descripcion.trim(),
+      fecha: nuevaTarea.fecha || null,
+      hora: nuevaTarea.hora || null,
+      creado_por: miAgente?.correo || null,
+    }]).select().single();
+    setGuardandoTarea(false);
+    if (!error && data) {
+      setTareas(prev => [...prev, data]);
+      setNuevaTarea({ descripcion: '', fecha: '', hora: '' });
+    }
+  };
+
+  const handleToggleTarea = async (tarea) => {
+    const { data, error } = await supabase.from('negocio_tareas').update({ completada: !tarea.completada }).eq('id', tarea.id).select().single();
+    if (!error && data) setTareas(prev => prev.map(t => t.id === data.id ? data : t));
+  };
+
+  const handleEliminarTarea = async (tareaId) => {
+    await supabase.from('negocio_tareas').delete().eq('id', tareaId);
+    setTareas(prev => prev.filter(t => t.id !== tareaId));
   };
 
   // FIX: antes cualquier rol que no fuera Super Admin/Admin/Sub Admin
@@ -184,6 +248,8 @@ export default function Negocios() {
       valor: form.valor || 0, etapa: form.etapa,
       fecha_cierre: form.fecha_cierre || null, desarrollo: form.desarrollo || null,
       tiempo_compra: form.tiempo_compra || null, descripcion: form.descripcion || null,
+      fuente_medio: form.fuente_medio || null,
+      unidad_id: form.unidad_id || null, unidad_numero: form.unidad_numero || null,
       asesor_ventas: asesorVentas, asesor_correo: asesorCorreo,
       creado_por: form.creado_por || miAgente?.correo || '',
     };
@@ -298,9 +364,10 @@ export default function Negocios() {
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '6px' }}>
                   <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: (etapa?.color || '#ccc') + '20', color: etapa?.color }}>{n.etapa}</span>
-                  {n.desarrollo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: '#f0f0f0', color: '#555' }}>{n.desarrollo}</span>}
+                  {n.desarrollo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: '#f0f0f0', color: '#555' }}>{n.desarrollo}{n.unidad_numero ? ` · ${n.unidad_numero}` : ''}</span>}
                 </div>
                 {n.contactos && <div style={{ fontSize: '12px', color: '#888' }}>👤 {n.contactos.nombres} {n.contactos.apellidos}</div>}
+                {n.fuente_medio && <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📣 {n.fuente_medio}</div>}
                 {n.asesor_ventas && <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>👔 {n.asesor_ventas}</div>}
               </div>
             );
@@ -341,7 +408,8 @@ export default function Negocios() {
                       style={{ background: '#fff', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'grab', border: '0.5px solid #e0e0e0', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', userSelect: 'none' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '4px' }}>{n.nombre}</div>
                       {n.contactos && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>👤 {n.contactos.nombres} {n.contactos.apellidos}</div>}
-                      {n.desarrollo && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>🏢 {n.desarrollo}</div>}
+                      {n.desarrollo && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>🏢 {n.desarrollo}{n.unidad_numero ? ` · Unidad ${n.unidad_numero}` : ''}</div>}
+                      {n.fuente_medio && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>📣 {n.fuente_medio}</div>}
                       <div style={{ fontSize: '12px', fontWeight: '600', color: etapa.color }}>{fmt(n.valor)}</div>
                       {n.fecha_cierre && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>📅 {n.fecha_cierre}</div>}
                       {n.asesor_ventas && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>👔 {n.asesor_ventas}</div>}
@@ -372,6 +440,8 @@ export default function Negocios() {
               ['Contacto', negocioDetalle.contactos ? `${negocioDetalle.contactos.nombres} ${negocioDetalle.contactos.apellidos}` : '—'],
               ['Valor', fmt(negocioDetalle.valor)],
               ['Desarrollo', negocioDetalle.desarrollo || '—'],
+              ['Unidad', negocioDetalle.unidad_numero || '—'],
+              ['Fuente de medio', negocioDetalle.fuente_medio || '—'],
               ['Asesor', negocioDetalle.asesor_ventas || '—'],
               ['Tiempo de compra', negocioDetalle.tiempo_compra || '—'],
               ['Fecha de cierre', negocioDetalle.fecha_cierre || '—'],
@@ -397,6 +467,43 @@ export default function Negocios() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem' }}>
+              <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>TAREAS</div>
+              <input placeholder='Nueva tarea...' value={nuevaTarea.descripcion}
+                onChange={e => setNuevaTarea(t => ({ ...t, descripcion: e.target.value }))}
+                style={{ ...inputStyle, marginBottom: '8px' }} />
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                <input type='date' value={nuevaTarea.fecha} onChange={e => setNuevaTarea(t => ({ ...t, fecha: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1 }} />
+                <input type='time' value={nuevaTarea.hora} onChange={e => setNuevaTarea(t => ({ ...t, hora: e.target.value }))}
+                  style={{ ...inputStyle, flex: 1 }} />
+              </div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>
+                Fecha y hora son opcionales — si las pones, te llega un aviso 5 minutos antes y al llegar la hora.
+              </div>
+              <button onClick={handleAgregarTarea} disabled={guardandoTarea || !nuevaTarea.descripcion.trim()}
+                style={{ ...btnPrimary, width: '100%', justifyContent: 'center', padding: '10px', marginBottom: '1rem' }}>
+                {guardandoTarea ? 'Agregando...' : 'Agregar tarea'}
+              </button>
+              {tareas.length === 0 ? (
+                <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '0.5rem 0' }}>Sin tareas aún</div>
+              ) : tareas.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 0', borderBottom: '0.5px solid #f5f5f5' }}>
+                  <input type='checkbox' checked={!!t.completada} onChange={() => handleToggleTarea(t)} style={{ marginTop: '3px', cursor: 'pointer' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', color: t.completada ? '#aaa' : '#333', textDecoration: t.completada ? 'line-through' : 'none' }}>{t.descripcion}</div>
+                    {(t.fecha || t.hora) && (
+                      <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>
+                        {t.fecha ? new Date(t.fecha + 'T00:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''}
+                        {t.hora ? ` ${t.hora.slice(0, 5)}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => handleEliminarTarea(t.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+                </div>
+              ))}
             </div>
           </div>
           <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid #f0f0f0', flexShrink: 0, display: 'flex', gap: '8px' }}>
@@ -466,9 +573,26 @@ export default function Negocios() {
             </div>
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Desarrollo</label>
-              <select value={form.desarrollo} onChange={e => setForm({ ...form, desarrollo: e.target.value })} style={inputStyle}>
+              <select value={form.desarrollo} onChange={e => setForm({ ...form, desarrollo: e.target.value, unidad_id: '', unidad_numero: '' })} style={inputStyle}>
                 <option value=''>Selecciona...</option>
                 {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>Unidad</label>
+              <select value={form.unidad_id} disabled={!form.desarrollo} onChange={e => {
+                const u = unidadesForm.find(x => x.id === e.target.value);
+                setForm({ ...form, unidad_id: e.target.value, unidad_numero: u?.numero || '' });
+              }} style={{ ...inputStyle, background: form.desarrollo ? '#fff' : '#f9f9f9' }}>
+                <option value=''>{form.desarrollo ? 'Selecciona...' : 'Elige primero un desarrollo'}</option>
+                {unidadesForm.map(u => <option key={u.id} value={u.id}>{u.numero}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={labelStyle}>Fuente de medio</label>
+              <select value={form.fuente_medio} onChange={e => setForm({ ...form, fuente_medio: e.target.value })} style={inputStyle}>
+                <option value=''>Elige una opción...</option>
+                {MEDIO_OPCIONES.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div style={{ marginBottom: '12px' }}>
