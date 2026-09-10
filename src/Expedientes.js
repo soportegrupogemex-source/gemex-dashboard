@@ -1256,6 +1256,13 @@ export default function Expedientes({ miRol, miAgente }) {
             const archivado = expedienteArchivado(m.id);
             const pendiente = necesitaArchivar(m);
             const soyElVendedor = esVendedorDe(m);
+            // FIX: para Mesa de Control y Super Admin (quienes revisan
+            // documentos), un aviso junto al tipo de compra que identifique
+            // de un vistazo qué expedientes tienen documentos subidos sin
+            // revisar todavía — mismo criterio que expedientesPorRevisar,
+            // como refuerzo visual además de la notificación push.
+            const porRevisar = (miRol === 'Super Admin' || esMesaControl) && !archivado &&
+              Object.values(docsDe(m.id)).some(d => d?.archivo_path && d.estado_revision === 'pendiente');
             return (
               <div key={m.id} onClick={() => setMovSel(m)}
                 style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1267,6 +1274,7 @@ export default function Expedientes({ miRol, miAgente }) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {m.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{m.tipo_compra}</span>}
+                  {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
                   {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
                   {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
                   {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
