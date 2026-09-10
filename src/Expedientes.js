@@ -154,6 +154,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const [subiendoTipo, setSubiendoTipo] = useState(null);
   const [generandoZip, setGenerandoZip] = useState(null);
   const [archivandoId, setArchivandoId] = useState(null);
+  const [subiendoContrato, setSubiendoContrato] = useState(null);
   const [responsables, setResponsables] = useState([]);
   const [superAdmins, setSuperAdmins] = useState([]);
   const [showConfigResponsable, setShowConfigResponsable] = useState(false);
@@ -199,6 +200,10 @@ export default function Expedientes({ miRol, miAgente }) {
   // prender/apagar "Expediente completo", además de quien esté configurado
   // como responsable.
   const soyResponsable = esMesaControl || (miAgente?.correo && responsables.includes(miAgente.correo));
+  // FIX: pestaña "Contratos" — solo Gerentes, Admin y Super Admin pueden
+  // subir el contrato ya firmado (Mesa de Control puede entrar a verla,
+  // igual que ya hace con "Descargar", pero sin poder cargar el archivo).
+  const puedeCargarContrato = esGerente || esAdmin;
   // FIX: aviso a los responsables de expedientes con documentos por
   // revisar — se muestra una sola vez por sesión (no cada vez que se
   // actualiza algo en pantalla), con el mismo estilo que ya usa el aviso
@@ -409,6 +414,27 @@ export default function Expedientes({ miRol, miAgente }) {
     if (error) return;
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+  };
+
+  // FIX: pestaña "Contratos" — sube el contrato ya firmado (solo
+  // Gerentes/Admin/Super Admin, verificado también aquí y no solo en la
+  // UI, por si acaso) al bucket "contratos" y guarda la ruta en el mismo
+  // movimiento de Apartado.
+  const handleSubirContrato = async (mov, archivo) => {
+    if (!archivo || !puedeCargarContrato) return;
+    setSubiendoContrato(mov.id);
+    const ext = archivo.name.split('.').pop();
+    const path = `${mov.id}/${Date.now()}.${ext}`;
+    const { error: errUpload } = await supabase.storage.from('contratos').upload(path, archivo);
+    if (errUpload) { setSubiendoContrato(null); alert('No se pudo subir el archivo: ' + errUpload.message); return; }
+    const { data, error } = await supabase.from('movimientos').update({ contrato_firmado_path: path }).eq('id', mov.id).select().single();
+    setSubiendoContrato(null);
+    if (!error && data) setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+  };
+
+  const verContrato = async (path) => {
+    const { data } = await supabase.storage.from('contratos').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
   const cargarResponsables = async () => {
@@ -714,7 +740,13 @@ export default function Expedientes({ miRol, miAgente }) {
     return false;
   });
 
-  const listaActual = (tab === 'cargar' ? movimientosCargar : movimientosDescarga).filter(m =>
+  // FIX: "Contratos" — mismo criterio de visibilidad que "Descargar",
+  // pero solo expedientes ya marcados "Expediente completo" (los mismos
+  // que ya pasaron a Titulación).
+  const movimientosContratos = movimientosDescarga.filter(m => m.expediente_completo === true);
+
+  const listaBase = tab === 'cargar' ? movimientosCargar : tab === 'contratos' ? movimientosContratos : movimientosDescarga;
+  const listaActual = listaBase.filter(m =>
     (!buscar || m.contacto_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
@@ -1153,6 +1185,12 @@ export default function Expedientes({ miRol, miAgente }) {
             Descargar
           </button>
         )}
+        {puedeVerDescarga && (
+          <button onClick={() => { setTab('contratos'); setBuscar(''); }}
+            style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'contratos' ? '600' : '400', color: tab === 'contratos' ? '#1a1a2e' : '#888', borderBottom: tab === 'contratos' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+            Contratos
+          </button>
+        )}
       </div>
 
       {tab === 'cargar' && rechazados.length > 0 && (
@@ -1274,12 +1312,35 @@ export default function Expedientes({ miRol, miAgente }) {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   {m.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{m.tipo_compra}</span>}
-                  {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
-                  {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
-                  {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
-                  {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
-                  {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: aprobados === total ? '#2E7D4F' : '#888' }}>{aprobados}/{total}</span>
+                  {tab === 'contratos' ? (
+                    <>
+                      {m.contrato_firmado_path && (
+                        <button type="button" onClick={e => { e.stopPropagation(); verContrato(m.contrato_firmado_path); }}
+                          style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                          📄 Ver contrato
+                        </button>
+                      )}
+                      {puedeCargarContrato ? (
+                        <label onClick={e => e.stopPropagation()}
+                          style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                          {subiendoContrato === m.id ? 'Subiendo...' : (m.contrato_firmado_path ? 'Reemplazar' : '📎 Cargar contrato')}
+                          <input type="file" style={{ display: 'none' }} disabled={subiendoContrato === m.id}
+                            onChange={e => handleSubirContrato(m, e.target.files[0])} />
+                        </label>
+                      ) : (!m.contrato_firmado_path && (
+                        <span style={{ fontSize: '11px', color: '#aaa' }}>Sin contrato cargado</span>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
+                      {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
+                      {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
+                      {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
+                      {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: aprobados === total ? '#2E7D4F' : '#888' }}>{aprobados}/{total}</span>
+                    </>
+                  )}
                 </div>
               </div>
             );
