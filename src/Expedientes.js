@@ -1263,6 +1263,7 @@ export default function Expedientes({ miRol, miAgente }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {m.tipo_compra && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '500' }}>{m.tipo_compra}</span>}
                   {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
                   {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
                   {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
