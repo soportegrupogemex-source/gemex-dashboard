@@ -109,27 +109,17 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
 
   // FIX: los Gerentes solo ven movimientos de sus desarrollos a cargo,
   // igual que ya hacemos en Negocios y el Dashboard de Dirección.
-  // FIX: Mesa de Control va MÁS ALLÁ — además del desarrollo, se limita
-  // a movimientos de SU GENTE (él + agentes_cargo). Se cruza primero por
-  // vendedor_correo (confiable, columna nueva) y como respaldo también
-  // por nombre (para movimientos viejos cargados antes de que existiera
-  // vendedor_correo).
+  // FIX: Mesa de Control revisa TODA la empresa, sin restricción de
+  // desarrollo ni equipo (mismo criterio ya aplicado en Expedientes) —
+  // antes se le trataba como un Gerente más, limitado a sus
+  // desarrollos_cargo/agentes_cargo, y como Mesa de Control no tiene
+  // desarrollos a cargo terminaba viendo el historial vacío siempre.
   const cargarMovimientos = async () => {
     setLoading(true);
     let query = supabase.from('movimientos').select('*').order('created_at', { ascending: false });
     if (filtroTipo) query = query.eq('tipo', filtroTipo);
     if (filtroDesarrollo) query = query.eq('desarrollo_nombre', filtroDesarrollo);
-    if (miRol === 'Mesa de Control') {
-      const cargo = miAgente?.desarrollos_cargo || [];
-      const correo = miAgente?.correo || '';
-      const equipoCorreos = [correo, ...(miAgente?.agentes_cargo || [])].filter(Boolean);
-      if (cargo.length === 0 || !correo) { setMovimientos([]); setLoading(false); return; }
-      const { data: equipoAgentes } = await supabase.from('agentes').select('nombre, apellidos, correo').in('correo', equipoCorreos);
-      const nombresEquipo = (equipoAgentes || []).map(a => `${a.nombre || ''} ${a.apellidos || ''}`.trim()).filter(Boolean);
-      const condsCorreo = equipoCorreos.map(c => `vendedor_correo.eq.${c}`).join(',');
-      const condsNombre = nombresEquipo.map(n => `vendedor.eq."${n.replace(/"/g, '\\"')}"`).join(',');
-      query = query.or([condsCorreo, condsNombre].filter(Boolean).join(',')).in('desarrollo_nombre', cargo);
-    } else if (esGerente) {
+    if (esGerente && miRol !== 'Mesa de Control') {
       const cargo = miAgente?.desarrollos_cargo || [];
       if (cargo.length === 0) { setMovimientos([]); setLoading(false); return; }
       query = query.in('desarrollo_nombre', cargo);
@@ -156,7 +146,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
 
   const cargarDesarrollos = async () => {
     let query = supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
-    if (esGerente) {
+    if (esGerente && miRol !== 'Mesa de Control') {
       const cargo = miAgente?.desarrollos_cargo || [];
       if (cargo.length === 0) { setDesarrollos([]); return; }
       query = query.in('nombre', cargo);
