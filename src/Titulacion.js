@@ -17,7 +17,7 @@ const PASO2 = [
   { campo: 'autorizacion_financiera_1', label: 'Autorización financiera 1' },
   { campo: 'autorizacion_financiera_2', label: 'Autorización financiera 2' },
   { campo: 'liquidacion_final', label: 'Liquidación final' },
-  { campo: 'carta_liberacion', label: 'Carta liberación' },
+  { campo: 'carta_liberacion', label: 'Carta liberación', campoPath: 'carta_liberacion_path' },
 ];
 const TRAMITES = [
   { campo: 'cna_agua', label: 'CNA / Agua', campoPath: 'cna_agua_path' },
@@ -31,7 +31,7 @@ const VACIO = {
   autorizacion_financiera_1: false, autorizacion_financiera_2: false,
   liquidacion_final: false, carta_liberacion: false,
   cna_agua: false, cuotas_predial: false,
-  cna_agua_path: null, cuotas_predial_path: null,
+  cna_agua_path: null, cuotas_predial_path: null, carta_liberacion_path: null,
 };
 
 function calcularEtapa(s) {
@@ -304,10 +304,25 @@ export default function Titulacion({ miRol, miAgente }) {
 
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Paso 2 — Titulación a Escritura</div>
             {PASO2.map(p => (
-              <label key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', marginBottom: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
-                {p.label}
-              </label>
+              <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  {p.label}
+                </label>
+                {p.campoPath && (form[p.campoPath] ? (
+                  <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
+                    style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                    📄 Ver archivo
+                  </button>
+                ) : null)}
+                {p.campoPath && (
+                  <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                    {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
+                    <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
+                      onChange={e => handleSubirTramite(p.campoPath, e.target.files[0])} />
+                  </label>
+                )}
+              </div>
             ))}
 
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', margin: '16px 0 8px' }}>Trámites tras carta de liberación</div>
