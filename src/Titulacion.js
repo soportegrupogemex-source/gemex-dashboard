@@ -20,8 +20,8 @@ const PASO2 = [
   { campo: 'carta_liberacion', label: 'Carta liberación' },
 ];
 const TRAMITES = [
-  { campo: 'cna_agua', label: 'CNA / Agua' },
-  { campo: 'cuotas_predial', label: 'Cuotas / Predial' },
+  { campo: 'cna_agua', label: 'CNA / Agua', campoPath: 'cna_agua_path' },
+  { campo: 'cuotas_predial', label: 'Cuotas / Predial', campoPath: 'cuotas_predial_path' },
 ];
 
 const VACIO = {
@@ -31,6 +31,7 @@ const VACIO = {
   autorizacion_financiera_1: false, autorizacion_financiera_2: false,
   liquidacion_final: false, carta_liberacion: false,
   cna_agua: false, cuotas_predial: false,
+  cna_agua_path: null, cuotas_predial_path: null,
 };
 
 function calcularEtapa(s) {
@@ -71,6 +72,7 @@ export default function Titulacion({ miRol, miAgente }) {
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(VACIO);
   const [guardando, setGuardando] = useState(false);
+  const [subiendoTramite, setSubiendoTramite] = useState(null);
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -178,6 +180,36 @@ export default function Titulacion({ miRol, miAgente }) {
     }
   };
 
+  // FIX: subir el comprobante de un trámite (CNA/Agua, Cuotas/Predial) —
+  // guarda de inmediato en Storage + titulacion_seguimiento, sin esperar
+  // al botón "Guardar" general (mismo patrón que el comprobante de pago
+  // en Cobranza).
+  const handleSubirTramite = async (campoPath, archivo) => {
+    if (!archivo) return;
+    setSubiendoTramite(campoPath);
+    const ext = archivo.name.split('.').pop();
+    const path = `${unidadAbierta.id}/${campoPath}-${Date.now()}.${ext}`;
+    const { error: errUpload } = await supabase.storage.from('titulacion').upload(path, archivo);
+    if (errUpload) { setSubiendoTramite(null); alert('No se pudo subir el archivo: ' + errUpload.message); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('titulacion_seguimiento')
+      .upsert({
+        unidad_id: unidadAbierta.id, desarrollo_id: unidadAbierta.desarrollo_id,
+        [campoPath]: path, actualizado_por: user?.email || null, updated_at: new Date().toISOString(),
+      }, { onConflict: 'unidad_id' })
+      .select().single();
+    setSubiendoTramite(null);
+    if (!error && data) {
+      setForm(f => ({ ...f, [campoPath]: path }));
+      setSeguimientos(prev => ({ ...prev, [unidadAbierta.id]: data }));
+    }
+  };
+
+  const verArchivoTramite = async (path) => {
+    const { data } = await supabase.storage.from('titulacion').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
   const conteos = { 'Contrato y Expediente': 0, 'Titulación': 0, 'Escriturado': 0 };
   unidadesVisibles.forEach(u => { conteos[calcularEtapa(seguimientos[u.id] || VACIO)]++; });
 
@@ -280,10 +312,23 @@ export default function Titulacion({ miRol, miAgente }) {
 
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', margin: '16px 0 8px' }}>Trámites tras carta de liberación</div>
             {TRAMITES.map(p => (
-              <label key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', marginBottom: '8px', cursor: 'pointer' }}>
-                <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
-                {p.label}
-              </label>
+              <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  {p.label}
+                </label>
+                {form[p.campoPath] ? (
+                  <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
+                    style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                    📄 Ver archivo
+                  </button>
+                ) : null}
+                <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                  {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
+                  <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
+                    onChange={e => handleSubirTramite(p.campoPath, e.target.files[0])} />
+                </label>
+              </div>
             ))}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
