@@ -64,6 +64,7 @@ export default function Titulacion({ miRol, miAgente }) {
   const [unidades, setUnidades] = useState([]);
   const [seguimientos, setSeguimientos] = useState({});
   const [compradores, setCompradores] = useState({});
+  const [tiposCompra, setTiposCompra] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [etapaSel, setEtapaSel] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -93,16 +94,19 @@ export default function Titulacion({ miRol, miAgente }) {
     // arma el expediente — antes se exigía estatus='Vendido' y por eso la
     // casilla no se reflejaba).
     const { data: apartados } = await supabase.from('movimientos')
-      .select('id, unidad_id, contacto_nombre, expediente_completo, created_at')
+      .select('id, unidad_id, contacto_nombre, tipo_compra, expediente_completo, created_at')
       .eq('tipo', 'Apartado').eq('expediente_completo', true)
       .order('created_at', { ascending: false });
     const apartadoPorUnidad = {};
     (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });
     const idsConExpediente = Object.keys(apartadoPorUnidad);
     if (idsConExpediente.length === 0) {
-      setUnidades([]); setSeguimientos({}); setCompradores({}); setCargando(false);
+      setUnidades([]); setSeguimientos({}); setCompradores({}); setTiposCompra({}); setCargando(false);
       return;
     }
+    const mapaTipos = {};
+    idsConExpediente.forEach(id => { mapaTipos[id] = apartadoPorUnidad[id]?.tipo_compra; });
+    setTiposCompra(mapaTipos);
 
     const { data: inv } = await supabase.from('inventario')
       .select('id, numero, desarrollo_id, precio_lista_respaldo')
@@ -223,6 +227,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: COLOR_ETAPA[etapa], borderRadius: '20px', padding: '4px 12px' }}>{etapa}</div>
                 </div>
