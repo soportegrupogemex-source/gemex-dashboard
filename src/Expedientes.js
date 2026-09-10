@@ -195,7 +195,10 @@ export default function Expedientes({ miRol, miAgente }) {
   // restricción de desarrollo o equipo (confirmado con el cliente).
   const esMesaControl = miRol === 'Mesa de Control';
   const esAdmin = ROLES_ADMIN.includes(miRol);
-  const soyResponsable = miAgente?.correo && responsables.includes(miAgente.correo);
+  // FIX: Mesa de Control es quien valida expedientes — siempre puede
+  // prender/apagar "Expediente completo", además de quien esté configurado
+  // como responsable.
+  const soyResponsable = esMesaControl || (miAgente?.correo && responsables.includes(miAgente.correo));
   // FIX: aviso a los responsables de expedientes con documentos por
   // revisar — se muestra una sola vez por sesión (no cada vez que se
   // actualiza algo en pantalla), con el mismo estilo que ya usa el aviso
@@ -882,7 +885,7 @@ export default function Expedientes({ miRol, miAgente }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '1.5rem 0 1rem', flexWrap: 'wrap' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a2e' }}>EXPEDIENTE PERSONA FÍSICA</div>
           {movSel.tipo_compra && (
-            <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '500' }}>{movSel.tipo_compra}</span>
+            <span style={{ fontSize: '14px', padding: '5px 14px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{movSel.tipo_compra}</span>
           )}
         </div>
 
@@ -1263,7 +1266,7 @@ export default function Expedientes({ miRol, miAgente }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {m.tipo_compra && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '500' }}>{m.tipo_compra}</span>}
+                  {m.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{m.tipo_compra}</span>}
                   {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
                   {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
                   {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}

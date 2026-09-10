@@ -85,33 +85,32 @@ export default function Titulacion({ miRol, miAgente }) {
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
 
-    const { data: inv } = await supabase.from('inventario')
-      .select('id, numero, desarrollo_id, precio_lista_respaldo')
-      .eq('estatus', 'Vendido')
-      .order('numero');
-    const invBase = (inv || []).map(u => ({ ...u, desarrollo_nombre: mapaNombres[u.desarrollo_id] || '' }));
-
-    const unidadIds = invBase.map(u => u.id);
-    if (unidadIds.length === 0) {
+    // FIX: el expediente vive en el movimiento tipo 'Apartado' —
+    // "expediente_completo" es una casilla que solo el responsable
+    // enciende/apaga en Expedientes; en cuanto está activa la unidad debe
+    // aparecer aquí, sin esperar a que exista un movimiento 'Vendida' (la
+    // unidad puede seguir con estatus 'Apartado' en inventario mientras se
+    // arma el expediente — antes se exigía estatus='Vendido' y por eso la
+    // casilla no se reflejaba).
+    const { data: apartados } = await supabase.from('movimientos')
+      .select('id, unidad_id, contacto_nombre, expediente_completo, created_at')
+      .eq('tipo', 'Apartado').eq('expediente_completo', true)
+      .order('created_at', { ascending: false });
+    const apartadoPorUnidad = {};
+    (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });
+    const idsConExpediente = Object.keys(apartadoPorUnidad);
+    if (idsConExpediente.length === 0) {
       setUnidades([]); setSeguimientos({}); setCompradores({}); setCargando(false);
       return;
     }
 
-    // FIX: el expediente vive en el movimiento tipo 'Apartado' —
-    // "expediente_completo" es una casilla que solo el responsable
-    // enciende/apaga en Expedientes; mientras no esté activa, la unidad
-    // no aparece aquí.
-    const { data: apartados } = await supabase.from('movimientos')
-      .select('id, unidad_id, expediente_completo, created_at')
-      .eq('tipo', 'Apartado').in('unidad_id', unidadIds)
-      .order('created_at', { ascending: false });
-    const apartadoPorUnidad = {};
-    (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });
-
-    const invConExpediente = invBase.filter(u => !!apartadoPorUnidad[u.id]?.expediente_completo);
+    const { data: inv } = await supabase.from('inventario')
+      .select('id, numero, desarrollo_id, precio_lista_respaldo')
+      .in('id', idsConExpediente)
+      .order('numero');
+    const invConExpediente = (inv || []).map(u => ({ ...u, desarrollo_nombre: mapaNombres[u.desarrollo_id] || '' }));
     setUnidades(invConExpediente);
 
-    const idsConExpediente = invConExpediente.map(u => u.id);
     const { data: seg } = await supabase.from('titulacion_seguimiento').select('*').in('unidad_id', idsConExpediente);
     const mapa = {};
     (seg || []).forEach(s => { mapa[s.unidad_id] = s; });
@@ -123,6 +122,9 @@ export default function Titulacion({ miRol, miAgente }) {
       .order('created_at', { ascending: false });
     const mapaComp = {};
     (movs || []).forEach(m => { if (!mapaComp[m.unidad_id]) mapaComp[m.unidad_id] = m.contacto_nombre; });
+    // FIX: si aún no existe movimiento 'Vendida', mostrar el contacto del
+    // Apartado como respaldo (la unidad ya aparece aquí antes de venderse).
+    idsConExpediente.forEach(id => { if (!mapaComp[id]) mapaComp[id] = apartadoPorUnidad[id]?.contacto_nombre; });
     setCompradores(mapaComp);
 
     setCargando(false);
