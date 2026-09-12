@@ -6,10 +6,12 @@ import { supabase } from './supabase';
 // unidades (vendidas o no: el avance de obra es del edificio, no de la
 // venta). Guarda en la misma tabla titulacion_seguimiento que usa
 // Titulacion.js, así el Paso 1 queda disponible ahí en cuanto se marca.
-// DTU solo se puede marcar con Avance de obra >= 90% Y tipo de compra
-// Infonavit/Fovissste (se muestra siempre, pero deshabilitada fuera de
-// esas condiciones).
-const TIPOS_DTU = ['Infonavit', 'Fovissste'];
+// FIX: DTU se habilita solo con Avance de obra >= 90% — no depende de
+// si la unidad ya está vendida ni de su tipo de compra, ya que el
+// avance es del edificio y muchas unidades llegan a ese % sin vender.
+// (Antes también exigía tipo de compra Infonavit/Fovissste, pero eso
+// dejaba a las unidades sin movimiento de venta —o vendidas sin
+// Infonavit/Fovissste— con DTU bloqueado para siempre.)
 
 const VACIO = { avance_obra_pct: 0, dtu: false, lista_avaluo: false };
 
@@ -74,10 +76,7 @@ export default function Construccion() {
 
   const unidadesVisibles = unidades.filter(u => !desarrolloSel || u.desarrollo_nombre === desarrolloSel);
 
-  const dtuHabilitado = (unidadId, avanceObra) => {
-    const tipoCompra = tipoCompraPorUnidad[unidadId];
-    return Number(avanceObra) >= 90 && TIPOS_DTU.includes(tipoCompra);
-  };
+  const dtuHabilitado = (avanceObra) => Number(avanceObra) >= 90;
 
   const abrirUnidad = (u) => {
     setUnidadAbierta(u);
@@ -87,7 +86,7 @@ export default function Construccion() {
   const guardar = async () => {
     setGuardando(true);
     const { data: { user } } = await supabase.auth.getUser();
-    const habilitado = dtuHabilitado(unidadAbierta.id, form.avance_obra_pct);
+    const habilitado = dtuHabilitado(form.avance_obra_pct);
     const payload = {
       unidad_id: unidadAbierta.id,
       desarrollo_id: unidadAbierta.desarrollo_id,
@@ -171,7 +170,7 @@ export default function Construccion() {
             </label>
 
             {(() => {
-              const habilitado = dtuHabilitado(unidadAbierta.id, form.avance_obra_pct);
+              const habilitado = dtuHabilitado(form.avance_obra_pct);
               return (
                 <label style={{ fontSize: '13px', color: habilitado ? '#333' : '#bbb', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', cursor: habilitado ? 'pointer' : 'not-allowed' }}>
                   <input type="checkbox" checked={habilitado && !!form.dtu} disabled={!habilitado}
@@ -181,7 +180,7 @@ export default function Construccion() {
               );
             })()}
             <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '20px' }}>
-              Se habilita con 90% de avance de obra y tipo de compra Infonavit o Fovissste.
+              Se habilita con 90% de avance de obra.
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
