@@ -61,6 +61,7 @@ const MENU_POR_ROL = {
   // que Mesa de Control con Movimientos/Historial.
   'Construcción': ['direccion'],
   'Tesorería': ['direccion'],
+  'Titulación': ['direccion'],
 };
 
 function useIsMobile() {
@@ -162,6 +163,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
               // — dentro de Dirección solo ven su propia pantalla.
               if (miRol === 'Construcción') return s.id === 'construccion';
               if (miRol === 'Tesorería') return s.id === 'cobranza';
+              if (miRol === 'Titulación') return s.id === 'titulacion';
               if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
@@ -693,6 +695,8 @@ function App() {
         setActivePage('construccion');
       } else if (data?.rol === 'Tesorería') {
         setActivePage('cobranza');
+      } else if (data?.rol === 'Titulación') {
+        setActivePage('titulacion');
       } else if (data?.rol === 'Agente' && data?.equipo === 'Gemex') {
         // FIX: mismo fallback seguro (false) que cargarConfigRankingBs +
         // log de error si la lectura falla por RLS.

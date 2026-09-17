@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import Expedientes from './Expedientes';
 
 // FIX: Titulación ahora solo trabaja el Paso 2 (Titulación -> Escritura)
 // — el Paso 1 (Avance de obra, DTU, Lista para avalúo) lo captura el
@@ -73,6 +74,12 @@ export default function Titulacion({ miRol, miAgente }) {
   const [form, setForm] = useState(VACIO);
   const [guardando, setGuardando] = useState(false);
   const [subiendoTramite, setSubiendoTramite] = useState(null);
+  // FIX: apartado "Expedientes" dentro de Titulación — de solo lectura,
+  // muestra los expedientes ya enviados a Titulación (embebe el
+  // componente Expedientes en modo soloEnviadosATitulacion). Pensado
+  // sobre todo para el rol Titulación, que no tiene acceso al módulo
+  // de Expedientes por su cuenta.
+  const [vista, setVista] = useState('seguimiento');
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -219,6 +226,22 @@ export default function Titulacion({ miRol, miAgente }) {
       <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Titulación</h2>
       <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Unidades vendidas con expediente completo, hasta escrituración</div>
 
+      {/* Pestañas: seguimiento del Paso 2, o los expedientes ya enviados
+          (de solo lectura) */}
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '1.25rem', borderBottom: '1px solid #e0e0e0' }}>
+        <button onClick={() => setVista('seguimiento')}
+          style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: vista === 'seguimiento' ? '600' : '400', color: vista === 'seguimiento' ? '#1a1a2e' : '#888', borderBottom: vista === 'seguimiento' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+          Seguimiento
+        </button>
+        <button onClick={() => setVista('expedientes')}
+          style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: vista === 'expedientes' ? '600' : '400', color: vista === 'expedientes' ? '#1a1a2e' : '#888', borderBottom: vista === 'expedientes' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+          Expedientes
+        </button>
+      </div>
+
+      {vista === 'expedientes' && <Expedientes miRol={miRol} miAgente={miAgente} soloEnviadosATitulacion />}
+
+      {vista === 'seguimiento' && (<>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <select value={desarrolloSel} onChange={e => setDesarrolloSel(e.target.value)}
           style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
@@ -269,6 +292,7 @@ export default function Titulacion({ miRol, miAgente }) {
           })}
         </div>
       )}
+      </>)}
 
       {unidadAbierta && (
         <div onClick={() => setUnidadAbierta(null)}

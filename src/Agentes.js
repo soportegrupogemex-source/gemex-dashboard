@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 
-const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Construcción', 'Tesorería'];
+const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Construcción', 'Tesorería', 'Titulación'];
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
 const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;

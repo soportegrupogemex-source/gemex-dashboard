@@ -145,9 +145,16 @@ const getArchivosDoc = (doc) => {
   return doc.archivo_path ? [{ path: doc.archivo_path, nombre: doc.nombre_archivo }] : [];
 };
 
-export default function Expedientes({ miRol, miAgente }) {
+// FIX: `soloEnviadosATitulacion` — modo embebido usado por el nuevo
+// apartado "Expedientes" dentro de Titulación (el rol Titulación no
+// tiene acceso al módulo de Expedientes por su cuenta, solo puede ver,
+// de solo lectura, los expedientes ya enviados a Titulación). En este
+// modo se oculta el selector de pestañas Cargar/Descargar/Contratos,
+// se fuerza la vista de solo lectura ("descargar") y la lista se
+// limita a movimientos con enviar_titulacion=true.
+export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion = false }) {
   const isMobile = useIsMobile();
-  const [tab, setTab] = useState('cargar');
+  const [tab, setTab] = useState(soloEnviadosATitulacion ? 'descargar' : 'cargar');
   const [movimientos, setMovimientos] = useState([]);
   const [docsPorMovimiento, setDocsPorMovimiento] = useState({});
   const [loading, setLoading] = useState(true);
@@ -199,6 +206,10 @@ export default function Expedientes({ miRol, miAgente }) {
   // demás Gerentes, ve y revisa TODOS los expedientes de la empresa, sin
   // restricción de desarrollo o equipo (confirmado con el cliente).
   const esMesaControl = miRol === 'Mesa de Control';
+  // FIX: rol Titulación — de un solo módulo, solo ve (sin poder revisar
+  // ni cargar) los expedientes ya enviados a Titulación, dentro del
+  // apartado "Expedientes" embebido en esa pantalla.
+  const esTitulacionRol = miRol === 'Titulación';
   const esAdmin = ROLES_ADMIN.includes(miRol);
   // FIX: Mesa de Control es quien valida expedientes — siempre puede
   // prender/apagar "Expediente completo", además de quien esté configurado
@@ -216,7 +227,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const yaAvisoPendientesRef = useRef(false);
   const misProyectos = miAgente?.desarrollos_cargo || [];
 
-  const puedeVerDescarga = esAdmin || esGerente || esMesaControl;
+  const puedeVerDescarga = esAdmin || esGerente || esMesaControl || esTitulacionRol;
 
   useEffect(() => {
     cargarMovimientos();
@@ -749,8 +760,10 @@ export default function Expedientes({ miRol, miAgente }) {
   });
 
   const movimientosDescarga = movimientos.filter(m => {
+    if (soloEnviadosATitulacion && m.enviar_titulacion !== true) return false;
     if (esAdmin) return true;
     if (esMesaControl) return true;
+    if (esTitulacionRol) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
     return false;
   });
@@ -1195,30 +1208,34 @@ export default function Expedientes({ miRol, miAgente }) {
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
-      <div style={{ marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Expedientes</h2>
-        <div style={{ fontSize: '13px', color: '#888' }}>Expediente Persona Física</div>
-      </div>
+      {!soloEnviadosATitulacion && (
+        <div style={{ marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Expedientes</h2>
+          <div style={{ fontSize: '13px', color: '#888' }}>Expediente Persona Física</div>
+        </div>
+      )}
 
-      {/* Pestañas */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '1.25rem', borderBottom: '1px solid #e0e0e0' }}>
-        <button onClick={() => { setTab('cargar'); setBuscar(''); }}
-          style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'cargar' ? '600' : '400', color: tab === 'cargar' ? '#1a1a2e' : '#888', borderBottom: tab === 'cargar' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
-          Cargar
-        </button>
-        {puedeVerDescarga && (
-          <button onClick={() => { setTab('descargar'); setBuscar(''); }}
-            style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'descargar' ? '600' : '400', color: tab === 'descargar' ? '#1a1a2e' : '#888', borderBottom: tab === 'descargar' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
-            Descargar
+      {/* Pestañas — ocultas en el modo embebido dentro de Titulación */}
+      {!soloEnviadosATitulacion && (
+        <div style={{ display: 'flex', gap: '4px', marginBottom: '1.25rem', borderBottom: '1px solid #e0e0e0' }}>
+          <button onClick={() => { setTab('cargar'); setBuscar(''); }}
+            style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'cargar' ? '600' : '400', color: tab === 'cargar' ? '#1a1a2e' : '#888', borderBottom: tab === 'cargar' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+            Cargar
           </button>
-        )}
-        {puedeVerDescarga && (
-          <button onClick={() => { setTab('contratos'); setBuscar(''); }}
-            style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'contratos' ? '600' : '400', color: tab === 'contratos' ? '#1a1a2e' : '#888', borderBottom: tab === 'contratos' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
-            Contratos
-          </button>
-        )}
-      </div>
+          {puedeVerDescarga && (
+            <button onClick={() => { setTab('descargar'); setBuscar(''); }}
+              style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'descargar' ? '600' : '400', color: tab === 'descargar' ? '#1a1a2e' : '#888', borderBottom: tab === 'descargar' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+              Descargar
+            </button>
+          )}
+          {puedeVerDescarga && (
+            <button onClick={() => { setTab('contratos'); setBuscar(''); }}
+              style={{ padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: tab === 'contratos' ? '600' : '400', color: tab === 'contratos' ? '#1a1a2e' : '#888', borderBottom: tab === 'contratos' ? '2px solid #1a1a2e' : '2px solid transparent' }}>
+              Contratos
+            </button>
+          )}
+        </div>
+      )}
 
       {tab === 'cargar' && rechazados.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
