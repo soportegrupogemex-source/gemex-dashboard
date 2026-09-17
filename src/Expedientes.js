@@ -47,30 +47,34 @@ const DOC_DEFS_FINANCIADO = {
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
   liquidacion_gemex: { label: 'Liquidación Gemex' },
+  documentos_generales: { label: 'Documentos generales del cliente', opcional: true, nota: 'En caso de aplicar — único documento que se puede omitir', avisoRojo: 'ARCHIVO EN PDF' },
 };
 
 // Por tipo de compra: qué documentos específicos van para Titular y
 // Coacreditado (además de los de identidad, que siempre van), y cuáles
 // son EXCLUSIVOS del Titular (no se piden al coacreditado).
+// FIX: "documentos_generales" (antes "Referencia bancaria") aplica a
+// TODOS los tipos de compra, no solo Contado — se agrega como
+// soloTitular en los 4 financiados también.
 const DOCS_FINANCIADO_ESPECIFICOS = {
   Infonavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
-    soloTitular: ['liquidacion_gemex'],
+    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: true,
   },
   Fovissste: {
     comunes: ['validacion_credito_sofom', 'ultimo_talon_pago'],
-    soloTitular: ['liquidacion_gemex'],
+    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
   Bancario: {
     comunes: ['carta_autorizacion_banco'],
-    soloTitular: ['liquidacion_gemex'],
+    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
   Cofinavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
-    soloTitular: ['carta_autorizacion_cofinavit', 'liquidacion_gemex'],
+    soloTitular: ['carta_autorizacion_cofinavit', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: true,
   },
 };
