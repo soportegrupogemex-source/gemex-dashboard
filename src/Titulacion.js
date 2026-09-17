@@ -89,15 +89,16 @@ export default function Titulacion({ miRol, miAgente }) {
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
 
     // FIX: el expediente vive en el movimiento tipo 'Apartado' —
-    // "expediente_completo" es una casilla que solo el responsable
-    // enciende/apaga en Expedientes; en cuanto está activa la unidad debe
-    // aparecer aquí, sin esperar a que exista un movimiento 'Vendida' (la
-    // unidad puede seguir con estatus 'Apartado' en inventario mientras se
-    // arma el expediente — antes se exigía estatus='Vendido' y por eso la
-    // casilla no se reflejaba).
+    // "enviar_titulacion" es una casilla independiente de "expediente
+    // completo" que solo el responsable enciende/apaga en Expedientes:
+    // no todos los expedientes completos pasan a Titulación de
+    // inmediato, así que aquí se filtra por esta casilla y no por esa
+    // (antes usaba expediente_completo, sin esperar a que exista un
+    // movimiento 'Vendida' — la unidad puede seguir con estatus
+    // 'Apartado' en inventario mientras se arma el expediente).
     const { data: apartados } = await supabase.from('movimientos')
-      .select('id, unidad_id, contacto_nombre, tipo_compra, expediente_completo, created_at')
-      .eq('tipo', 'Apartado').eq('expediente_completo', true)
+      .select('id, unidad_id, contacto_nombre, tipo_compra, enviar_titulacion, created_at')
+      .eq('tipo', 'Apartado').eq('enviar_titulacion', true)
       .order('created_at', { ascending: false });
     const apartadoPorUnidad = {};
     (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });

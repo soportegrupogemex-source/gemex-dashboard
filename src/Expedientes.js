@@ -410,11 +410,22 @@ export default function Expedientes({ miRol, miAgente }) {
   };
 
   // FIX: "Expediente completo" — casilla que solo el responsable puede
-  // prender/apagar. Al activarla, la unidad pasa a Titulación (que la
-  // usa como único filtro de qué expedientes mostrar).
+  // prender/apagar. Marca que la documentación ya está lista.
   const handleToggleExpedienteCompleto = async (mov, valor) => {
     if (!soyResponsable) return;
     const { data, error } = await supabase.from('movimientos').update({ expediente_completo: valor }).eq('id', mov.id).select().single();
+    if (error) return;
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+  };
+
+  // FIX: "Enviar a Titulación" — casilla independiente de "Expediente
+  // completo": no todos los expedientes completos pasan a Titulación
+  // de inmediato, así que el responsable decide por separado cuándo
+  // mandarlo (Titulación filtra por esta casilla, no por la anterior).
+  const handleToggleEnviarTitulacion = async (mov, valor) => {
+    if (!soyResponsable) return;
+    const { data, error } = await supabase.from('movimientos').update({ enviar_titulacion: valor }).eq('id', mov.id).select().single();
     if (error) return;
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
@@ -932,16 +943,28 @@ export default function Expedientes({ miRol, miAgente }) {
         )}
 
         {tab === 'descargar' && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', marginBottom: '1.5rem', cursor: soyResponsable ? 'pointer' : 'default' }}>
-            <input type='checkbox' checked={!!movSel.expediente_completo} disabled={!soyResponsable}
-              onChange={e => handleToggleExpedienteCompleto(movSel, e.target.checked)} />
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.expediente_completo ? '#27500A' : '#856404' }}>
-                Expediente completo{!soyResponsable ? ' — solo el responsable puede cambiarlo' : ''}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', cursor: soyResponsable ? 'pointer' : 'default' }}>
+              <input type='checkbox' checked={!!movSel.expediente_completo} disabled={!soyResponsable}
+                onChange={e => handleToggleExpedienteCompleto(movSel, e.target.checked)} />
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.expediente_completo ? '#27500A' : '#856404' }}>
+                  Expediente completo{!soyResponsable ? ' — solo el responsable puede cambiarlo' : ''}
+                </div>
+                <div style={{ fontSize: '11px', color: '#888' }}>La documentación ya está lista.</div>
               </div>
-              <div style={{ fontSize: '11px', color: '#888' }}>Al activarla, la unidad pasa a Titulación.</div>
-            </div>
-          </label>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#EAF3DE' : '#F3F0FF', borderRadius: '8px', cursor: soyResponsable ? 'pointer' : 'default' }}>
+              <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!soyResponsable}
+                onChange={e => handleToggleEnviarTitulacion(movSel, e.target.checked)} />
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#27500A' : '#5B21B6' }}>
+                  Enviar a Titulación{!soyResponsable ? ' — solo el responsable puede cambiarlo' : ''}
+                </div>
+                <div style={{ fontSize: '11px', color: '#888' }}>Al activarla, la unidad pasa a Titulación.</div>
+              </div>
+            </label>
+          </div>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
