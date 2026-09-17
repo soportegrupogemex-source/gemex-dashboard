@@ -17,7 +17,7 @@ const DOCS_ASESOR = [
   { id: 'cotizacion', label: 'Cotización completa a nombre del cliente', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
   { id: 'comprobante_apartado', label: 'Comprobante de apartado', aceptaImagen: true, multiple: true, maxArchivos: 10, nota: 'Puedes subir hasta 10 archivos si el apartado se hizo en varios movimientos', avisoRojo: 'ARCHIVO DESCARGADO EN PDF O FOTO LEGIBLE' },
   { id: 'kyc', label: 'KYC firmado', avisoRojo: 'ARCHIVO EN PDF O FOTO LEGIBLE' },
-  { id: 'documentos_generales', label: 'Documentos generales del cliente', opcional: true, nota: 'En caso de aplicar — único documento que se puede omitir', avisoRojo: 'ARCHIVO EN PDF' },
+  { id: 'documentos_generales', label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
 const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Orden de contrato' };
@@ -47,7 +47,7 @@ const DOC_DEFS_FINANCIADO = {
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
   liquidacion_gemex: { label: 'Liquidación Gemex' },
-  documentos_generales: { label: 'Documentos generales del cliente', opcional: true, nota: 'En caso de aplicar — único documento que se puede omitir', avisoRojo: 'ARCHIVO EN PDF' },
+  documentos_generales: { label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
 };
 
 // Por tipo de compra: qué documentos específicos van para Titular y
@@ -479,7 +479,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const esDeMiProyecto = (m) => misProyectos.includes(m.desarrollo_nombre);
 
   // FIX: los 11 documentos del asesor se dan por completos cuando están
-  // subidos Y aprobados (documentos_generales puede estar marcada "no aplica")
+  // subidos Y aprobados (documento_adicional puede estar marcado "no aplica").
   const docsAsesorCompletos = (movimiento) => {
     const docs = docsDe(movimiento.id);
     return docsRequeridos(movimiento, 'titular').every(t => {
