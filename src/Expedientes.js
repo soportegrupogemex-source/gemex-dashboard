@@ -251,10 +251,13 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
 
   const cargarMovimientos = async () => {
     setLoading(true);
-    // FIX: se liga al movimiento tipo "Apartado" — es donde vive el
-    // expediente desde el inicio, aunque después exista también una fila
-    // separada de "Vendida" para la misma unidad.
-    const { data } = await supabase.from('movimientos').select('*').eq('tipo', 'Apartado').order('created_at', { ascending: false });
+    // FIX: el expediente vive en el movimiento de Apartado, pero ese
+    // MISMO registro se convierte en "Vendida" editando su tipo en
+    // Historial de Movimientos (no se crea una fila nueva) — si aquí
+    // solo se pedía tipo='Apartado', el expediente completo (con todos
+    // sus documentos, ligados por movimiento_id) desaparecía de la
+    // lista en cuanto se registraba la venta. Se incluyen ambos tipos.
+    const { data } = await supabase.from('movimientos').select('*').in('tipo', ['Apartado', 'Vendida']).order('created_at', { ascending: false });
     setMovimientos(data || []);
     if (data && data.length > 0) {
       const { data: docs } = await supabase.from('expediente_documentos').select('*').in('movimiento_id', data.map(m => m.id));

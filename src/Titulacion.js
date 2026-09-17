@@ -95,17 +95,17 @@ export default function Titulacion({ miRol, miAgente }) {
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
 
-    // FIX: el expediente vive en el movimiento tipo 'Apartado' —
-    // "enviar_titulacion" es una casilla independiente de "expediente
-    // completo" que solo el responsable enciende/apaga en Expedientes:
-    // no todos los expedientes completos pasan a Titulación de
-    // inmediato, así que aquí se filtra por esta casilla y no por esa
-    // (antes usaba expediente_completo, sin esperar a que exista un
-    // movimiento 'Vendida' — la unidad puede seguir con estatus
-    // 'Apartado' en inventario mientras se arma el expediente).
+    // FIX: el expediente vive en el movimiento de Apartado — pero ese
+    // MISMO registro se convierte en 'Vendida' editando su tipo en
+    // Historial de Movimientos (no se crea una fila nueva), así que hay
+    // que seguir tomándolo en cuenta con tipo 'Apartado' O 'Vendida' o
+    // desaparece de Titulación en cuanto se registra la venta. Se
+    // filtra por "enviar_titulacion" (casilla independiente de
+    // "expediente completo" que solo el responsable enciende/apaga en
+    // Expedientes) sin esperar a que la unidad tenga estatus='Vendido'.
     const { data: apartados } = await supabase.from('movimientos')
       .select('id, unidad_id, contacto_nombre, tipo_compra, enviar_titulacion, created_at')
-      .eq('tipo', 'Apartado').eq('enviar_titulacion', true)
+      .in('tipo', ['Apartado', 'Vendida']).eq('enviar_titulacion', true)
       .order('created_at', { ascending: false });
     const apartadoPorUnidad = {};
     (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });
@@ -130,15 +130,11 @@ export default function Titulacion({ miRol, miAgente }) {
     (seg || []).forEach(s => { mapa[s.unidad_id] = s; });
     setSeguimientos(mapa);
 
-    const { data: movs } = await supabase.from('movimientos')
-      .select('unidad_id, contacto_nombre, created_at')
-      .eq('tipo', 'Vendida').in('unidad_id', idsConExpediente)
-      .order('created_at', { ascending: false });
+    // FIX: el contacto ya viene directo del mismo registro (Apartado o
+    // Vendida, según en qué vaya la unidad) — antes se buscaba aparte
+    // un movimiento 'Vendida' distinto, pero ambos son la misma fila.
     const mapaComp = {};
-    (movs || []).forEach(m => { if (!mapaComp[m.unidad_id]) mapaComp[m.unidad_id] = m.contacto_nombre; });
-    // FIX: si aún no existe movimiento 'Vendida', mostrar el contacto del
-    // Apartado como respaldo (la unidad ya aparece aquí antes de venderse).
-    idsConExpediente.forEach(id => { if (!mapaComp[id]) mapaComp[id] = apartadoPorUnidad[id]?.contacto_nombre; });
+    idsConExpediente.forEach(id => { mapaComp[id] = apartadoPorUnidad[id]?.contacto_nombre; });
     setCompradores(mapaComp);
 
     setCargando(false);
