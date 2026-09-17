@@ -17,7 +17,7 @@ const DOCS_ASESOR = [
   { id: 'cotizacion', label: 'Cotización completa a nombre del cliente', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
   { id: 'comprobante_apartado', label: 'Comprobante de apartado', aceptaImagen: true, multiple: true, maxArchivos: 10, nota: 'Puedes subir hasta 10 archivos si el apartado se hizo en varios movimientos', avisoRojo: 'ARCHIVO DESCARGADO EN PDF O FOTO LEGIBLE' },
   { id: 'kyc', label: 'KYC firmado', avisoRojo: 'ARCHIVO EN PDF O FOTO LEGIBLE' },
-  { id: 'referencia_bancaria', label: 'Referencia bancaria', opcional: true, nota: 'En caso de aplicar — único documento que se puede omitir', avisoRojo: 'ARCHIVO EN PDF' },
+  { id: 'documentos_generales', label: 'Documentos generales del cliente', opcional: true, nota: 'En caso de aplicar — único documento que se puede omitir', avisoRojo: 'ARCHIVO EN PDF' },
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
 const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Orden de contrato' };
@@ -161,7 +161,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const [nuevosResponsables, setNuevosResponsables] = useState([]);
   const [revisando, setRevisando] = useState(null);
   // FIX: Buyer Persona — 4 campos capturados en el contacto (no en el
-  // expediente) justo después de "Referencia bancaria". Obligatorios
+  // expediente) justo después de "Documentos generales del cliente". Obligatorios
   // para poder aprobar los 11 documentos, pero SOLO en apartados creados
   // después de la fecha de corte (buyer_persona_activo_desde) — lo que
   // ya estaba en proceso antes de este cambio queda exento.
@@ -475,7 +475,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const esDeMiProyecto = (m) => misProyectos.includes(m.desarrollo_nombre);
 
   // FIX: los 11 documentos del asesor se dan por completos cuando están
-  // subidos Y aprobados (referencia_bancaria puede estar marcada "no aplica")
+  // subidos Y aprobados (documentos_generales puede estar marcada "no aplica")
   const docsAsesorCompletos = (movimiento) => {
     const docs = docsDe(movimiento.id);
     return docsRequeridos(movimiento, 'titular').every(t => {
