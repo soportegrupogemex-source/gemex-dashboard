@@ -3,6 +3,15 @@ import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 
 const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
+// FIX: al editar el tipo de un movimiento aquí (p. ej. de Apartado a
+// Vendida cuando se cierra la venta), hay que mantener sincronizado el
+// estatus de esa unidad en inventario — Movimientos.js ya lo hace al
+// registrar un movimiento nuevo (aplicarEstatusUnidad), pero esta
+// pantalla solo actualizaba la fila de movimientos, dejando el
+// estatus del inventario desfasado (p. ej. Cobranza/Inventario
+// seguían viendo la unidad como "Apartado" aunque ya se hubiera
+// marcado "Vendida" aquí).
+const ESTATUS_POR_TIPO = { Apartado: 'Apartado', Vendida: 'Vendido', 'Cancelación': 'Libre', 'Cambio de Unidad': 'Libre' };
 // FIX: se agrega "Especial" — misma lista que Movimientos.js, para que el
 // panel de edición del historial pueda mostrar/asignar este plan también.
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
@@ -196,6 +205,10 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       editado_por: miAgente?.correo || null,
       unidad_id: form.unidad_id, unidad_numero: form.unidad_numero,
     }).eq('id', editando);
+    const nuevoEstatus = ESTATUS_POR_TIPO[form.tipo];
+    if (nuevoEstatus && form.unidad_id) {
+      await supabase.from('inventario').update({ estatus: nuevoEstatus }).eq('id', form.unidad_id);
+    }
     setGuardando(false);
     setEditando(null);
     cargarMovimientos();

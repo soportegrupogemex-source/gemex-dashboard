@@ -28,6 +28,7 @@ const TRAMITES = [
 const VACIO = {
   avance_obra_pct: 0, dtu: false, lista_avaluo: false,
   fecha_solicitud_avaluo: '', fecha_terminacion_avaluo: '',
+  fecha_solicitud_seguro_calidad: '', fecha_terminacion_seguro_calidad: '',
   saldo_cobrado: false, asignar_sofom: false,
   autorizacion_financiera_1: false, autorizacion_financiera_2: false,
   liquidacion_final: false, carta_liberacion: false,
@@ -163,6 +164,8 @@ export default function Titulacion({ miRol, miAgente }) {
       desarrollo_id: unidadAbierta.desarrollo_id,
       fecha_solicitud_avaluo: form.fecha_solicitud_avaluo || null,
       fecha_terminacion_avaluo: form.fecha_terminacion_avaluo || null,
+      fecha_solicitud_seguro_calidad: form.fecha_solicitud_seguro_calidad || null,
+      fecha_terminacion_seguro_calidad: form.fecha_terminacion_seguro_calidad || null,
       saldo_cobrado: !!form.saldo_cobrado,
       asignar_sofom: !!form.asignar_sofom,
       autorizacion_financiera_1: !!form.autorizacion_financiera_1,
@@ -319,6 +322,22 @@ export default function Titulacion({ miRol, miAgente }) {
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
                 <input type="date" value={form.fecha_terminacion_avaluo || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_avaluo: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+            </div>
+
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Seguro de calidad</div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de solicitud</label>
+                <input type="date" value={form.fecha_solicitud_seguro_calidad || ''}
+                  onChange={e => setForm(f => ({ ...f, fecha_solicitud_seguro_calidad: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
+                <input type="date" value={form.fecha_terminacion_seguro_calidad || ''}
+                  onChange={e => setForm(f => ({ ...f, fecha_terminacion_seguro_calidad: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
             </div>
