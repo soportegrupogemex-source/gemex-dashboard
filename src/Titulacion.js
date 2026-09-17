@@ -33,7 +33,7 @@ const VACIO = {
   autorizacion_financiera_1: false, autorizacion_financiera_2: false,
   liquidacion_final: false, carta_liberacion: false,
   cna_agua: false, cuotas_predial: false,
-  cna_agua_path: null, cuotas_predial_path: null, carta_liberacion_path: null,
+  cna_agua_path: null, cuotas_predial_path: null, carta_liberacion_path: null, avaluo_path: null,
 };
 
 function calcularEtapa(s) {
@@ -324,6 +324,19 @@ export default function Titulacion({ miRol, miAgente }) {
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_avaluo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              {form.avaluo_path && (
+                <button type="button" onClick={() => verArchivoTramite(form.avaluo_path)}
+                  style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                  📄 Ver avalúo
+                </button>
+              )}
+              <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                {subiendoTramite === 'avaluo_path' ? 'Subiendo...' : (form.avaluo_path ? 'Reemplazar avalúo' : '📎 Cargar avalúo')}
+                <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === 'avaluo_path'}
+                  onChange={e => handleSubirTramite('avaluo_path', e.target.files[0])} />
+              </label>
             </div>
 
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Seguro de calidad</div>
