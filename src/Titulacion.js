@@ -88,6 +88,9 @@ export default function Titulacion({ miRol, miAgente }) {
     ? desarrollos.filter(d => (miAgente?.desarrollos_cargo || []).includes(d.nombre))
     : desarrollos;
   const idsPermitidos = desarrollosPermitidos.map(d => d.id);
+  // FIX: el Gerente Operador solo puede VER Titulación (sin editar
+  // fechas, casillas ni cargar archivos).
+  const soloLectura = miRol === 'Gerente Operador';
 
   const cargarTodo = async () => {
     setCargando(true);
@@ -157,6 +160,7 @@ export default function Titulacion({ miRol, miAgente }) {
   };
 
   const guardar = async () => {
+    if (soloLectura) return;
     setGuardando(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload = {
@@ -192,7 +196,7 @@ export default function Titulacion({ miRol, miAgente }) {
   // al botón "Guardar" general (mismo patrón que el comprobante de pago
   // en Cobranza).
   const handleSubirTramite = async (campoPath, archivo) => {
-    if (!archivo) return;
+    if (!archivo || soloLectura) return;
     setSubiendoTramite(campoPath);
     const ext = archivo.name.split('.').pop();
     const path = `${unidadAbierta.id}/${campoPath}-${Date.now()}.${ext}`;
@@ -314,13 +318,13 @@ export default function Titulacion({ miRol, miAgente }) {
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de solicitud</label>
-                <input type="date" value={form.fecha_solicitud_avaluo || ''}
+                <input type="date" disabled={soloLectura} value={form.fecha_solicitud_avaluo || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_solicitud_avaluo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
-                <input type="date" value={form.fecha_terminacion_avaluo || ''}
+                <input type="date" disabled={soloLectura} value={form.fecha_terminacion_avaluo || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_avaluo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
@@ -332,24 +336,24 @@ export default function Titulacion({ miRol, miAgente }) {
                   📄 Ver avalúo
                 </button>
               )}
-              <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+              {!soloLectura && <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                 {subiendoTramite === 'avaluo_path' ? 'Subiendo...' : (form.avaluo_path ? 'Reemplazar avalúo' : '📎 Cargar avalúo')}
                 <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === 'avaluo_path'}
                   onChange={e => handleSubirTramite('avaluo_path', e.target.files[0])} />
-              </label>
+              </label>}
             </div>
 
             <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Seguro de calidad</div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de solicitud</label>
-                <input type="date" value={form.fecha_solicitud_seguro_calidad || ''}
+                <input type="date" disabled={soloLectura} value={form.fecha_solicitud_seguro_calidad || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_solicitud_seguro_calidad: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
-                <input type="date" value={form.fecha_terminacion_seguro_calidad || ''}
+                <input type="date" disabled={soloLectura} value={form.fecha_terminacion_seguro_calidad || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_seguro_calidad: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
@@ -359,7 +363,7 @@ export default function Titulacion({ miRol, miAgente }) {
             {PASO2.map(p => (
               <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
                 {p.campoPath && (form[p.campoPath] ? (
@@ -368,7 +372,7 @@ export default function Titulacion({ miRol, miAgente }) {
                     📄 Ver archivo
                   </button>
                 ) : null)}
-                {p.campoPath && (
+                {p.campoPath && !soloLectura && (
                   <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                     {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
                     <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
@@ -382,7 +386,7 @@ export default function Titulacion({ miRol, miAgente }) {
             {TRAMITES.map(p => (
               <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
                 {form[p.campoPath] ? (
@@ -391,23 +395,25 @@ export default function Titulacion({ miRol, miAgente }) {
                     📄 Ver archivo
                   </button>
                 ) : null}
+                {!soloLectura && (
                 <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                   {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
                   <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
                     onChange={e => handleSubirTramite(p.campoPath, e.target.files[0])} />
                 </label>
+                )}
               </div>
             ))}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
               <button onClick={() => setUnidadAbierta(null)}
                 style={{ flex: 1, padding: '10px', background: '#fff', color: '#666', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                Cancelar
+                {soloLectura ? 'Cerrar' : 'Cancelar'}
               </button>
-              <button onClick={guardar} disabled={guardando}
+              {!soloLectura && <button onClick={guardar} disabled={guardando}
                 style={{ flex: 1, padding: '10px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {guardando ? 'Guardando...' : 'Guardar'}
-              </button>
+              </button>}
             </div>
           </div>
         </div>

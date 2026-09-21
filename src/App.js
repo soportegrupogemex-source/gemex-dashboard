@@ -164,9 +164,14 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
               if (miRol === 'Construcción') return s.id === 'construccion';
               if (miRol === 'Tesorería') return s.id === 'cobranza';
               if (miRol === 'Titulación') return s.id === 'titulacion';
+              // FIX: Gerente Operador — solo Dashboard (de sus desarrollos a
+              // cargo), Movimientos, Historial, Titulación (solo ver) y
+              // Tendencias; sin Cobranza, Construcción, Objetivos ni Buyer
+              // Persona.
+              if (miRol === 'Gerente Operador') return ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'tendencias_producto'].includes(s.id);
               if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-              if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
+              if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor';
               return true;
             });
             return (
@@ -749,7 +754,7 @@ function App() {
       case 'construccion': return <Construccion />;
       case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
-        return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador')
+        return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor')
           ? <BuyerPersona miRol={miRol} miAgente={miAgente} />
           : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'micuenta': return <MiCuenta user={session.user} miRol={miRol} />;

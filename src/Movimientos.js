@@ -99,6 +99,12 @@ export default function Movimientos() {
 
   const ventanaCerrada = esGerente && !dentroDeVentana();
 
+  // FIX: el Gerente Operador solo puede cargar movimientos de los
+  // desarrollos que tiene a su cargo.
+  const desarrollosDisponibles = miAgente?.rol === 'Gerente Operador'
+    ? desarrollos.filter(d => (miAgente?.desarrollos_cargo || []).includes(d.nombre))
+    : desarrollos;
+
   const cargarMiAgente = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -318,7 +324,7 @@ export default function Movimientos() {
           <label style={labelStyle}>Proyecto</label>
           <select value={form.desarrollo_id} onChange={handleDesarrolloChange} style={inputStyle}>
             <option value=''>Seleccionar proyecto...</option>
-            {desarrollos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+            {desarrollosDisponibles.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
           </select>
         </div>
 

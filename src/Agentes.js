@@ -1265,8 +1265,9 @@ export default function Agentes() {
             </div>
 
             {/* FIX: el picker de "desarrollos a cargo" ahora también aplica a
-                Mesa de Control (antes solo se mostraba para Gerente Editor) */}
-            {(form.rol === 'Gerente Editor' || form.rol === 'Mesa de Control') && (
+                Mesa de Control y Gerente Operador (antes solo se mostraba para
+                Gerente Editor) */}
+            {(form.rol === 'Gerente Editor' || form.rol === 'Gerente Operador' || form.rol === 'Mesa de Control') && (
               <div style={{ marginBottom: '16px', marginTop: '12px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' }}>
                 <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Desarrollos a su <strong>cargo</strong> (puede editar)</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
