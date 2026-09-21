@@ -142,7 +142,11 @@ export default function Inventario({ desarrollo, onBack }) {
   // Super Admin/Admin que pueden en cualquier desarrollo.
   const esMesaControlDeEsteDesarrollo = miRol === 'Mesa de Control' && misDesarrollosCargo.includes(desarrollo.nombre);
   const puedeGestionarEstatus = miRol === 'Super Admin' || miRol === 'Admin' || esMesaControlDeEsteDesarrollo;
-  const puedeCambiarPrecio = miRol === 'Super Admin' || miRol === 'Admin' || esMesaControlDeEsteDesarrollo;
+  // FIX: los precios (precio de lista, en línea, en el formulario y en la
+  // carga masiva) solo los mueve Super Admin — Admin y Mesa de Control
+  // conservan el resto de la gestión del inventario (estatus, datos de la
+  // unidad), pero no el precio.
+  const puedeCambiarPrecio = miRol === 'Super Admin';
   const puedeVerPrecioOculto = miRol === 'Super Admin';
   // FIX BUG DE SEGURIDAD: antes los botones "+ Cargar unidad", "Editar" y
   // "Eliminar" (menú "···" en escritorio y panel de detalle en móvil) no
@@ -204,8 +208,11 @@ const { data } = await query.limit(5000);
   const handleGuardar = async () => {
     if (!puedeEditarInventario) return; // FIX: respaldo de seguridad
     setGuardando(true);
-    if (editandoId) await supabase.from('inventario').update(form).eq('id', editandoId);
-    else await supabase.from('inventario').insert([{ ...form, desarrollo_id: desarrollo.id }]);
+    // Sin permiso de precio: al editar no se toca el precio; al crear
+    // la unidad queda en 0 hasta que Super Admin le ponga precio.
+    const { precio_lista: _pl, precio_m2: _pm, ...formSinPrecio } = form;
+    if (editandoId) await supabase.from('inventario').update(puedeCambiarPrecio ? form : formSinPrecio).eq('id', editandoId);
+    else await supabase.from('inventario').insert([{ ...(puedeCambiarPrecio ? form : { ...formSinPrecio, precio_lista: 0, precio_m2: 0 }), desarrollo_id: desarrollo.id }]);
     setGuardando(false);
     setShowForm(false); setEditandoId(null); setForm(formVacio());
     cargarUnidades();
@@ -235,6 +242,7 @@ const { data } = await query.limit(5000);
   // FIX: registra quién y cuándo hizo el último cambio de precio —
   // solo visible para Super Admin en la tabla (columna "Editado por").
   const handleGuardarPrecio = async (id) => {
+    if (!puedeCambiarPrecio) return; // FIX: respaldo de seguridad
     const nuevo = parseFloat(precioTemp);
     if (!isNaN(nuevo) && nuevo > 0) {
       const m2Total = unidades.find(u => u.id === id)?.m2_total || 0;
@@ -367,8 +375,8 @@ const { data } = await query.limit(5000);
       m2_interior: parseFloat(f.m2_interior) || 0,
       m2_terraza: parseFloat(f.m2_terraza) || 0,
       m2_total: f.m2_total || 0,
-      precio_lista: parseFloat(f.precio_lista) || 0,
-      precio_m2: f.precio_m2 || 0,
+      precio_lista: puedeCambiarPrecio ? (parseFloat(f.precio_lista) || 0) : 0,
+      precio_m2: puedeCambiarPrecio ? (f.precio_m2 || 0) : 0,
       detalles: f.detalles || '',
       estructura: f.estructura || '',
     }));
@@ -539,7 +547,7 @@ const { data } = await query.limit(5000);
                     <input readOnly value={fila.m2_total}
                       style={{ width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', background: '#f0f0f8', boxSizing: 'border-box' }} />
                   </td>
-                  <td style={{ padding: '6px 8px', minWidth: '100px' }}>{inpCell(idx, 'precio_lista', 'number')}</td>
+                  <td style={{ padding: '6px 8px', minWidth: '100px' }}>{puedeCambiarPrecio ? inpCell(idx, 'precio_lista', 'number') : <span style={{ fontSize: '12px', color: '#aaa' }}>solo Super Admin</span>}</td>
                   <td style={{ padding: '6px 8px', minWidth: '80px', background: '#f0f0f8' }}>
                     <input readOnly value={fila.precio_m2}
                       style={{ width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', background: '#f0f0f8', boxSizing: 'border-box' }} />
@@ -1102,7 +1110,7 @@ const { data } = await query.limit(5000);
             {inp('m² Interior', 'm2_interior', 'number')}
             {inp('m² Terraza', 'm2_terraza', 'number')}
             {inp('m² Total (automático)', 'm2_total', 'number', true)}
-            {inp('Precio de lista', 'precio_lista', 'number')}
+            {puedeCambiarPrecio && inp('Precio de lista', 'precio_lista', 'number')}
             {inp('Precio por m² (automático)', 'precio_m2', 'number', true)}
             <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Detalles</label>

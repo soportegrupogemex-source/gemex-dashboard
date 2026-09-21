@@ -763,7 +763,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
                 {tabForm === 'precios' && (
                   <div>
-                    {inp('Precio desde', 'precio_desde', 'number')}
+                    {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'number')}
                     {inp('Apartado', 'apartado', 'number')}
                     {sel('Precio en', 'precio_en', MONEDAS)}
                     {inp('Fecha de entrega', 'fecha_entrega', 'date')}
@@ -935,7 +935,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </div>
                   </div>
                   {inp('Mensaje WhatsApp', 'mensaje_whatsapp')}
-                  {inp('Precio desde', 'precio_desde', 'number')}
+                  {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'number')}
                   {inp('Apartado', 'apartado', 'number')}
                   {sel('Precio en', 'precio_en', MONEDAS)}
                   {inp('Fecha de entrega', 'fecha_entrega', 'date')}
