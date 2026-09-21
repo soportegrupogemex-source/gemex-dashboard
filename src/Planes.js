@@ -5,8 +5,8 @@ import { supabase } from './supabase';
 // cualquiera que llegara a esta pantalla (por ejemplo un Agente, si
 // alguna vez se le mostrara el botón "Planes") podía editar/eliminar
 // planes de pago sin ningún candado. Ahora solo puede editar/agregar/
-// eliminar Super Admin, Admin, o Mesa de Control cuando el desarrollo
-// está entre sus desarrollos_cargo.
+// eliminar Super Admin o Admin (Mesa de Control ya no: los planes
+// mueven el precio final, así que quedan solo para ellos).
 export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
   const [planes, setPlanes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,8 +14,7 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
   // FIX: selector de torre/etapa, igual que en Inventario
   const [estructuraSel, setEstructuraSel] = useState(desarrollo.tiene_etapas ? `${desarrollo.tipo_estructura} 1` : null);
 
-  const puedeEditar = miRol === 'Super Admin' || miRol === 'Admin' ||
-    (miRol === 'Mesa de Control' && (miAgente?.desarrollos_cargo || []).includes(desarrollo.nombre));
+  const puedeEditar = miRol === 'Super Admin' || miRol === 'Admin';
 
   useEffect(() => {
     // Si no tiene etapas, carga directo. Si tiene etapas, espera a que
