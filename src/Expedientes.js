@@ -795,11 +795,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   );
 
   useEffect(() => {
-    if ((esAdmin || esMesaControl) && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
+    if (!soloEnviadosATitulacion && (esAdmin || esMesaControl) && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
       yaAvisoPendientesRef.current = true;
       setShowAlertaPendientes(true);
     }
-  }, [esAdmin, esMesaControl, expedientesPorRevisar.length]);
+  }, [esAdmin, esMesaControl, expedientesPorRevisar.length, soloEnviadosATitulacion]);
 
   // FIX: bloque reutilizable que muestra quién aprobó/rechazó el
   // documento y cuándo — registro visible SOLO para Super Admin (no
@@ -825,7 +825,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     const puedoSubirOrden = esGerente && esDeMiProyecto(movSel);
     // FIX: Mesa de Control también puede aprobar/rechazar — es quien
     // revisa expedientes ahora, no solo Admin/Super Admin.
-    const puedoRevisar = tab === 'descargar' && (esAdmin || esMesaControl);
+    // FIX: dentro de Titulación (soloEnviadosATitulacion) el expediente ya
+    // pasó el filtro de Mesa de Control — ni se vuelve a aprobar/rechazar
+    // documentos, ni se tocan las casillas "Expediente completo"/"Enviar
+    // a Titulación", solo se puede ver y descargar.
+    const puedoRevisar = tab === 'descargar' && !soloEnviadosATitulacion && (esAdmin || esMesaControl);
     const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
     const esFinanciado = !!cfgFinanciado;
     const docsTitular = docsRequeridos(movSel, 'titular');
@@ -962,7 +966,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           </div>
         )}
 
-        {tab === 'descargar' && (
+        {tab === 'descargar' && !soloEnviadosATitulacion && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', cursor: soyResponsable ? 'pointer' : 'default' }}>
               <input type='checkbox' checked={!!movSel.expediente_completo} disabled={!soyResponsable}
@@ -1250,7 +1254,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         </div>
       )}
 
-      {tab === 'descargar' && esAdmin && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && esAdmin && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button onClick={() => setShowConfigResponsable(true)}
             style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}>
@@ -1259,7 +1263,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         </div>
       )}
 
-      {tab === 'descargar' && soyResponsable && pendientesDeArchivar.length > 0 && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && soyResponsable && pendientesDeArchivar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
           ⚠️ Tienes {pendientesDeArchivar.length} expediente{pendientesDeArchivar.length !== 1 ? 's' : ''} con más de {MESES_PARA_ARCHIVAR} meses sin archivar.
         </div>
@@ -1268,7 +1272,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       {/* FIX: banner permanente (se ve cada vez que estás en "Descargar")
           + modal que solo aparece una vez por sesión, avisando que hay
           documentos subidos esperando revisión. */}
-      {tab === 'descargar' && (esAdmin || esMesaControl) && expedientesPorRevisar.length > 0 && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && (esAdmin || esMesaControl) && expedientesPorRevisar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
           📋 Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos por revisar.
         </div>
@@ -1350,7 +1354,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             // de un vistazo qué expedientes tienen documentos subidos sin
             // revisar todavía — mismo criterio que expedientesPorRevisar,
             // como refuerzo visual además de la notificación push.
-            const porRevisar = (miRol === 'Super Admin' || esMesaControl) && !archivado &&
+            const porRevisar = !soloEnviadosATitulacion && (miRol === 'Super Admin' || esMesaControl) && !archivado &&
               Object.values(docsDe(m.id)).some(d => d?.archivo_path && d.estado_revision === 'pendiente');
             return (
               <div key={m.id} onClick={() => setMovSel(m)}
