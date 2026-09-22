@@ -46,7 +46,7 @@ const DOC_DEFS_FINANCIADO = {
   ultimo_talon_pago: { label: 'Último Talón de Pago' },
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
-  liquidacion_gemex: { label: 'Liquidación Gemex' },
+  liquidacion_gemex: { label: 'Preliquidación Gemex' },
   documentos_generales: { label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
 };
 
@@ -838,7 +838,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       const archivosMultiples = tipo.multiple ? getArchivosDoc(doc) : null;
       const tieneArchivo = tipo.multiple ? archivosMultiples.length > 0 : !!doc?.archivo_path;
       const estado = doc?.no_aplica ? null : (tieneArchivo ? (doc.estado_revision || 'pendiente') : null);
-      const puedeSubirEste = esMio && !archivado;
+      // FIX: "Liquidación Gemex" la sube Mesa de Control, no el asesor —
+      // sin depender de en qué orden vayan los demás documentos (puede
+      // subirla antes o después de que el asesor suba los suyos).
+      const puedeSubirEste = (tipo.id === 'liquidacion_gemex' ? esMesaControl : esMio) && !archivado;
       const aceptar = tipo.aceptaImagen ? 'application/pdf,image/*' : 'application/pdf';
       return (
         <div key={tipo.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
