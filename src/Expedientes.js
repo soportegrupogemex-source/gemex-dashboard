@@ -935,7 +935,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             <div style={{ fontSize: '13px', color: '#888' }}>{movSel.desarrollo_nombre} — Unidad {movSel.unidad_numero} — Vendedor: {movSel.vendedor}</div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {(esAdmin || esMesaControl || (esGerente && esDeMiProyecto(movSel))) && (
+            {(esAdmin || esMesaControl || esTitulacionRol || (esGerente && esDeMiProyecto(movSel))) && (
               <button onClick={() => handleDescargarZip(movSel)} disabled={generandoZip === movSel.id}
                 style={{ padding: '8px 16px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {generandoZip === movSel.id ? 'Generando ZIP...' : '⬇ Descargar todo (ZIP)'}
