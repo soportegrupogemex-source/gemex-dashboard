@@ -18,6 +18,7 @@ const DOCS_ASESOR = [
   { id: 'comprobante_apartado', label: 'Comprobante de apartado', aceptaImagen: true, multiple: true, maxArchivos: 10, nota: 'Puedes subir hasta 10 archivos si el apartado se hizo en varios movimientos', avisoRojo: 'ARCHIVO DESCARGADO EN PDF O FOTO LEGIBLE' },
   { id: 'kyc', label: 'KYC firmado', avisoRojo: 'ARCHIVO EN PDF O FOTO LEGIBLE' },
   { id: 'documentos_generales', label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
+  { id: 'liquidacion_gemex', label: 'Preliquidación Gemex', avisoRojo: 'ARCHIVO EN PDF' },
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
 const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Orden de contrato' };
