@@ -21,7 +21,7 @@ const DOCS_ASESOR = [
   { id: 'liquidacion_gemex', label: 'Preliquidación Gemex', avisoRojo: 'ARCHIVO EN PDF' },
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
-const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Orden de contrato' };
+const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Contrato firmado' };
 
 // FIX: checklist de documentos por tipo de compra (Infonavit, Fovissste,
 // Bancario, Cofinavit) — viene del checklist oficial de Los Arrayanes.
@@ -94,7 +94,7 @@ const docsRequeridos = (movimiento, persona = 'titular') => {
 };
 
 // Lista completa para conteos/ZIP: Titular + Coacreditado (si aplica) +
-// Orden de contrato.
+// Contrato firmado.
 const docsRequeridosCompletos = (movimiento) => {
   const titular = docsRequeridos(movimiento, 'titular');
   const coacreditado = movimiento?.tiene_coacreditado ? docsRequeridos(movimiento, 'coacreditado') : [];
@@ -822,7 +822,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     const archivado = expedienteArchivado(movSel.id);
     const esMio = esVendedorDe(movSel);
     const soloLectura11 = tab === 'cargar' && !esMio; // Gerente/Admin viendo lo de otros: solo lectura de los 11
-    const puedoSubirOrden = esGerente && esDeMiProyecto(movSel);
+    // FIX: "Contrato firmado" lo sube el asesor (antes el Gerente), y
+    // solo hasta que el expediente ya esté aprobado ("Expediente
+    // completo" activo) — no antes.
+    const puedoSubirOrden = esMio && !!movSel.expediente_completo;
     // FIX: Mesa de Control también puede aprobar/rechazar — es quien
     // revisa expedientes ahora, no solo Admin/Super Admin.
     // FIX: dentro de Titulación (soloEnviadosATitulacion) el expediente ya
@@ -843,10 +846,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       const archivosMultiples = tipo.multiple ? getArchivosDoc(doc) : null;
       const tieneArchivo = tipo.multiple ? archivosMultiples.length > 0 : !!doc?.archivo_path;
       const estado = doc?.no_aplica ? null : (tieneArchivo ? (doc.estado_revision || 'pendiente') : null);
-      // FIX: "Liquidación Gemex" la sube Mesa de Control, no el asesor —
-      // sin depender de en qué orden vayan los demás documentos (puede
-      // subirla antes o después de que el asesor suba los suyos).
-      const puedeSubirEste = (tipo.id === 'liquidacion_gemex' ? esMesaControl : esMio) && !archivado;
+      const puedeSubirEste = esMio && !archivado;
       const aceptar = tipo.aceptaImagen ? 'application/pdf,image/*' : 'application/pdf';
       return (
         <div key={tipo.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
@@ -1150,7 +1150,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             </div>
           )}
 
-          {/* Orden de contrato — separado, la sube el Gerente */}
+          {/* Contrato firmado — separado, lo sube el asesor una vez que
+              el expediente ya está aprobado */}
           <div style={{ marginTop: '10px', paddingTop: '14px', borderTop: '1px dashed #ddd' }}>
             {(() => {
               const doc = docs['orden_contrato'];
@@ -1168,7 +1169,9 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                       )}
                       <RegistroValidacion doc={doc} />
                       {!doc && !puedoSubirOrden && (
-                        <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>Solo el Gerente a cargo de este proyecto puede subirla</div>
+                        <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
+                          {!esMio ? 'Solo el asesor del expediente puede subirlo' : 'Se habilita cuando el expediente esté aprobado (Expediente completo)'}
+                        </div>
                       )}
                       {doc?.estado_revision === 'rechazado' && doc.motivo_rechazo && (
                         <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '6px', background: '#FCEBEB', padding: '8px 10px', borderRadius: '6px' }}>
