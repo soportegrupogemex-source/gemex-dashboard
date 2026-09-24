@@ -517,7 +517,10 @@ export default function Agentes() {
   };
 
   const puedeVerAcceso = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador'].includes(miRol);
-  const esAdmin = miRol === 'Super Admin' || miRol === 'Admin';
+  // FIX: Gerente Operador ahora tiene acceso completo a Agentes, igual
+  // que Admin — es quien da de alta a su equipo. Eliminar cuentas sigue
+  // siendo exclusivo de Super Admin (candado aparte, más abajo).
+  const esAdmin = miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Operador';
 
   const formatFecha = (fecha) => {
     if (!fecha) return 'Sin registro';

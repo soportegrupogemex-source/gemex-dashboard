@@ -47,7 +47,9 @@ const MENU_POR_ROL = {
   'Admin':       ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
   'Sub Admin':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
   'Gerente Editor':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
-  'Gerente Operador': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
+  // FIX: Gerente Operador ahora también entra a Agentes — es quien da
+  // de alta a su equipo, con acceso completo igual que Admin ahí.
+  'Gerente Operador': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
   // Mesa de Control — revisa expedientes de TODA la empresa (sin
   // restricción de desarrollo/equipo, a diferencia de los demás Gerentes).
   // Sin Ranking Gemex, Contactos, Agentes ni Negocios. Dentro de Dirección
