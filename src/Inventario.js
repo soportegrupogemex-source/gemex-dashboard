@@ -111,7 +111,7 @@ export default function Inventario({ desarrollo, onBack }) {
       estatus: 'Libre', orientacion: '', recamaras: '', estacionamiento: '',
       banos: '', m2_bodega: 0, sumar_m2_bodega: false, m2_interior: 0,
       m2_terraza: 0, m2_total: 0, precio_lista: 0, precio_m2: 0,
-      detalles: '', notas: '', posicion: '', estructura: ''
+      detalles: '', notas: '', posicion: '', estructura: '', fecha_entrega_unidad: ''
     };
   }
 
@@ -210,10 +210,21 @@ const { data } = await query.limit(5000);
     setGuardando(true);
     // Sin permiso de precio: al editar no se toca el precio; al crear
     // la unidad queda en 0 hasta que Super Admin le ponga precio.
-    const { precio_lista: _pl, precio_m2: _pm, ...formSinPrecio } = form;
-    if (editandoId) await supabase.from('inventario').update(puedeCambiarPrecio ? form : formSinPrecio).eq('id', editandoId);
-    else await supabase.from('inventario').insert([{ ...(puedeCambiarPrecio ? form : { ...formSinPrecio, precio_lista: 0, precio_m2: 0 }), desarrollo_id: desarrollo.id }]);
+    // FIX: fecha_entrega_unidad es columna `date` — un <input type="date">
+    // vacío manda '' (no null), y Postgres rechaza '' como fecha. Antes
+    // esta función tampoco revisaba el error de guardado, así que un
+    // rechazo así se perdía en silencio (junto con TODO lo demás editado
+    // en ese guardado, no solo la fecha).
+    const base = { ...form, fecha_entrega_unidad: form.fecha_entrega_unidad || null };
+    const { precio_lista: _pl, precio_m2: _pm, ...baseSinPrecio } = base;
+    let error;
+    if (editandoId) {
+      ({ error } = await supabase.from('inventario').update(puedeCambiarPrecio ? base : baseSinPrecio).eq('id', editandoId));
+    } else {
+      ({ error } = await supabase.from('inventario').insert([{ ...(puedeCambiarPrecio ? base : { ...baseSinPrecio, precio_lista: 0, precio_m2: 0 }), desarrollo_id: desarrollo.id }]));
+    }
     setGuardando(false);
+    if (error) { alert('Error al guardar: ' + error.message); return; }
     setShowForm(false); setEditandoId(null); setForm(formVacio());
     cargarUnidades();
   };
@@ -1123,6 +1134,12 @@ const { data } = await query.limit(5000);
                 style={{ width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', resize: 'vertical' }} />
             </div>
             {inp('Posición', 'posicion')}
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Fecha de entrega específica</label>
+              <input type='date' value={form.fecha_entrega_unidad} onChange={e => setForm({ ...form, fecha_entrega_unidad: e.target.value })}
+                style={{ width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', background: '#fff' }} />
+              <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>Vacío = usa la fecha general del proyecto. Si se captura, ajusta el número de mensualidades al cotizar esta unidad.</div>
+            </div>
             {desarrollo.tiene_etapas && (
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>{desarrollo.tipo_estructura}</label>

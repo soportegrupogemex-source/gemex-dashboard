@@ -179,16 +179,33 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     }
   };
 
-  const calcularPlan = (plan, precio) => {
+  // FIX: si la unidad tiene fecha_entrega_unidad capturada (torres donde
+  // la entrega varía por piso), el número de mensualidades se recalcula
+  // como los meses que faltan de HOY a esa fecha, en vez del número fijo
+  // del plan — mínimo 1, nunca 0 (si la fecha ya está encima o pasó, la
+  // fila de mensualidades no debe desaparecer de la cotización). Diferencia
+  // por mes calendario, ignorando el día (el negocio piensa en "se entrega
+  // en agosto 2027", no en un día exacto).
+  const mesesHastaFecha = (fechaStr) => {
+    if (!fechaStr) return null;
+    const [y, m] = fechaStr.slice(0, 10).split('-').map(Number);
+    const hoy = new Date();
+    const meses = (y - hoy.getFullYear()) * 12 + (m - 1 - hoy.getMonth());
+    return Math.max(meses, 1);
+  };
+
+  const calcularPlan = (plan, precio, unidad) => {
     const precioConPreventa = precio * (1 - plan.descuento_preventa / 100);
     const precioConDescuento = precioConPreventa * (1 - plan.descuento_plan / 100);
     const enganche = precioConDescuento * plan.enganche / 100;
     const duranteObra = precioConDescuento * plan.durante_obra / 100;
     const restoPorc = 100 - plan.enganche - plan.durante_obra;
     const resto = precioConDescuento * restoPorc / 100;
-    const mensualidad = plan.meses_plan > 0 ? duranteObra / plan.meses_plan : 0;
+    const mesesEspecificos = mesesHastaFecha(unidad?.fecha_entrega_unidad);
+    const mesesPlan = mesesEspecificos != null ? mesesEspecificos : plan.meses_plan;
+    const mensualidad = mesesPlan > 0 ? duranteObra / mesesPlan : 0;
     const ahorro = precio - precioConDescuento;
-    return { precioConDescuento, enganche, duranteObra, mensualidad, ahorro, entrega: resto, restoPorc };
+    return { precioConDescuento, enganche, duranteObra, mensualidad, ahorro, entrega: resto, restoPorc, mesesPlan, mesesAjustados: mesesEspecificos != null };
   };
 
   const generarPDFBlob = async () => {
@@ -358,7 +375,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
                   Unidad {u.numero} — {fmt(u.precio_lista)}
                 </div>
                 {planes.map(plan => {
-                  const calc = calcularPlan(plan, u.precio_lista || 0);
+                  const calc = calcularPlan(plan, u.precio_lista || 0, u);
                   return (
                     <div key={plan.id} style={{ border: '1px solid #ddd', borderRadius: '6px', marginBottom: '8px', overflow: 'hidden' }}>
                       <div style={{ background: '#1a1a2e', color: '#fff', padding: '5px 8px', fontSize: '10px', fontWeight: '700', textAlign: 'center' }}>
@@ -369,7 +386,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
                         {fila('Ahorro:', fmt(calc.ahorro))}
                         {fila(`Enganche (${plan.enganche}%):`, fmt(calc.enganche))}
                         {fila(`Durante obra (${plan.durante_obra}%):`, fmt(calc.duranteObra))}
-                        {plan.meses_plan > 0 && fila(`${plan.meses_plan} mensualidades:`, fmt(calc.mensualidad))}
+                        {calc.mesesPlan > 0 && fila(`${calc.mesesPlan} mensualidades${calc.mesesAjustados ? ' (ajustadas)' : ''}:`, fmt(calc.mensualidad))}
                         {fila(`A la entrega (${calc.restoPorc}%):`, fmt(calc.entrega))}
                       </div>
                     </div>
@@ -464,7 +481,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
           {planes.length === 0 ? (
             <div style={{ fontSize: '12px', color: '#888', textAlign: 'center', padding: '2rem' }}>No hay planes activos configurados</div>
           ) : planes.map((plan) => {
-            const calc = calcularPlan(plan, precio);
+            const calc = calcularPlan(plan, precio, u);
             return (
               <div key={plan.id} style={{ border: '1px solid #ddd', borderRadius: '6px', marginBottom: '12px', overflow: 'hidden' }}>
                 <div style={{ background: '#1a1a2e', color: '#fff', padding: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', letterSpacing: '1px' }}>
@@ -475,7 +492,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
                   {fila('Total ahorro:', fmt(calc.ahorro))}
                   {fila(`Enganche(${plan.enganche}%):`, fmt(calc.enganche))}
                   {fila(`Durante la obra(${plan.durante_obra}%):`, fmt(calc.duranteObra))}
-                  {plan.meses_plan > 0 && fila(`${plan.meses_plan} mensualidades de:`, fmt(calc.mensualidad))}
+                  {calc.mesesPlan > 0 && fila(`${calc.mesesPlan} mensualidades${calc.mesesAjustados ? ' (ajustadas)' : ''} de:`, fmt(calc.mensualidad))}
                   {fila(`A la entrega(${calc.restoPorc}%):`, fmt(calc.entrega))}
                 </div>
               </div>
