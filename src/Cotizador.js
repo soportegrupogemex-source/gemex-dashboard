@@ -201,7 +201,11 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     const duranteObra = precioConDescuento * plan.durante_obra / 100;
     const restoPorc = 100 - plan.enganche - plan.durante_obra;
     const resto = precioConDescuento * restoPorc / 100;
-    const mesesEspecificos = mesesHastaFecha(unidad?.fecha_entrega_unidad);
+    // FIX: el ajuste por fecha específica solo aplica a planes que YA
+    // tienen fase de mensualidades (meses_plan > 0) — Contado, 50-50, etc.
+    // no tienen esa fase y no deben mostrar una fila de "mensualidades"
+    // fantasma solo porque la unidad tenga fecha específica.
+    const mesesEspecificos = plan.meses_plan > 0 ? mesesHastaFecha(unidad?.fecha_entrega_unidad) : null;
     const mesesPlan = mesesEspecificos != null ? mesesEspecificos : plan.meses_plan;
     const mensualidad = mesesPlan > 0 ? duranteObra / mesesPlan : 0;
     const ahorro = precio - precioConDescuento;
