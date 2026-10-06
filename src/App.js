@@ -18,29 +18,43 @@ import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
-  Target, Building, LineChart,
+  Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
+  TrendingUp, Landmark,
 } from 'lucide-react';
 
-const MENU_COMPLETO = [
-  { id: 'dashboard', label: 'Ranking Gemex', icon: 'dashboard' },
-  { id: 'contactos', label: 'Contactos', icon: 'contactos' },
-  { id: 'negocios', label: 'Negocios', icon: 'negocios' },
-  { id: 'desarrollos', label: 'Desarrollos', icon: 'desarrollos' },
-  { id: 'agentes', label: 'Agentes', icon: 'agentes' },
-  { id: 'expedientes', label: 'Expedientes', icon: 'expedientes' },
-  { id: 'direccion', label: 'Dirección', icon: 'direccion', submenu: [
+// Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
+// cómo se agrupan. Un módulo con una sola hoja visible para el rol se
+// muestra como botón directo.
+const MENU_MODULOS = [
+  { id: 'mod_ventas', label: 'Ventas', icon: 'mod_ventas', submenu: [
     { id: 'dashboard_dir', label: 'Dashboard', icon: 'dashboard_dir' },
+    { id: 'dashboard', label: 'Ranking Gemex', icon: 'dashboard' },
+    { id: 'contactos', label: 'Contactos', icon: 'contactos' },
+    { id: 'negocios', label: 'Negocios', icon: 'negocios' },
+    { id: 'desarrollos', label: 'Desarrollos', icon: 'desarrollos' },
+    { id: 'expedientes', label: 'Expedientes', icon: 'expedientes' },
+    { id: 'objetivos', label: 'Objetivos', icon: 'objetivos' },
     { id: 'movimientos', label: 'Movimientos', icon: 'movimientos' },
     { id: 'historial', label: 'Historial', icon: 'historial' },
-    { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
-    { id: 'cobranza', label: 'Cobranza', icon: 'cobranza' },
-    { id: 'construccion', label: 'Construcción', icon: 'construccion' },
-    { id: 'objetivos', label: 'Objetivos', icon: 'objetivos' },
-    { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
     { id: 'buyer_persona', label: 'Buyer Persona', icon: 'buyer_persona' },
+    { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
+  ]},
+  { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
+    { id: 'construccion', label: 'Construcción', icon: 'construccion' },
+  ]},
+  { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
+    { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
+  ]},
+  { id: 'mod_administracion', label: 'Administración', icon: 'mod_administracion', submenu: [
+    { id: 'cobranza', label: 'Cobranza', icon: 'cobranza' },
+    { id: 'agentes', label: 'Agentes', icon: 'agentes' },
   ]},
 ];
+
+// Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
+// decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
+const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -101,7 +115,8 @@ const MENU_ICONS = {
   desarrollos: <Building2 size={18} />,
   agentes: <Users size={18} />,
   expedientes: <Folder size={18} />,
-  direccion: <Building size={18} />,
+  mod_ventas: <TrendingUp size={18} />,
+  mod_administracion: <Landmark size={18} />,
   movimientos: <ArrowLeftRight size={18} />,
   dashboard_dir: <LineChart size={18} />,
   historial: <FileText size={18} />,
@@ -118,13 +133,39 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
   // vez de abierto. Antes: useState('direccion').
   const [submenuAbierto, setSubmenuAbierto] = React.useState(null);
   const menuPermitido = MENU_POR_ROL[miRol] || [];
-  const menuVisible = MENU_COMPLETO.filter(item => {
-    if (!menuPermitido.includes(item.id)) return false;
-    if (item.id === 'dashboard' && miRol === 'Agente' && miAgente?.equipo !== 'Gemex') return false;
-    if (item.id === 'dashboard' && miRol === 'Desarrollador') return false;
-    if (item.id === 'dashboard' && miRol !== 'Super Admin' && !rankingBsVisible) return false;
+  const hojaVisible = (s) => {
+    if (!HOJAS_DIRECCION.includes(s.id)) {
+      if (!menuPermitido.includes(s.id)) return false;
+      if (s.id === 'dashboard' && miRol === 'Agente' && miAgente?.equipo !== 'Gemex') return false;
+      if (s.id === 'dashboard' && miRol === 'Desarrollador') return false;
+      if (s.id === 'dashboard' && miRol !== 'Super Admin' && !rankingBsVisible) return false;
+      return true;
+    }
+    if (!menuPermitido.includes('direccion')) return false;
+    if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
+    // FIX: Mesa de Control entra a revisar Movimientos, Historial
+    // y Titulación (también se encargan de ese módulo) — sin
+    // Dashboard, Cobranza, Objetivos, Tendencias ni Buyer Persona
+    // (a diferencia de los demás Gerentes).
+    if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial' || s.id === 'titulacion';
+    // FIX: Construcción y Tesorería son roles de un solo módulo
+    // — solo ven su propia pantalla.
+    if (miRol === 'Construcción') return s.id === 'construccion';
+    if (miRol === 'Tesorería') return s.id === 'cobranza';
+    if (miRol === 'Titulación') return s.id === 'titulacion';
+    // FIX: Gerente Operador — solo Dashboard (de sus desarrollos a
+    // cargo), Movimientos, Historial, Titulación (solo ver) y
+    // Tendencias; sin Cobranza, Construcción, Objetivos ni Buyer
+    // Persona.
+    if (miRol === 'Gerente Operador') return ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'tendencias_producto'].includes(s.id);
+    if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
+    if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
+    if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor';
     return true;
-  });
+  };
+  const modulosVisibles = MENU_MODULOS
+    .map(mod => ({ ...mod, hojas: mod.submenu.filter(hojaVisible) }))
+    .filter(mod => mod.hojas.length > 0);
   const nombre = miAgente ? `${miAgente.nombre || ''} ${miAgente.apellidos || ''}`.trim() : '';
   const handleNav = (id) => { onNav(id); if (isMobile) onClose(); };
   if (isMobile && !isOpen) return null;
@@ -149,62 +190,60 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
           </div>
         )}
         <nav style={{ flex: 1, padding: '12px 8px' }}>
-          {menuVisible.map(item => {
-            const tieneSubmenu = item.submenu?.length > 0;
-            const estaAbierto = submenuAbierto === item.id;
-            const submenuActivo = item.submenu?.some(s => s.id === active);
-            const isActive = active === item.id || submenuActivo;
-            const submenuFiltrado = (item.submenu || []).filter(s => {
-              if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
-              // FIX: Mesa de Control entra a revisar Movimientos, Historial
-              // y Titulación (también se encargan de ese módulo) — sin
-              // Dashboard, Cobranza, Objetivos, Tendencias ni Buyer Persona
-              // (a diferencia de los demás Gerentes).
-              if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial' || s.id === 'titulacion';
-              // FIX: Construcción y Tesorería son roles de un solo módulo
-              // — dentro de Dirección solo ven su propia pantalla.
-              if (miRol === 'Construcción') return s.id === 'construccion';
-              if (miRol === 'Tesorería') return s.id === 'cobranza';
-              if (miRol === 'Titulación') return s.id === 'titulacion';
-              // FIX: Gerente Operador — solo Dashboard (de sus desarrollos a
-              // cargo), Movimientos, Historial, Titulación (solo ver) y
-              // Tendencias; sin Cobranza, Construcción, Objetivos ni Buyer
-              // Persona.
-              if (miRol === 'Gerente Operador') return ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'tendencias_producto'].includes(s.id);
-              if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-              if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-              if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor';
-              return true;
-            });
+          {modulosVisibles.map(mod => {
+            const puntoRojo = (hoja) => hoja.id === 'expedientes' && expedientesRechazados > 0 && (
+              <span style={{ position: 'absolute', top: '-3px', right: '-4px', width: '9px', height: '9px', borderRadius: '50%', background: '#E53935', border: '1.5px solid #6B1524' }} />
+            );
+            const toggleRanking = (hoja) => hoja.id === 'dashboard' && miRol === 'Super Admin' && (
+              <span onClick={e => { e.stopPropagation(); onToggleRankingBs(); }}
+                title={rankingBsVisible ? 'Visible para todos — click para ocultar' : 'Oculto para los demás roles — click para mostrar'}
+                style={{ width: '32px', height: '18px', borderRadius: '10px', background: rankingBsVisible ? '#2E7D4F' : '#444', position: 'relative', flexShrink: 0, cursor: 'pointer' }}>
+                <span style={{ position: 'absolute', top: '2px', left: rankingBsVisible ? '16px' : '2px', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
+              </span>
+            );
+
+            if (mod.hojas.length === 1) {
+              const hoja = mod.hojas[0];
+              const isActive = active === hoja.id;
+              return (
+                <div key={mod.id}>
+                  <button onClick={() => handleNav(hoja.id)}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: isActive ? '#fff' : 'transparent', color: isActive ? '#C0203A' : '#aaa', textAlign: 'left', fontWeight: isActive ? '600' : '400', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>{MENU_ICONS[hoja.icon]}{puntoRojo(hoja)}</span>
+                      {hoja.label}
+                    </div>
+                    {toggleRanking(hoja)}
+                  </button>
+                </div>
+              );
+            }
+
+            const estaAbierto = submenuAbierto === mod.id;
+            const isActive = mod.hojas.some(h => h.id === active);
             return (
-              <div key={item.id}>
-                <button onClick={() => { if (tieneSubmenu) setSubmenuAbierto(estaAbierto ? null : item.id); else handleNav(item.id); }}
-                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: isActive && !tieneSubmenu ? '#fff' : tieneSubmenu && estaAbierto ? 'rgba(255,255,255,0.08)' : 'transparent', color: isActive && !tieneSubmenu ? '#C0203A' : '#aaa', textAlign: 'left', fontWeight: isActive ? '600' : '400', justifyContent: 'space-between' }}>
+              <div key={mod.id}>
+                <button onClick={() => setSubmenuAbierto(estaAbierto ? null : mod.id)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: estaAbierto ? 'rgba(255,255,255,0.08)' : 'transparent', color: isActive ? '#fff' : '#aaa', textAlign: 'left', fontWeight: isActive ? '600' : '400', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <span style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-                      {MENU_ICONS[item.icon]}
-                      {item.id === 'expedientes' && expedientesRechazados > 0 && (
-                        <span style={{ position: 'absolute', top: '-3px', right: '-4px', width: '9px', height: '9px', borderRadius: '50%', background: '#E53935', border: '1.5px solid #6B1524' }} />
-                      )}
+                      {MENU_ICONS[mod.icon]}
+                      {!estaAbierto && mod.hojas.some(h => puntoRojo(h)) && puntoRojo({ id: 'expedientes' })}
                     </span>
-                    {item.label}
+                    {mod.label}
                   </div>
-                  {tieneSubmenu && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>{estaAbierto ? '▾' : '▸'}</span>}
-                  {item.id === 'dashboard' && miRol === 'Super Admin' && (
-                    <span onClick={e => { e.stopPropagation(); onToggleRankingBs(); }}
-                      title={rankingBsVisible ? 'Visible para todos — click para ocultar' : 'Oculto para los demás roles — click para mostrar'}
-                      style={{ width: '32px', height: '18px', borderRadius: '10px', background: rankingBsVisible ? '#2E7D4F' : '#444', position: 'relative', flexShrink: 0, cursor: 'pointer' }}>
-                      <span style={{ position: 'absolute', top: '2px', left: rankingBsVisible ? '16px' : '2px', width: '14px', height: '14px', borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
-                    </span>
-                  )}
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>{estaAbierto ? '▾' : '▸'}</span>
                 </button>
-                {tieneSubmenu && estaAbierto && (
+                {estaAbierto && (
                   <div style={{ paddingLeft: '12px', marginBottom: '4px' }}>
-                    {submenuFiltrado.map(sub => (
+                    {mod.hojas.map(sub => (
                       <button key={sub.id} onClick={() => handleNav(sub.id)}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: active === sub.id ? '#fff' : 'transparent', color: active === sub.id ? '#C0203A' : '#888', textAlign: 'left', fontWeight: active === sub.id ? '600' : '400' }}>
-                        <span style={{ display: 'flex', alignItems: 'center' }}>{MENU_ICONS[sub.icon]}</span>
-                        {sub.label}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: active === sub.id ? '#fff' : 'transparent', color: active === sub.id ? '#C0203A' : '#888', textAlign: 'left', fontWeight: active === sub.id ? '600' : '400', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>{MENU_ICONS[sub.icon]}{puntoRojo(sub)}</span>
+                          {sub.label}
+                        </div>
+                        {toggleRanking(sub)}
                       </button>
                     ))}
                   </div>
