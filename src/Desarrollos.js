@@ -101,7 +101,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
       amenidades: [], mensaje_whatsapp: '', precio_desde: 0, apartado: 0,
       precio_en: 'Pesos MXN', fecha_entrega: '', datos_bancarios: '',
       tiempo_entrega: '', recamaras: '', estacionamiento: '', banos: '',
-      dueno: '', descripcion: '', video: '', landing_url: '', activo: true,
+      dueno: '', descripcion: '', video: '', landing_url: '', recorrido_virtual: '', activo: true,
       logo_url: '', portada_url: '', brochure_url: '',
       mostrar_web: false, galeria_web: [],
       tiene_etapas: false, tipo_estructura: 'Etapa', num_estructuras: 1
@@ -620,6 +620,10 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                             📄 Brochure
                           </button>
                         )}
+                        <button onClick={() => { if (d.recorrido_virtual) window.open(d.recorrido_virtual, '_blank', 'noopener,noreferrer'); setShowMenu(null); }}
+                          style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: d.recorrido_virtual ? 'pointer' : 'default', fontSize: '14px', textAlign: 'left', color: d.recorrido_virtual ? '#333' : '#ccc' }}>
+                          🥽 Recorrido virtual
+                        </button>
                         {puedeEditar(d) && (
                           <button onClick={() => handleEditar(d)}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
@@ -705,6 +709,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </div>
                     {inp('Video URL', 'video')}
                     {inp('Landing URL', 'landing_url')}
+                    {inp('Recorrido virtual (link)', 'recorrido_virtual')}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
                       <input type='checkbox' checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} id='activo' style={{ width: '18px', height: '18px' }} />
                       <label htmlFor='activo' style={{ fontSize: '14px', color: '#333' }}>Activo</label>
@@ -963,6 +968,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                   </div>
                   {inp('Video URL', 'video')}
                   {inp('Landing URL', 'landing_url')}
+                  {inp('Recorrido virtual (link)', 'recorrido_virtual')}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                     <input type='checkbox' checked={form.activo} onChange={e => setForm({ ...form, activo: e.target.checked })} id='activo' />
                     <label htmlFor='activo' style={{ fontSize: '13px', color: '#333' }}>Activo</label>
