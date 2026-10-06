@@ -289,7 +289,9 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
   };
 
   const handleEditar = (d) => {
-    setForm({ ...formVacio(), ...d });
+    // galeria_web llega como {} (objeto) en desarrollos que nunca tuvieron
+    // fotos; el formulario espera un arreglo y truena con pantalla en blanco.
+    setForm({ ...formVacio(), ...d, galeria_web: Array.isArray(d.galeria_web) ? d.galeria_web : [] });
     setEditando(d.id); setShowForm(true); setShowMenu(null); setTabForm('general');
     setOtraCiudad(!CIUDADES.includes(d.ciudad) && !!d.ciudad);
     if (d.tiene_etapas) cargarEstructuras(d.id, d.tipo_estructura, d.num_estructuras);
