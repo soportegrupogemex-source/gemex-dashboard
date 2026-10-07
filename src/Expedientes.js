@@ -163,6 +163,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const [buscar, setBuscar] = useState('');
   const [desarrollos, setDesarrollos] = useState([]);
   const [filtroDesarrollo, setFiltroDesarrollo] = useState('');
+  const [filtroTipoCompra, setFiltroTipoCompra] = useState('');
   const [movSel, setMovSel] = useState(null);
   const [subiendoTipo, setSubiendoTipo] = useState(null);
   const [generandoZip, setGenerandoZip] = useState(null);
@@ -795,7 +796,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     (!buscar || m.contacto_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
-    (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo)
+    (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo) &&
+    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra)
   );
 
   const rechazados = misDocumentosRechazados();
@@ -1350,6 +1352,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           style={{ width: isMobile ? '100%' : '220px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
           <option value=''>Todos los desarrollos</option>
           {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+        </select>
+        <select value={filtroTipoCompra} onChange={e => setFiltroTipoCompra(e.target.value)}
+          style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
+          <option value=''>Todos los tipos de crédito</option>
+          {['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
 
