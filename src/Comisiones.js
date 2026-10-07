@@ -6,7 +6,14 @@ import { supabase } from './supabase';
 // solo como referencia. Seguimiento propio en la tabla `comisiones`:
 // enganche pagado / comisión solicitada / comisión pagada. "Comisionable"
 // NO se captura aquí: viene del Historial (movimientos.comisionable).
+// Permisos por casilla:
+//  - Comisión pagada: solo Super Admin y Tesorería.
+//  - Comisión solicitada: los Gerentes (solo de sus desarrollos y mientras
+//    no esté pagada), además de Super Admin, Admin y Tesorería.
+//  - Enganche pagado: Super Admin, Admin y Tesorería.
 const ROLES_EDITAN = ['Super Admin', 'Admin', 'Tesorería'];
+const ROLES_MARCAN_PAGADA = ['Super Admin', 'Tesorería'];
+const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
@@ -36,7 +43,18 @@ const CAMPOS = [
 
 export default function Comisiones({ miRol, miAgente }) {
   const isMobile = useIsMobile();
-  const puedeEditar = ROLES_EDITAN.includes(miRol);
+  const esGerente = ROLES_GERENTE.includes(miRol);
+  const misDesarrollos = miAgente?.desarrollos_cargo || [];
+  const puedeCampo = (campo, seg) => {
+    if (campo === 'comision_pagada') return ROLES_MARCAN_PAGADA.includes(miRol);
+    if (campo === 'comision_solicitada') return ROLES_EDITAN.includes(miRol) || (esGerente && !seg?.comision_pagada);
+    return ROLES_EDITAN.includes(miRol);
+  };
+  const quienPuede = {
+    enganche_pagado: 'solo Super Admin, Admin y Tesorería',
+    comision_solicitada: 'solo Gerentes, Super Admin, Admin y Tesorería',
+    comision_pagada: 'solo Super Admin y Tesorería',
+  };
   const [ventas, setVentas] = useState([]);
   const [docsPorMov, setDocsPorMov] = useState({});
   const [segPorMov, setSegPorMov] = useState({});
@@ -97,8 +115,10 @@ export default function Comisiones({ miRol, miAgente }) {
     return 'pendiente';
   };
 
-  const desarrollos = [...new Set(ventas.map(v => v.desarrollo_nombre).filter(Boolean))].sort();
-  const visibles = ventas.filter(m => {
+  // Los Gerentes solo ven las ventas de sus desarrollos a cargo.
+  const ventasAlcance = ventas.filter(m => !esGerente || misDesarrollos.includes(m.desarrollo_nombre));
+  const desarrollos = [...new Set(ventasAlcance.map(v => v.desarrollo_nombre).filter(Boolean))].sort();
+  const visibles = ventasAlcance.filter(m => {
     if (filtroDesarrollo && m.desarrollo_nombre !== filtroDesarrollo) return false;
     if (filtroEstado && estadoComision(m) !== filtroEstado) return false;
     const q = buscar.trim().toLowerCase();
@@ -113,7 +133,7 @@ export default function Comisiones({ miRol, miAgente }) {
   };
 
   const cambiarCampo = async (m, campo, valor) => {
-    if (!puedeEditar) return;
+    if (!puedeCampo(campo, segPorMov[m.id])) return;
     setGuardando(true);
     const ahora = new Date().toISOString();
     const payload = {
@@ -205,7 +225,7 @@ export default function Comisiones({ miRol, miAgente }) {
       )}
 
       {abierta && (() => {
-        const m = ventas.find(v => v.id === abierta);
+        const m = ventasAlcance.find(v => v.id === abierta);
         if (!m) return null;
         const s = segPorMov[m.id] || {};
         const neg = negocioDe(m);
@@ -248,10 +268,11 @@ export default function Comisiones({ miRol, miAgente }) {
                 <span style={{ fontSize: '11px', color: '#aaa' }}>(se marca en Historial)</span>
               </div>
               {CAMPOS.map(c => (
-                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', fontSize: '13px', cursor: puedeEditar ? 'pointer' : 'default' }}>
-                  <input type="checkbox" checked={!!s[c.key]} disabled={!puedeEditar || guardando}
+                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', fontSize: '13px', cursor: puedeCampo(c.key, s) ? 'pointer' : 'default', flexWrap: 'wrap' }}>
+                  <input type="checkbox" checked={!!s[c.key]} disabled={!puedeCampo(c.key, s) || guardando}
                     onChange={e => cambiarCampo(m, c.key, e.target.checked)} style={{ width: '16px', height: '16px' }} />
                   <span style={{ color: '#333' }}>{c.label}</span>
+                  {!puedeCampo(c.key, s) && <span style={{ fontSize: '11px', color: '#aaa' }}>({quienPuede[c.key]})</span>}
                   {s[c.key] && s[`${c.key}_fecha`] && (
                     <span style={{ fontSize: '11px', color: '#aaa' }}>{fmtFecha(s[`${c.key}_fecha`])}{s[`${c.key}_por`] ? ` · ${s[`${c.key}_por`]}` : ''}</span>
                   )}
