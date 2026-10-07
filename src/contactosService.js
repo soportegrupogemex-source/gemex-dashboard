@@ -56,7 +56,7 @@ export async function obtenerContactos({
     // sin filtro de rol
   }
   // Agente solo ve sus propios contactos
-  else if (miRol === 'Agente') {
+  else if (miRol === 'Agente' || miRol === 'Asesor Premium') {
     if (miAgente?.correo) {
       query = query.eq('creado_por', miAgente.correo);
     } else {

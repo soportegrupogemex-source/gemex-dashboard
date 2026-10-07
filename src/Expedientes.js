@@ -212,6 +212,9 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // ni cargar) los expedientes ya enviados a Titulación, dentro del
   // apartado "Expedientes" embebido en esa pantalla.
   const esTitulacionRol = miRol === 'Titulación';
+  // Asesor Premium: igual que un asesor, pero puede cargar los documentos
+  // de los expedientes de CUALQUIER asesor.
+  const esAsesorPremium = miRol === 'Asesor Premium';
   const esAdmin = ROLES_ADMIN.includes(miRol);
   // FIX: Mesa de Control es quien valida expedientes — siempre puede
   // prender/apagar "Expediente completo", además de quien esté configurado
@@ -766,7 +769,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // ============ Listas filtradas por pestaña y rol ============
 
   const movimientosCargar = movimientos.filter(m => {
-    if (esVendedorDe(m)) return true;
+    if (esVendedorDe(m) || esAsesorPremium) return true;
     if (esMesaControl) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
     if (esAdmin) return true;
@@ -830,7 +833,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   if (movSel) {
     const docs = docsDe(movSel.id);
     const archivado = expedienteArchivado(movSel.id);
-    const esMio = esVendedorDe(movSel);
+    const esMio = esVendedorDe(movSel) || esAsesorPremium;
     const soloLectura11 = tab === 'cargar' && !esMio; // Gerente/Admin viendo lo de otros: solo lectura de los 11
     // FIX: "Contrato firmado" lo sube el asesor (antes el Gerente), y
     // solo hasta que el expediente ya esté aprobado ("Expediente

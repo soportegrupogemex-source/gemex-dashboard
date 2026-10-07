@@ -73,6 +73,9 @@ const MENU_POR_ROL = {
   // submenuFiltrado más abajo).
   'Mesa de Control':  ['desarrollos', 'expedientes', 'direccion'],
   'Agente':      ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
+  // Asesor Premium: igual que Agente, pero en Expedientes carga los
+  // documentos de cualquier asesor.
+  'Asesor Premium': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
   'Desarrollador': ['contactos', 'desarrollos', 'direccion'],
   // FIX: roles de un solo módulo — solo entran a Dirección y ahí solo ven
   // su propia pantalla (se filtra en submenuFiltrado más abajo), igual
@@ -139,7 +142,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
   const hojaVisible = (s) => {
     if (!HOJAS_DIRECCION.includes(s.id)) {
       if (!menuPermitido.includes(s.id)) return false;
-      if (s.id === 'dashboard' && miRol === 'Agente' && miAgente?.equipo !== 'Gemex') return false;
+      if (s.id === 'dashboard' && (miRol === 'Agente' || miRol === 'Asesor Premium') && miAgente?.equipo !== 'Gemex') return false;
       if (s.id === 'dashboard' && miRol === 'Desarrollador') return false;
       if (s.id === 'dashboard' && miRol !== 'Super Admin' && !rankingBsVisible) return false;
       return true;
@@ -748,7 +751,7 @@ function App() {
         setActivePage('cobranza');
       } else if (data?.rol === 'Titulación') {
         setActivePage('titulacion');
-      } else if (data?.rol === 'Agente' && data?.equipo === 'Gemex') {
+      } else if ((data?.rol === 'Agente' || data?.rol === 'Asesor Premium') && data?.equipo === 'Gemex') {
         // FIX: mismo fallback seguro (false) que cargarConfigRankingBs +
         // log de error si la lectura falla por RLS.
         const { data: config, error } = await supabase.from('configuracion').select('valor').eq('clave', 'ranking_bs_visible').limit(1);
@@ -782,7 +785,7 @@ function App() {
   const renderPage = () => {
     switch (activePage) {
       case 'dashboard':
-        if (miRol === 'Agente' && miAgente?.equipo !== 'Gemex') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
+        if ((miRol === 'Agente' || miRol === 'Asesor Premium') && miAgente?.equipo !== 'Gemex') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         if (miRol === 'Mesa de Control') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         if (miRol !== 'Super Admin' && !rankingBsVisible) return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         return <Dashboard />;

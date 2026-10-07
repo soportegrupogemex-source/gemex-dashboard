@@ -110,7 +110,7 @@ export default function Movimientos() {
     if (user) {
       const { data } = await supabase.from('agentes').select('*').eq('correo', user.email).single();
       setMiAgente(data);
-      if (data?.rol === 'Agente') { setVendedorSel(`${data.nombre} ${data.apellidos}`.trim()); setVendedorCorreoSel(data.correo || ''); }
+      if (data?.rol === 'Agente' || data?.rol === 'Asesor Premium') { setVendedorSel(`${data.nombre} ${data.apellidos}`.trim()); setVendedorCorreoSel(data.correo || ''); }
     }
   };
 
@@ -399,7 +399,7 @@ export default function Movimientos() {
           </div>
           <div>
             <label style={labelStyle}>Vendedor</label>
-            {miAgente?.rol === 'Agente' ? (
+            {(miAgente?.rol === 'Agente' || miAgente?.rol === 'Asesor Premium') ? (
               <input value={`${miAgente.nombre} ${miAgente.apellidos}`.trim()} readOnly
                 style={{ ...inputStyle, background: '#f9f9f9', color: '#888', cursor: 'not-allowed', padding: isMobile ? '12px' : '9px 12px' }} />
             ) : (
