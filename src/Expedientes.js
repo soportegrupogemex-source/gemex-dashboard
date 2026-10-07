@@ -14,7 +14,7 @@ const DOCS_ASESOR = [
   { id: 'acta_matrimonio', label: 'Acta de matrimonio', avisoRojo: 'ACTA DESCARGADA EN PDF O ESCANEO DEL ACTA FISICA, NO FOTOS O ESCANEO DE CELULAR' },
   { id: 'curp', label: 'CURP', avisoRojo: 'CURP DESCARGADA EN PDF O ESCANEO DE LA CURP FISICA, NO FOTOS O ESCANEO DE CELULAR' },
   { id: 'constancia_fiscal', label: 'Constancia de situación fiscal (no mayor a 3 meses)', avisoRojo: 'CONSTANCIA DESCARGADA EN PDF O ESCANEO DE LA CONSTANCIA FISICA COMPLETA, NO FOTOS O ESCANEO DE CELULAR' },
-  { id: 'cotizacion', label: 'Cotización completa a nombre del cliente', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
+  { id: 'cotizacion', label: 'Cotización del día del apartado (a nombre del cliente)', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
   { id: 'comprobante_apartado', label: 'Comprobante de apartado', aceptaImagen: true, multiple: true, maxArchivos: 10, nota: 'Puedes subir hasta 10 archivos si el apartado se hizo en varios movimientos', avisoRojo: 'ARCHIVO DESCARGADO EN PDF O FOTO LEGIBLE' },
   { id: 'kyc', label: 'KYC firmado', avisoRojo: 'ARCHIVO EN PDF O FOTO LEGIBLE' },
   { id: 'documentos_generales', label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
@@ -47,6 +47,7 @@ const DOC_DEFS_FINANCIADO = {
   ultimo_talon_pago: { label: 'Último Talón de Pago' },
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
+  cotizacion: { label: 'Cotización del día del apartado (a nombre del cliente)', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
   liquidacion_gemex: { label: 'Preliquidación Gemex' },
   documentos_generales: { label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
 };
@@ -60,22 +61,22 @@ const DOC_DEFS_FINANCIADO = {
 const DOCS_FINANCIADO_ESPECIFICOS = {
   Infonavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
-    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
+    soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: true,
   },
   Fovissste: {
     comunes: ['validacion_credito_sofom', 'ultimo_talon_pago'],
-    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
+    soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
   Bancario: {
     comunes: ['carta_autorizacion_banco'],
-    soloTitular: ['liquidacion_gemex', 'documentos_generales'],
+    soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
   Cofinavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
-    soloTitular: ['carta_autorizacion_cofinavit', 'liquidacion_gemex', 'documentos_generales'],
+    soloTitular: ['carta_autorizacion_cofinavit', 'cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: true,
   },
 };

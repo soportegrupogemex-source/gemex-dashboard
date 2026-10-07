@@ -14,13 +14,14 @@ import DashboardDireccion from './DashboardDireccion';
 import Expedientes from './Expedientes';
 import Titulacion from './Titulacion';
 import Cobranza from './Cobranza';
+import Comisiones from './Comisiones';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
-  TrendingUp, Landmark,
+  TrendingUp, Landmark, Percent,
 } from 'lucide-react';
 
 // Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
@@ -48,13 +49,14 @@ const MENU_MODULOS = [
   ]},
   { id: 'mod_administracion', label: 'Administración', icon: 'mod_administracion', submenu: [
     { id: 'cobranza', label: 'Cobranza', icon: 'cobranza' },
+    { id: 'comisiones', label: 'Comisiones', icon: 'comisiones' },
     { id: 'agentes', label: 'Agentes', icon: 'agentes' },
   ]},
 ];
 
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
+const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -122,6 +124,7 @@ const MENU_ICONS = {
   historial: <FileText size={18} />,
   titulacion: <ClipboardCheck size={18} />,
   cobranza: <Banknote size={18} />,
+  comisiones: <Percent size={18} />,
   construccion: <HardHat size={18} />,
   objetivos: <Target size={18} />,
   tendencias_producto: <Flame size={18} />,
@@ -142,6 +145,8 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
       return true;
     }
     if (!menuPermitido.includes('direccion')) return false;
+    // Comisiones: solo Super Admin, Admin y Tesorería (dato sensible).
+    if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería'].includes(miRol);
     if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
     // FIX: Mesa de Control entra a revisar Movimientos, Historial
     // y Titulación (también se encargan de ese módulo) — sin
@@ -792,6 +797,7 @@ function App() {
       case 'objetivos': return <Objetivos miRol={miRol} miAgente={miAgente} />;
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
+      case 'comisiones': return <Comisiones miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
       case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
