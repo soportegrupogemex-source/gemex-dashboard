@@ -22,14 +22,33 @@ const bgTipo = { 'Apartado': '#FFF8E1', 'Vendida': '#EAF3DE', 'Cancelación': '#
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 const DIAS_SEMANA_LABEL = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 
+// Solo las fechas "puras" (columnas date: YYYY-MM-DD) se toman como día
+// local. Los timestamps (created_at, en UTC) se convierten a la hora local
+// real; antes se cortaban a su fecha UTC y movimientos cargados de noche
+// caían en el día/mes siguiente.
 function parseFechaLocal(fechaStr) {
   if (!fechaStr) return null;
-  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-    const [y, m, d] = fechaStr.slice(0, 10).split('-').map(Number);
+  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+    const [y, m, d] = fechaStr.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
   return new Date(fechaStr);
 }
+
+// Valor de un <input type='date'>. Si se teclea el año con 2 dígitos
+// ("26") Chrome lo deja como año 0026; se interpreta como 2026.
+function fechaDeInput(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  const dt = new Date(2000, m - 1, d);
+  dt.setFullYear(y < 100 ? 2000 + y : y);
+  return dt;
+}
+
+const CAMPOS_FECHA_FILTRO = [
+  { key: 'created_at', label: 'Fecha de carga' },
+  { key: 'fecha_apartado', label: 'Fecha de apartado' },
+  { key: 'fecha_firma', label: 'Fecha de firma' },
+];
 
 const fmtFecha = (f) => {
   const d = parseFechaLocal(f);
@@ -70,6 +89,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   // FIX: filtro de rango de fechas (ej. "martes 14 a lunes 20") — cuando
   // está activo, tiene prioridad sobre día/mes/año sueltos, para no
   // combinar dos formas de filtrar fecha a la vez.
+  const [filtroCampoFecha, setFiltroCampoFecha] = useState('created_at');
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('');
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('');
   const [showFiltros, setShowFiltros] = useState(false);
@@ -233,7 +253,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   const flecha = (col) => ordenCol === col ? (ordenDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
 
   const aniosDisponibles = [...new Set(movimientos.map(m => {
-    const d = parseFechaLocal(m.created_at);
+    const d = parseFechaLocal(m[filtroCampoFecha]);
     return d ? d.getFullYear() : null;
   }).filter(Boolean))].sort((a,b) => b - a);
 
@@ -272,25 +292,18 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
         m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
         m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase()) ||
         m.vendedor?.toLowerCase().includes(buscar.toLowerCase());
-      const fecha = parseFechaLocal(m.created_at);
-      // FIX: si hay rango desde/hasta activo, usa eso en vez de día/mes/año sueltos.
+      const fecha = parseFechaLocal(m[filtroCampoFecha]);
+      // Todos los filtros de fecha se combinan (Desde, Hasta, Día, Mes, Año).
       let fechaOk = true;
-      if (filtroFechaDesde || filtroFechaHasta) {
-        if (filtroFechaDesde) {
-          const desde = parseFechaLocal(filtroFechaDesde);
-          fechaOk = fechaOk && !!fecha && fecha >= desde;
-        }
-        if (filtroFechaHasta) {
-          const hasta = parseFechaLocal(filtroFechaHasta);
-          hasta.setHours(23, 59, 59, 999);
-          fechaOk = fechaOk && !!fecha && fecha <= hasta;
-        }
-      } else {
-        const diaOk = !filtroDia || (fecha && fecha.getDate() === parseInt(filtroDia));
-        const mesOk = !filtroMes || (fecha && fecha.getMonth() + 1 === parseInt(filtroMes));
-        const anioOk = !filtroAnio || (fecha && fecha.getFullYear() === parseInt(filtroAnio));
-        fechaOk = diaOk && mesOk && anioOk;
+      if (filtroFechaDesde) fechaOk = fechaOk && !!fecha && fecha >= fechaDeInput(filtroFechaDesde);
+      if (filtroFechaHasta) {
+        const hasta = fechaDeInput(filtroFechaHasta);
+        hasta.setHours(23, 59, 59, 999);
+        fechaOk = fechaOk && !!fecha && fecha <= hasta;
       }
+      if (filtroDia) fechaOk = fechaOk && !!fecha && fecha.getDate() === parseInt(filtroDia);
+      if (filtroMes) fechaOk = fechaOk && !!fecha && fecha.getMonth() + 1 === parseInt(filtroMes);
+      if (filtroAnio) fechaOk = fechaOk && !!fecha && fecha.getFullYear() === parseInt(filtroAnio);
       return textOk && fechaOk;
     })
     .sort((a, b) => {
@@ -633,17 +646,19 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                 <option value=''>Todos los desarrollos</option>
                 {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
               </select>
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Rango de fechas por Fecha de carga (ej. martes a lunes)</div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Filtrar por</div>
+              <select value={filtroCampoFecha} onChange={e => { setFiltroCampoFecha(e.target.value); setPagina(0); }}
+                style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }}>
+                {CAMPOS_FECHA_FILTRO.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Rango de fechas (Desde / Hasta)</div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input type='date' value={filtroFechaDesde} onChange={e => { setFiltroFechaDesde(e.target.value); setPagina(0); }}
                   style={{ flex: 1, padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }} />
                 <input type='date' value={filtroFechaHasta} onChange={e => { setFiltroFechaHasta(e.target.value); setPagina(0); }}
                   style={{ flex: 1, padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }} />
               </div>
-              {(filtroFechaDesde || filtroFechaHasta) && (
-                <div style={{ fontSize: '11px', color: '#aaa' }}>El rango tiene prioridad — se ignoran Día/Mes/Año mientras esté activo.</div>
-              )}
-              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>O por día/mes/año suelto</div>
+              <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Y/o por día/mes/año (se combinan con el rango)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '8px' }}>
                 <input type='number' placeholder='Día' value={filtroDia} onChange={e => { setFiltroDia(e.target.value); setPagina(0); }} min='1' max='31'
                   style={{ padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }} />
@@ -680,9 +695,12 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
             {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
           </select>
           <div style={{ width: '1px', height: '28px', background: '#e0e0e0', margin: '0 4px' }} />
-          <span style={{ fontSize: '12px', color: '#888' }}>Rango (F. carga):</span>
+          <select value={filtroCampoFecha} onChange={e => { setFiltroCampoFecha(e.target.value); setPagina(0); }} style={filtroStyle}>
+            {CAMPOS_FECHA_FILTRO.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+          <span style={{ fontSize: '12px', color: '#888' }}>Desde:</span>
           <input type='date' value={filtroFechaDesde} onChange={e => { setFiltroFechaDesde(e.target.value); setPagina(0); }} style={filtroStyle} />
-          <span style={{ fontSize: '12px', color: '#888' }}>a</span>
+          <span style={{ fontSize: '12px', color: '#888' }}>Hasta:</span>
           <input type='date' value={filtroFechaHasta} onChange={e => { setFiltroFechaHasta(e.target.value); setPagina(0); }} style={filtroStyle} />
           <div style={{ width: '1px', height: '28px', background: '#e0e0e0', margin: '0 4px' }} />
           <input type='number' placeholder='Día' value={filtroDia} onChange={e => { setFiltroDia(e.target.value); setPagina(0); }} min='1' max='31'

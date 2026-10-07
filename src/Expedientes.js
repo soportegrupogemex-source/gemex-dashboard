@@ -117,8 +117,8 @@ function useIsMobile() {
 
 function parseFechaLocal(fechaStr) {
   if (!fechaStr) return null;
-  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-    const [y, m, d] = fechaStr.slice(0, 10).split('-').map(Number);
+  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+    const [y, m, d] = fechaStr.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
   return new Date(fechaStr);
@@ -525,14 +525,23 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     return n;
   };
 
+  // Meses calendario completos transcurridos (antes se dividían los días
+  // entre 30, y "6 meses" llegaba a los 180 días en vez de a los 6 meses).
   const mesesDesde = (fecha) => {
     const f = parseFechaLocal(fecha);
     if (!f) return 0;
-    return (new Date() - f) / (1000 * 60 * 60 * 24 * 30);
+    const hoy = new Date();
+    let meses = (hoy.getFullYear() - f.getFullYear()) * 12 + (hoy.getMonth() - f.getMonth());
+    if (hoy.getDate() < f.getDate()) meses -= 1;
+    return Math.max(meses, 0);
   };
 
   const expedienteArchivado = (movimientoId) => Object.values(docsDe(movimientoId)).some(d => d.archivado);
-  const necesitaArchivar = (m) => !expedienteArchivado(m.id) && mesesDesde(m.fecha_apartado || m.created_at) >= MESES_PARA_ARCHIVAR;
+  // La antigüedad corre desde que el expediente entró al sistema (created_at),
+  // no desde fecha_apartado: los apartados históricos cargados después traen
+  // fechas de apartado de hace más de 6 meses sin que el expediente lleve
+  // ese tiempo en el CRM.
+  const necesitaArchivar = (m) => !expedienteArchivado(m.id) && mesesDesde(m.created_at) >= MESES_PARA_ARCHIVAR;
 
   // FIX: aviso de rechazo — cualquier documento mío que haya sido
   // rechazado y todavía no lo haya vuelto a subir.

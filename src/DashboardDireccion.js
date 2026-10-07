@@ -12,8 +12,10 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 
 function parseFechaLocal(fechaStr) {
   if (!fechaStr) return null;
-  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(fechaStr)) {
-    const [y, m, d] = fechaStr.slice(0, 10).split('-').map(Number);
+  // Solo fechas "puras" (YYYY-MM-DD) son día local; los timestamps UTC
+  // (created_at) se convierten a hora local real.
+  if (typeof fechaStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+    const [y, m, d] = fechaStr.split('-').map(Number);
     return new Date(y, m - 1, d);
   }
   return new Date(fechaStr);
@@ -247,7 +249,9 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       return { inicio, fin: hoy };
     }
     if (periodo === 'mes') {
-      const inicio = new Date(); inicio.setDate(inicio.getDate() - 29); inicio.setHours(0,0,0,0);
+      // Mes calendario en curso (día 1 a hoy), no "últimos 30 días": esos
+      // 30 días arrastraban ventas del mes anterior.
+      const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
       return { inicio, fin: hoy };
     }
     return { inicio: new Date(anioSel, 0, 1), fin: new Date(anioSel, 11, 31, 23, 59, 59, 999) };
@@ -448,8 +452,9 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       });
     } else if (periodo === 'mes') {
       const ahora = new Date();
-      labels = Array.from({ length: 30 }, (_, i) => {
-        const d = new Date(ahora); d.setDate(ahora.getDate() - 29 + i); d.setHours(0,0,0,0);
+      const diasDelMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate();
+      labels = Array.from({ length: diasDelMes }, (_, i) => {
+        const d = new Date(ahora.getFullYear(), ahora.getMonth(), i + 1);
         const fin = new Date(d); fin.setHours(23,59,59,999);
         return { label: `${d.getDate()}`, inicio: d, fin };
       });
