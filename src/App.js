@@ -148,9 +148,10 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
       return true;
     }
     if (!menuPermitido.includes('direccion')) return false;
-    // Comisiones: Super Admin, Admin, Tesorería y los Gerentes (estos solo
-    // ven sus desarrollos y solo pueden solicitar; se limita dentro de la pantalla).
-    if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador'].includes(miRol);
+    // Comisiones: Super Admin, Admin, Tesorería, los Gerentes (estos solo
+    // ven sus desarrollos y solo pueden solicitar) y Mesa de Control (solo
+    // lectura, toda la empresa); los permisos finos se limitan dentro de la pantalla.
+    if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
     if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
     // FIX: Mesa de Control entra a revisar Movimientos, Historial
     // y Titulación (también se encargan de ese módulo) — sin
