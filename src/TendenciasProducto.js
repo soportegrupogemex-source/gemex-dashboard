@@ -18,9 +18,9 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 // FIX: reporte nuevo — qué producto (unidad/tipología) se está enseñando
 // más y cuáles están "frías" (nunca cotizadas), más quiénes son los
 // agentes más activos cotizando. Se alimenta de cotizaciones_log, que se
-// llena solo cuando el agente tiene un contacto asignado en el Cotizador
-// y descarga o comparte el PDF (ver registrarLog en Cotizador.js) — abrir
-// el cotizador a mirar precios no cuenta. Lo ve Super Admin (todo) y
+// llena cuando el agente descarga o comparte el PDF en el Cotizador, con o
+// sin contacto asignado (ver registrarLog en Cotizador.js) — abrir el
+// cotizador a mirar precios no cuenta. Lo ve Super Admin (todo) y
 // Gerente Editor/Operador (solo sus desarrollos a cargo — la RLS de
 // cotizaciones_log ya lo restringe también a nivel de base).
 export default function TendenciasProducto({ miRol, miAgente }) {
@@ -150,13 +150,16 @@ export default function TendenciasProducto({ miRol, miAgente }) {
   const idsCotizados = new Set(logs.map(r => r.unidad_id).filter(Boolean));
   const unidadesFrias = inventarioLibre.filter(u => !idsCotizados.has(u.id));
 
+  const totalSinContacto = logs.filter(r => !r.contacto_id).length;
+
   // ============ Agentes más activos ============
   const rankingAgentes = (() => {
     const mapa = {};
     logs.forEach(r => {
       const key = r.agente_correo || 'Sin identificar';
-      if (!mapa[key]) mapa[key] = { correo: key, nombre: r.agente_nombre || r.agente_correo || 'Sin identificar', equipo: agentesEquipoMap[r.agente_correo] || null, count: 0 };
+      if (!mapa[key]) mapa[key] = { correo: key, nombre: r.agente_nombre || r.agente_correo || 'Sin identificar', equipo: agentesEquipoMap[r.agente_correo] || null, count: 0, sinContacto: 0 };
       mapa[key].count++;
+      if (!r.contacto_id) mapa[key].sinContacto++;
     });
     return Object.values(mapa).sort((a, b) => b.count - a.count);
   })();
@@ -191,7 +194,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
       <div style={{ marginBottom: '1rem' }}>
         <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Tendencias de Producto</h2>
-        <div style={{ fontSize: '13px', color: '#888' }}>{logs.length} cotizaciones registradas en el período — qué se enseña más y qué está frío</div>
+        <div style={{ fontSize: '13px', color: '#888' }}>{logs.length} cotizaciones registradas en el período{totalSinContacto > 0 ? ` (${totalSinContacto} sin contacto asignado)` : ''} — qué se enseña más y qué está frío</div>
       </div>
 
       {/* Pestañas */}
@@ -362,7 +365,10 @@ export default function TendenciasProducto({ miRol, miAgente }) {
                             </span>
                           )}
                         </span>
-                        <span style={{ fontWeight: '700', color: '#1a1a2e' }}>{a.count}</span>
+                        <span style={{ fontWeight: '700', color: '#1a1a2e' }}>
+                          {a.sinContacto > 0 && <span style={{ fontSize: '11px', fontWeight: '400', color: '#aaa', marginRight: '8px' }}>{a.sinContacto} sin contacto</span>}
+                          {a.count}
+                        </span>
                       </div>
                       <div style={{ height: '6px', background: '#f0f0f0', borderRadius: '3px' }}>
                         <div style={{ height: '100%', background: '#8B5CF6', borderRadius: '3px', width: `${(a.count / max) * 100}%` }} />

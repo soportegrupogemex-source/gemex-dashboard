@@ -30,14 +30,13 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
 
   useEffect(() => { cargarPlanes(); cargarAsesor(); cargarContactos(); cargarDatosBancariosTorre(); }, []);
 
-  // FIX: registra en `cotizaciones_log` cada unidad de la cotización,
-  // pero solo cuando hay un contacto asignado y la cotización se
-  // descarga o se reenvía — antes se contaba con solo ABRIR el
-  // cotizador, sin contacto ni acción real, lo que inflaba el conteo en
-  // Tendencias con unidades que un agente abrió para mirar precios pero
-  // nunca llegó a enviar a nadie.
+  // FIX: registra en `cotizaciones_log` cada unidad de la cotización cuando
+  // se descarga o se reenvía el PDF — con o sin contacto asignado (sin
+  // contacto queda contacto_id null y Tendencias la cuenta aparte). Abrir
+  // el cotizador a mirar precios NO cuenta. Los negocios en etapa
+  // "Cotización" solo se crean cuando hay contacto. Si el guardado falla se
+  // avisa, en vez de perderse en silencio.
   const registrarLog = async () => {
-    if (!contactoSeleccionado) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       let agenteNombre = '';
@@ -56,13 +55,19 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
         tipologia: u.tipologia || null,
         nivel: u.nivel || null,
         precio_lista: u.precio_lista || null,
-        contacto_id: contactoSeleccionado.id,
-        contacto_nombre: `${contactoSeleccionado.nombres} ${contactoSeleccionado.apellidos}`.trim(),
+        contacto_id: contactoSeleccionado?.id || null,
+        contacto_nombre: contactoSeleccionado ? `${contactoSeleccionado.nombres} ${contactoSeleccionado.apellidos}`.trim() : null,
       }));
-      if (filas.length > 0) await supabase.from('cotizaciones_log').insert(filas);
-      await crearNegociosCotizacion(agenteCorreo, agenteNombre);
+      if (filas.length > 0) {
+        const { error } = await supabase.from('cotizaciones_log').insert(filas);
+        if (error) {
+          console.error('No se pudo registrar la cotización en Tendencias:', error);
+          alert('La cotización se generó, pero no se pudo registrar en Tendencias: ' + error.message);
+        }
+      }
+      if (contactoSeleccionado) await crearNegociosCotizacion(agenteCorreo, agenteNombre);
     } catch (err) {
-      // el log nunca debe bloquear la cotización si falla
+      console.error('Error registrando la cotización:', err);
     }
   };
 
