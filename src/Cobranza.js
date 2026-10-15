@@ -12,7 +12,39 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0 };
+const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0, cuotas_condominales: 0 };
+
+// A qué crédito corresponde cada "Financiera" según el tipo de compra
+// (se usa en la pantalla y en la liquidación final en PDF).
+const ETIQUETAS_CREDITO = {
+  Infonavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
+  Fovissste: { f1: 'Crédito Fovissste', f2: 'Crédito bancario' },
+  Cofinavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
+  Bancario: { f1: 'Crédito bancario', f2: 'Otro crédito' },
+};
+const etiquetasCredito = (tipo) => ETIQUETAS_CREDITO[tipo] || { f1: 'Financiera 1', f2: 'Financiera 2' };
+
+const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const fechaCorta = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}-${MESES_ABREV[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
+const fmtN = (n) => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// "C203" -> edificio "C", departamento "203". Sin letra (ej. "103") el edificio queda vacío.
+const partirUnidad = (numero) => {
+  const m = String(numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)[\s-]*(\d.*)$/);
+  return m ? { edificio: m[1].toUpperCase(), departamento: m[2] } : { edificio: '', departamento: String(numero || '') };
+};
+
+const cargarLogo = () => new Promise(resolve => {
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext('2d').drawImage(img, 0, 0);
+    resolve({ data: c.toDataURL('image/jpeg', 0.92), w: img.naturalWidth, h: img.naturalHeight });
+  };
+  img.onerror = () => resolve(null);
+  img.src = process.env.PUBLIC_URL + '/logo-gemex.jpg';
+});
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -38,6 +70,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
   const [guardando, setGuardando] = useState(false);
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
+  const [firmantes, setFirmantes] = useState({ titulacion: '', tesorero: '' });
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -48,7 +81,10 @@ export default function Cobranza({ miRol, miAgente }) {
 
   const cargarTodo = async () => {
     setCargando(true);
-    const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
+    const { data: des } = await supabase.from('desarrollos').select('id, nombre, direccion, ciudad').eq('activo', true).order('nombre');
+    const { data: firm } = await supabase.from('agentes').select('nombre, apellidos, rol').in('rol', ['Titulación', 'Tesorería']).eq('activo', true);
+    const nombreDe = (rol) => { const a = (firm || []).find(x => x.rol === rol); return a ? `${a.nombre || ''} ${a.apellidos || ''}`.trim().toUpperCase() : ''; };
+    setFirmantes({ titulacion: nombreDe('Titulación'), tesorero: nombreDe('Tesorería') });
     setDesarrollos(des || []);
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
@@ -120,6 +156,7 @@ export default function Cobranza({ miRol, miAgente }) {
       financiera_1_monto: r2(form.financiera_1_monto),
       financiera_2_monto: r2(form.financiera_2_monto),
       liberacion_monto: r2(form.liberacion_monto),
+      cuotas_condominales: r2(form.cuotas_condominales),
       actualizado_por: user?.email || null,
       updated_at: new Date().toISOString(),
     };
@@ -172,39 +209,103 @@ export default function Cobranza({ miRol, miAgente }) {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
-  const descargarPDF = () => {
-    const { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente } = calc(unidadAbierta.id, form);
+  // Liquidación final: mismo formato que el que usa Tesorería.
+  const descargarPDF = async () => {
+    const { valorVenta, pagado, saldoNeto } = calc(unidadAbierta.id, form);
     const venta = ventaPorUnidad[unidadAbierta.id] || {};
-    const pagos = pagosPorUnidad[unidadAbierta.id] || [];
-    const cliente = venta.contacto_nombre || 'Sin comprador registrado';
+    const cliente = (venta.contacto_nombre || 'Sin comprador registrado').replace(/\s+/g, ' ').trim().toUpperCase();
+    const desarrollo = desarrollos.find(d => d.id === unidadAbierta.desarrollo_id) || {};
+    const { edificio, departamento } = partirUnidad(unidadAbierta.numero);
+    const et = etiquetasCredito(venta.tipo_compra);
+    const f1 = r2(form.financiera_1_monto);
+    const f2 = r2(form.financiera_2_monto);
+    const cuotas = r2(form.cuotas_condominales);
+    const totalPagos = r2(pagado + f1 + f2);
 
     const doc = new jsPDF('p', 'mm', 'letter');
-    let y = 15;
-    doc.setFontSize(14); doc.text('Cobranza', 10, y); y += 8;
-    doc.setFontSize(10);
-    doc.text(`Cliente asignado: ${cliente}`, 10, y); y += 6;
-    doc.text(`Unidad: ${unidadAbierta.numero} — ${unidadAbierta.desarrollo_nombre}`, 10, y); y += 6;
-    doc.text(`Tipo de compra: ${venta.tipo_compra || '—'}`, 10, y); y += 6;
-    doc.text(`Valor de venta: ${fmt(valorVenta)}`, 10, y); y += 10;
+    const L = 22;          // margen izquierdo de etiquetas
+    const V = 100;         // columna de valores de texto
+    const R = 150;         // borde derecho de los importes
+    const linea = (y, x1 = L, x2 = R, grosor = 0.3) => { doc.setLineWidth(grosor); doc.line(x1, y, x2, y); };
+    const fila = (y, etiqueta, valor, negrita = false) => {
+      doc.setFont('helvetica', negrita ? 'bold' : 'normal');
+      doc.text(etiqueta, L, y);
+      doc.text(valor, R, y, { align: 'right' });
+    };
 
-    doc.setFontSize(11); doc.text('Enganche y pagos', 10, y); y += 6;
+    const logo = await cargarLogo();
+    if (logo) {
+      const h = 24; const w = h * (logo.w / logo.h);
+      doc.addImage(logo.data, 'JPEG', L, 14, w, h);
+    }
+
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+    doc.text('LIQUIDACIÓN FINAL', 62, 52);
     doc.setFontSize(10);
-    if (pagos.length === 0) { doc.text('Sin abonos registrados', 10, y); y += 6; }
-    pagos.forEach(p => {
-      doc.text(`${p.fecha}   ${fmt(p.monto)}${p.comprobante_path ? '   (con comprobante)' : ''}`, 10, y);
-      y += 6;
+    doc.setFont('helvetica', 'normal'); doc.text('FECHA', 138, 52);
+    doc.setFont('helvetica', 'bold'); doc.text(fechaCorta(), 165, 52);
+
+    doc.setFontSize(10);
+    let y = 66;
+    const dato = (etiqueta, valor, negrita = true) => {
+      doc.setFont('helvetica', 'normal'); doc.text(etiqueta, L, y);
+      doc.setFont('helvetica', negrita ? 'bold' : 'normal');
+      const lineas = doc.splitTextToSize(String(valor || ''), 95);
+      doc.text(lineas, V, y);
+      y += 6 * Math.max(lineas.length, 1) + 1;
+    };
+    dato('DESARROLLO', (unidadAbierta.desarrollo_nombre || '').toUpperCase(), false);
+    dato('DOMICILIO', (desarrollo.direccion || '').toUpperCase(), false);
+    dato('TIPO DE CRÉDITO', (venta.tipo_compra || '').toUpperCase());
+    dato('EDIFICIO', edificio);
+    dato('DEPARTAMENTO', departamento);
+    y += 5;
+    dato('NOMBRE DEL CLIENTE', cliente);
+
+    y += 8;
+    fila(y, 'PRECIO DE LISTA', fmtN(valorVenta)); y += 6;
+    fila(y, 'DESCUENTO', fmtN(0)); y += 3;
+    linea(y, L, R, 0.5); y += 5;
+    fila(y, 'VALOR DE VENTA NETO', fmtN(valorVenta), true); y += 2;
+    linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);
+
+    y += 11;
+    fila(y, 'ENGANCHE (+)', fmtN(pagado)); y += 6;
+    fila(y, et.f1.toUpperCase(), fmtN(f1)); y += 6;
+    fila(y, et.f2.toUpperCase(), fmtN(f2)); y += 3;
+    linea(y, L, R, 0.5); y += 5;
+    fila(y, 'TOTAL PAGOS', fmtN(totalPagos), true); y += 2;
+    linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);
+
+    y += 14;
+    doc.setFontSize(10);
+    fila(y, 'DIFERENCIA A PAGAR', fmtN(saldoNeto), true);
+    linea(y - 5, R - 38, R, 0.4); linea(y + 2, R - 38, R, 0.4);
+
+    if (cuotas > 0) {
+      y += 17;
+      doc.setFont('helvetica', 'normal'); doc.text('PAGO DE CUOTAS CONDOMINALES / DOS MESES', L, y);
+      doc.setFont('helvetica', 'bold');
+      doc.rect(R - 38, y - 5, 38, 8);
+      doc.text(fmtN(cuotas), R - 2, y, { align: 'right' });
+    }
+
+    // Firmas
+    const yFirma = 232;
+    const firmas = [
+      { x: 20, nombre: firmantes.titulacion, rol: 'TITULACIÓN' },
+      { x: 82, nombre: firmantes.tesorero, rol: 'TESORERO' },
+      { x: 144, nombre: cliente, rol: 'CLIENTE' },
+    ];
+    firmas.forEach(f => {
+      linea(yFirma, f.x, f.x + 56, 0.3);
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+      doc.text(doc.splitTextToSize(f.nombre || '', 56), f.x + 28, yFirma + 5, { align: 'center' });
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+      doc.text(f.rol, f.x + 28, yFirma + 13, { align: 'center' });
     });
-    doc.text(`Total abonado: ${fmt(pagado)}`, 10, y); y += 10;
 
-    doc.text(`Diferencia por cubrir: ${fmt(diferenciaPorCubrir)}`, 10, y); y += 8;
-    doc.text(`Financiera 1: ${fmt(form.financiera_1_monto)}`, 10, y); y += 6;
-    doc.text(`Financiera 2: ${fmt(form.financiera_2_monto)}`, 10, y); y += 6;
-    doc.text(`Liberación: ${fmt(form.liberacion_monto)}`, 10, y); y += 8;
-    doc.setFontSize(11);
-    doc.text(`Saldo neto: ${fmt(saldoNeto)}`, 10, y); y += 7;
-    doc.text(`Remanente: ${fmt(remanente)}`, 10, y);
-
-    doc.save(`${cliente} - Cobranza.pdf`);
+    doc.save(`${cliente} - Liquidación final.pdf`);
   };
 
   return (
@@ -310,13 +411,13 @@ export default function Cobranza({ miRol, miAgente }) {
 
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 1</label>
+                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 1 — {etiquetasCredito(venta.tipo_compra).f1}</label>
                   <input type="number" step="0.01" min="0" value={form.financiera_1_monto}
                     onChange={e => setForm(f => ({ ...f, financiera_1_monto: e.target.value }))}
                     style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 2</label>
+                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 2 — {etiquetasCredito(venta.tipo_compra).f2}</label>
                   <input type="number" step="0.01" min="0" value={form.financiera_2_monto}
                     onChange={e => setForm(f => ({ ...f, financiera_2_monto: e.target.value }))}
                     style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
@@ -326,6 +427,12 @@ export default function Cobranza({ miRol, miAgente }) {
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
                 <input type="number" step="0.01" min="0" value={form.liberacion_monto}
                   onChange={e => setForm(f => ({ ...f, liberacion_monto: e.target.value }))}
+                  style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Cuotas condominales (2 meses)</label>
+                <input type="number" step="0.01" min="0" value={form.cuotas_condominales}
+                  onChange={e => setForm(f => ({ ...f, cuotas_condominales: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
 
@@ -352,7 +459,7 @@ export default function Cobranza({ miRol, miAgente }) {
               </div>
               <button onClick={descargarPDF}
                 style={{ width: '100%', padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                ⬇ Descargar PDF
+                ⬇ Descargar liquidación final (PDF)
               </button>
             </div>
           </div>
