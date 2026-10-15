@@ -21,6 +21,10 @@ function useIsMobile() {
 
 export default function Agentes() {
   const puede = usePuede();
+  const [rolesPersonalizados, setRolesPersonalizados] = useState([]);
+  useEffect(() => {
+    supabase.from('roles_personalizados').select('nombre, basado_en').order('nombre').then(({ data }) => setRolesPersonalizados(data || []));
+  }, []);
   const isMobile = useIsMobile();
   const [agentes, setAgentes] = useState([]);
   const [desarrollos, setDesarrollos] = useState([]);
@@ -77,7 +81,7 @@ export default function Agentes() {
   function formVacio() {
     return {
       nombre: '', apellidos: '', correo: '', telefono: '',
-      whatsapp: '', rol: 'Agente', equipo: 'Gemex',
+      whatsapp: '', rol: 'Agente', rol_personalizado: '', equipo: 'Gemex',
       codigo_agente: '', inmobiliaria_id: null,
       desarrollos: [], desarrollos_cargo: [], desarrollos_todos: false, foto_url: '', activo: true,
       // FIX: correos de los agentes que un Mesa de Control tiene a su
@@ -183,7 +187,7 @@ export default function Agentes() {
     // por si llegó con espacios de alguna otra forma (ej. precargado de un
     // registro viejo que ya los tenía guardados).
     const correoLimpio = form.correo.replace(/\s/g, '');
-    let payload = { ...form, correo: correoLimpio };
+    let payload = { ...form, correo: correoLimpio, rol_personalizado: form.rol_personalizado || null };
     delete payload.inmobiliarias;
 
     if (form.equipo === 'Inmobiliaria' && nuevaInmobiliariaNombre.trim()) {
@@ -819,7 +823,7 @@ export default function Agentes() {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{miAgente.nombre} {miAgente.apellidos}</div>
-              <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{miAgente.rol} · {miAgente.equipo}</div>
+              <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{miAgente.rol_personalizado || miAgente.rol} · {miAgente.equipo}</div>
               {!isMobile && (
                 <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px', color: '#888' }}>
                   {miAgente.correo && <span>✉ {miAgente.correo}</span>}
@@ -929,7 +933,7 @@ export default function Agentes() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e' }}>{a.nombre} {a.apellidos}</div>
-                      <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{a.rol}</div>
+                      <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{a.rol_personalizado || a.rol}</div>
                       <div style={{ fontSize: '11px', color: '#aaa', marginTop: '1px' }}>{a.correo}</div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
@@ -980,7 +984,7 @@ export default function Agentes() {
                           </div>
                           <div>
                             <div style={{ fontWeight: '500', color: '#1a1a2e' }}>{a.nombre} {a.apellidos}</div>
-                            <div style={{ fontSize: '11px', color: '#aaa' }}>{a.rol}</div>
+                            <div style={{ fontSize: '11px', color: '#aaa' }}>{a.rol_personalizado || a.rol}</div>
                           </div>
                         </div>
                       </td>
@@ -1040,7 +1044,7 @@ export default function Agentes() {
               </div>
               <div>
                 <div style={{ fontSize: '17px', fontWeight: '600', color: '#1a1a2e' }}>{showDetalle.nombre} {showDetalle.apellidos}</div>
-                <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{showDetalle.rol}</div>
+                <div style={{ fontSize: '13px', color: '#888', marginTop: '2px' }}>{showDetalle.rol_personalizado || showDetalle.rol}</div>
                 {showDetalle.equipo === 'Gemex' && showDetalle.codigo_agente && (
                   <div style={{ fontSize: '12px', color: '#555', marginTop: '2px' }}>Código: <strong>{showDetalle.codigo_agente}</strong></div>
                 )}
@@ -1179,9 +1183,15 @@ export default function Agentes() {
 
             <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Rol</label>
-              <select value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}
+              <select value={form.rol_personalizado || form.rol}
+                onChange={e => {
+                  const elegido = rolesPersonalizados.find(r => r.nombre === e.target.value);
+                  // Un rol personalizado se guarda como su rol base (lo que ya entiende todo el sistema) + su nombre.
+                  setForm({ ...form, rol: elegido ? elegido.basado_en : e.target.value, rol_personalizado: elegido ? elegido.nombre : '' });
+                }}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }}>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                {rolesPersonalizados.map(r => <option key={r.nombre} value={r.nombre}>{r.nombre} (basado en {r.basado_en})</option>)}
               </select>
               {form.rol === 'Mesa de Control' && (
                 <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>

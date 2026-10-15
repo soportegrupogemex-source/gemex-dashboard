@@ -108,7 +108,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>Bienvenido,</div>
             <div style={{ fontSize: '13px', color: '#ccc', fontWeight: '500', marginTop: '2px' }}>{nombre}</div>
             <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }}>
-              {miAgente?.equipo === 'Gemex' && miAgente?.codigo_agente ? miAgente.codigo_agente : miRol}
+              {miAgente?.equipo === 'Gemex' && miAgente?.codigo_agente ? miAgente.codigo_agente : (miAgente?.rol_personalizado || miRol)}
             </div>
           </div>
         )}
@@ -618,18 +618,22 @@ function App() {
   const [rankingBsVisible, setRankingBsVisible] = useState(true);
   // Ajustes del Super Admin al menú de mi rol (tabla permisos_rol; solo diferencias).
   const [permisosRol, setPermisosRol] = useState({});
+  // Un rol creado en el panel se guarda como rol base (comportamiento y alcance
+  // de datos) + nombre propio (rol_personalizado); sus ajustes de permisos van
+  // bajo ese nombre.
+  const rolPermisos = miAgente?.rol_personalizado || miRol;
   useEffect(() => {
     if (!session || !miRol || miRol === 'Super Admin') { setPermisosRol({}); return; }
     let cancelado = false;
     (async () => {
-      const { data } = await supabase.from('permisos_rol').select('permiso, habilitado').eq('rol', miRol);
+      const { data } = await supabase.from('permisos_rol').select('permiso, habilitado').eq('rol', rolPermisos);
       if (cancelado) return;
       const m = {};
       (data || []).forEach(r => { m[r.permiso] = r.habilitado; });
       setPermisosRol(m);
     })();
     return () => { cancelado = true; };
-  }, [session, miRol]);
+  }, [session, miRol, rolPermisos]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAviso, setShowAviso] = useState(false);
   // FIX: aviso automático al entrar al CRM si tengo documentos de
