@@ -128,7 +128,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
   // FIX: antes traía TODOS los contactos sin importar el rol — un Agente
   // podía ver (y elegir) contactos de otros asesores al cotizar, lo cual
   // es una fuga de información de clientes. Ahora la consulta misma trae
-  // solo lo que corresponde: Agente/Desarrollador → los suyos; Gerente →
+  // solo lo que corresponde: Agente → los suyos; Gerente →
   // los de su equipo/proyectos a cargo; Super Admin/Admin/Sub Admin → todos.
   const cargarContactos = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -164,7 +164,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
         ? query.or(`creado_por.eq.${correo},desarrollo.in.(${cargo.map(d => `"${d}"`).join(',')})`)
         : query.eq('creado_por', correo);
     } else {
-      // Agente, Desarrollador, o cualquier otro rol: solo lo suyo
+      // Agente, o cualquier otro rol: solo lo suyo
       query = query.or(`creado_por.eq.${correo},asesor_ventas.eq.${nombreCompleto}`);
     }
 

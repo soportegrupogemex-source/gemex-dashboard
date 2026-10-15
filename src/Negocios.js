@@ -90,7 +90,7 @@ export default function Negocios() {
   // traía TODOS los contactos del sistema sin importar quién los ve,
   // dejando elegir en el selector "Contacto" al crear un negocio a
   // clientes de otros asesores. Mismo filtro que ya usa Cotizador.js:
-  // Agente/Desarrollador → los suyos; Mesa de Control → él + su equipo,
+  // Agente → los suyos; Mesa de Control → él + su equipo,
   // dentro de sus desarrollos a cargo; Gerente Editor/Operador → los
   // suyos + los de sus desarrollos a cargo; Super Admin/Admin/Sub Admin
   // → todos.
@@ -149,7 +149,7 @@ export default function Negocios() {
         ? query.or(`creado_por.eq.${correo},desarrollo.in.(${cargo.map(d => `"${d}"`).join(',')})`)
         : query.eq('creado_por', correo);
     } else {
-      // Agente, Desarrollador, o cualquier otro rol: solo lo suyo
+      // Agente, o cualquier otro rol: solo lo suyo
       query = query.or(`creado_por.eq.${correo},asesor_ventas.eq.${nombreCompleto}`);
     }
 

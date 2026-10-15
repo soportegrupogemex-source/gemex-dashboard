@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import { supabase } from './supabase';
 import { CLAVE_TITULADOR, CLAVE_TESORERO } from './AjustesAdministracion';
 import { fmtDinero, InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 // FIX: Cliente asignado, Valor venta y Tipo de compra ya NO se capturan
 // aquí — se leen en vivo del movimiento 'Vendida' de la unidad (fuente
@@ -60,8 +61,13 @@ function useIsMobile() {
 
 export default function Cobranza({ miRol, miAgente }) {
   const isMobile = useIsMobile();
-  // Mesa de Control puede ver y descargar la liquidación en PDF, sin editar nada.
-  const soloLectura = miRol === 'Mesa de Control';
+  // Cada acción tiene su interruptor en el panel Permisos (Mesa de Control, de fábrica, solo descarga el PDF).
+  const puede = usePuede();
+  const puedeAgregarPagos = puede('cobranza.agregar_pagos');
+  const puedeEliminarPagos = puede('cobranza.eliminar_pagos');
+  const puedeEditarMontos = puede('cobranza.editar_montos');
+  const puedeMarcarLiquidacion = puede('cobranza.marcar_liquidacion');
+  const puedeDescargarLiquidacion = puede('cobranza.descargar_liquidacion');
   const [desarrollos, setDesarrollos] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [seguimientos, setSeguimientos] = useState({});
@@ -165,7 +171,7 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   const guardarSeguimiento = async () => {
-    if (soloLectura) return null;
+    if (!puedeEditarMontos) return null;
     setGuardando(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload = {
@@ -188,7 +194,7 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   const agregarPago = async () => {
-    if (soloLectura) return;
+    if (!puedeAgregarPagos) return;
     if (!nuevoPago.monto || r2(nuevoPago.monto) <= 0) return;
     setSubiendoComprobante(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -217,7 +223,7 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   const eliminarPago = async (pago) => {
-    if (soloLectura) return;
+    if (!puedeEliminarPagos) return;
     await supabase.from('cobranza_pagos').delete().eq('id', pago.id);
     if (pago.comprobante_path) await supabase.storage.from('cobranza').remove([pago.comprobante_path]);
     setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: (prev[unidadAbierta.id] || []).filter(p => p.id !== pago.id) }));
@@ -335,7 +341,7 @@ export default function Cobranza({ miRol, miAgente }) {
   // Al desmarcar se borra el archivo. El PDF es una foto del momento: si
   // cambian pagos o montos después, hay que desmarcar y volver a marcar.
   const toggleLiquidacionFinal = async (marcada) => {
-    if (procesandoLiquidacion || soloLectura) return;
+    if (procesandoLiquidacion || !puedeMarcarLiquidacion) return;
     setProcesandoLiquidacion(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -448,13 +454,13 @@ export default function Cobranza({ miRol, miAgente }) {
                       {p.comprobante_path
                         ? <button onClick={() => verComprobante(p.comprobante_path)} style={{ border: 'none', background: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: '12px' }}>Ver comprobante</button>
                         : <span style={{ fontSize: '11px', color: '#bbb' }}>Sin comprobante</span>}
-                      {!soloLectura && <button onClick={() => eliminarPago(p)}
+                      {puedeEliminarPagos && <button onClick={() => eliminarPago(p)}
                         style={{ border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '12px' }}>Eliminar</button>}
                     </div>
                   ))}
                 </div>
               )}
-              {!soloLectura && <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              {puedeAgregarPagos && <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <input type="date" value={nuevoPago.fecha} onChange={e => setNuevoPago(p => ({ ...p, fecha: e.target.value }))}
                   style={{ flex: 1, minWidth: '120px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
                 <InputDinero placeholder="Monto" value={nuevoPago.monto} onChange={e => setNuevoPago(p => ({ ...p, monto: e.target.value }))}
@@ -486,19 +492,19 @@ export default function Cobranza({ miRol, miAgente }) {
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>Estos montos se capturan en Titulación (Autorización financiera 1 y 2).</div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
-                <InputDinero disabled={soloLectura} value={form.liberacion_monto}
+                <InputDinero disabled={!puedeEditarMontos} value={form.liberacion_monto}
                   onChange={e => setForm(f => ({ ...f, liberacion_monto: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Cuotas condominales (2 meses)</label>
-                <InputDinero disabled={soloLectura} value={form.cuotas_condominales}
+                <InputDinero disabled={!puedeEditarMontos} value={form.cuotas_condominales}
                   onChange={e => setForm(f => ({ ...f, cuotas_condominales: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
 
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: form.liquidacion_final_completada ? '#EAF3DE' : '#f9f9f9', borderRadius: '10px', marginBottom: '8px', cursor: 'pointer', fontSize: '13px' }}>
-                <input type="checkbox" checked={!!form.liquidacion_final_completada} disabled={procesandoLiquidacion || soloLectura}
+                <input type="checkbox" checked={!!form.liquidacion_final_completada} disabled={procesandoLiquidacion || !puedeMarcarLiquidacion}
                   onChange={e => toggleLiquidacionFinal(e.target.checked)} style={{ width: '16px', height: '16px' }} />
                 <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{procesandoLiquidacion ? 'Procesando...' : 'Liquidación final completada'}</span>
               </label>
@@ -522,15 +528,15 @@ export default function Cobranza({ miRol, miAgente }) {
                   style={{ flex: 1, padding: '10px', background: '#fff', color: '#666', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   Cerrar
                 </button>
-                {!soloLectura && <button onClick={guardarSeguimiento} disabled={guardando}
+                {puedeEditarMontos && <button onClick={guardarSeguimiento} disabled={guardando}
                   style={{ flex: 1, padding: '10px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   {guardando ? 'Guardando...' : 'Guardar'}
                 </button>}
               </div>
-              <button onClick={descargarPDF}
+              {puedeDescargarLiquidacion && <button onClick={descargarPDF}
                 style={{ width: '100%', padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 ⬇ Descargar liquidación final (PDF)
-              </button>
+              </button>}
             </div>
           </div>
         );

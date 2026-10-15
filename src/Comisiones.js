@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 // Comisiones — una fila por venta (movimiento tipo 'Vendida', la misma
 // fuente del Historial). Los negocios se ligan por unidad (o por contacto)
@@ -11,8 +12,6 @@ import { supabase } from './supabase';
 //  - Comisión solicitada: los Gerentes (solo de sus desarrollos y mientras
 //    no esté pagada), además de Super Admin, Admin y Tesorería.
 //  - Enganche pagado: Super Admin, Admin y Tesorería.
-const ROLES_EDITAN = ['Super Admin', 'Admin', 'Tesorería'];
-const ROLES_MARCAN_PAGADA = ['Super Admin', 'Tesorería'];
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const fmtFecha = (f) => f ? new Date(f).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
@@ -45,15 +44,13 @@ export default function Comisiones({ miRol, miAgente }) {
   const isMobile = useIsMobile();
   const esGerente = ROLES_GERENTE.includes(miRol);
   const misDesarrollos = miAgente?.desarrollos_cargo || [];
+  const puede = usePuede();
+  // Interruptores del panel Permisos. Los gerentes, además, no pueden mover
+  // "solicitada" cuando la comisión ya está pagada.
   const puedeCampo = (campo, seg) => {
-    if (campo === 'comision_pagada') return ROLES_MARCAN_PAGADA.includes(miRol);
-    if (campo === 'comision_solicitada') return ROLES_EDITAN.includes(miRol) || (esGerente && !seg?.comision_pagada);
-    return ROLES_EDITAN.includes(miRol);
-  };
-  const quienPuede = {
-    enganche_pagado: 'solo Super Admin, Admin y Tesorería',
-    comision_solicitada: 'solo Gerentes, Super Admin, Admin y Tesorería',
-    comision_pagada: 'solo Super Admin y Tesorería',
+    if (campo === 'comision_pagada') return puede('comisiones.marcar_pagada');
+    if (campo === 'comision_solicitada') return puede('comisiones.solicitar') && !(esGerente && seg?.comision_pagada);
+    return puede('comisiones.marcar_enganche');
   };
   const [ventas, setVentas] = useState([]);
   const [docsPorMov, setDocsPorMov] = useState({});
@@ -272,7 +269,7 @@ export default function Comisiones({ miRol, miAgente }) {
                   <input type="checkbox" checked={!!s[c.key]} disabled={!puedeCampo(c.key, s) || guardando}
                     onChange={e => cambiarCampo(m, c.key, e.target.checked)} style={{ width: '16px', height: '16px' }} />
                   <span style={{ color: '#333' }}>{c.label}</span>
-                  {!puedeCampo(c.key, s) && <span style={{ fontSize: '11px', color: '#aaa' }}>({quienPuede[c.key]})</span>}
+                  {!puedeCampo(c.key, s) && <span style={{ fontSize: '11px', color: '#aaa' }}>(sin permiso)</span>}
                   {s[c.key] && s[`${c.key}_fecha`] && (
                     <span style={{ fontSize: '11px', color: '#aaa' }}>{fmtFecha(s[`${c.key}_fecha`])}{s[`${c.key}_por`] ? ` · ${s[`${c.key}_por`]}` : ''}</span>
                   )}

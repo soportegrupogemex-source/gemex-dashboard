@@ -304,7 +304,7 @@ export default function Contactos() {
     const enMiAlcance = (c) => {
       if (!c) return false;
       if (ROLES_VER_TODOS.includes(miRol)) return true;
-      if (miRol === 'Agente' || miRol === 'Asesor Premium' || miRol === 'Desarrollador') {
+      if (miRol === 'Agente' || miRol === 'Asesor Premium') {
         return c.creado_por === correo || c.asesor_ventas === nombreCompleto;
       }
       if (miRol === 'Mesa de Control') {
@@ -334,7 +334,7 @@ export default function Contactos() {
     setLoading(true);
     let query = supabase.from('contactos').select('*', { count: 'exact' });
     if (ROLES_VER_TODOS.includes(miRol)) {
-    } else if (miRol === 'Agente' || miRol === 'Asesor Premium' || miRol === 'Desarrollador') {
+    } else if (miRol === 'Agente' || miRol === 'Asesor Premium') {
       // FIX BUG DE VISIBILIDAD: antes solo se filtraba por `creado_por`
       // (quién dio de alta el contacto originalmente). Si un Super
       // Admin/Admin reasignaba el contacto a otro agente cambiando

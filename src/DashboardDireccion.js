@@ -84,12 +84,6 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     cargarEquipoExterno();
   }, [miRol, miAgente]);
 
-  useEffect(() => {
-    if (miRol === 'Desarrollador' && miAgente?.desarrollos?.length > 0) {
-      setDesarrolloSel(miAgente.desarrollos[0]);
-    }
-  }, [miRol, miAgente]);
-
   const cargarMovimientosYDesarrollos = async () => {
     const [movs, devs] = await Promise.all([
       supabase.from('movimientos').select('*').order('created_at', { ascending: true }),
@@ -566,7 +560,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
             </div>
           </div>
           {isMobile ? (
-            miRol !== 'Desarrollador' && (
+            (
               <button onClick={() => setShowFiltros(f => !f)}
                 style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
                 ⚙️ Filtros
@@ -579,14 +573,14 @@ export default function DashboardDireccion({ miRol, miAgente }) {
                 style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
                 {(aniosDisponibles.length > 0 ? aniosDisponibles : [new Date().getFullYear()]).map(a => <option key={a} value={a}>{a}</option>)}
               </select>
-              {miRol !== 'Desarrollador' && (
+              {(
                 <select value={desarrolloSel} onChange={e => setDesarrolloSel(e.target.value)}
                   style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', minWidth: '180px' }}>
                   <option value=''>Todos los proyectos</option>
                   {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
                 </select>
               )}
-              {miRol !== 'Desarrollador' && miRol !== 'Mesa de Control' && (
+              {miRol !== 'Mesa de Control' && (
                 <select value={filtroEquipoVendedor} onChange={e => setFiltroEquipoVendedor(e.target.value)}
                   style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', minWidth: '160px' }}>
                   <option value=''>Todos los equipos</option>
@@ -602,7 +596,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
           )}
         </div>
 
-        {isMobile && showFiltros && miRol !== 'Desarrollador' && (
+        {isMobile && showFiltros && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#f9f9f9', borderRadius: '8px', marginTop: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', color: '#888', whiteSpace: 'nowrap' }}>Año:</span>

@@ -54,7 +54,6 @@ export const MENU_POR_ROL = {
   // Asesor Premium: igual que Agente, pero en Expedientes carga los
   // documentos de cualquier asesor.
   'Asesor Premium': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
-  'Desarrollador': ['contactos', 'desarrollos', 'direccion'],
   // Roles de un solo módulo — solo entran a su propia pantalla.
   'Construcción': ['direccion'],
   'Tesorería': ['direccion'],
@@ -62,7 +61,7 @@ export const MENU_POR_ROL = {
 };
 
 // Roles que se pueden configurar en el panel (Super Admin siempre tiene todo).
-export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Desarrollador', 'Construcción', 'Tesorería', 'Titulación'];
+export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación'];
 
 // Pantallas que se pueden encender/apagar por rol ("Ajustes de administración"
 // es solo del Super Admin y no se configura).
@@ -79,7 +78,6 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   if (!HOJAS_DIRECCION.includes(id)) {
     if (!menuPermitido.includes(id)) return false;
     if (id === 'dashboard' && (miRol === 'Agente' || miRol === 'Asesor Premium') && ctx.equipo !== 'Gemex') return false;
-    if (id === 'dashboard' && miRol === 'Desarrollador') return false;
     if (id === 'dashboard' && miRol !== 'Super Admin' && !ctx.rankingBsVisible) return false;
     return true;
   }
@@ -89,7 +87,6 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   if (id === 'cobranza' && miRol === 'Mesa de Control') return true;
   // Comisiones: los permisos finos (quién marca qué) se limitan dentro de la pantalla.
   if (id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
-  if (miRol === 'Desarrollador') return id === 'dashboard_dir';
   // Mesa de Control revisa Movimientos, Historial y Titulación.
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
@@ -143,15 +140,43 @@ export const ACCIONES = [
   { id: 'desarrollos.editar_web', seccion: 'Desarrollos', label: 'Editar publicación en la página web', defecto: roles('Super Admin') },
   { id: 'desarrollos.ver_planes', seccion: 'Desarrollos', label: 'Ver planes de pago del desarrollo', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control') },
 
+  // Expedientes. La pestaña "Cargar" solo deja subir en expedientes propios (el
+  // del asesor que es vendedor); "de cualquier asesor" es un permiso aparte.
+  { id: 'expedientes.cargar_documentos', seccion: 'Expedientes', label: 'Cargar documentos y datos de sus propios expedientes', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium') },
+  { id: 'expedientes.cargar_de_cualquier_asesor', seccion: 'Expedientes', label: 'Cargar documentos de expedientes de CUALQUIER asesor', defecto: roles('Asesor Premium'), sinSuperAdmin: true },
+  { id: 'expedientes.revisar_documentos', seccion: 'Expedientes', label: 'Aprobar o rechazar documentos', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
+  { id: 'expedientes.marcar_completo', seccion: 'Expedientes', label: 'Marcar "Expediente completo"', defecto: roles('Mesa de Control'), sinSuperAdmin: true },
+  { id: 'expedientes.enviar_titulacion', seccion: 'Expedientes', label: 'Marcar "Enviar a Titulación"', defecto: roles('Mesa de Control'), sinSuperAdmin: true },
+  { id: 'expedientes.archivar', seccion: 'Expedientes', label: 'Archivar expedientes', defecto: roles('Mesa de Control'), sinSuperAdmin: true },
+  { id: 'expedientes.configurar_responsables', seccion: 'Expedientes', label: 'Elegir a los responsables de expedientes', defecto: roles('Super Admin', 'Admin') },
+  { id: 'expedientes.ver_descargar', seccion: 'Expedientes', label: 'Ver las pestañas Descargar y Contratos', defecto: roles('Super Admin', 'Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Titulación') },
+  { id: 'expedientes.descargar_zip', seccion: 'Expedientes', label: 'Descargar el expediente completo (ZIP)', defecto: roles('Super Admin', 'Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Titulación') },
+  { id: 'expedientes.cargar_contrato', seccion: 'Expedientes', label: 'Cargar el contrato firmado (pestaña Contratos)', defecto: roles('Super Admin', 'Admin', 'Gerente Editor', 'Gerente Operador') },
+
+  // Comisiones (los gerentes además solo ven y solicitan sobre sus desarrollos).
+  { id: 'comisiones.marcar_enganche', seccion: 'Comisiones', label: 'Marcar "Enganche pagado"', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
+  { id: 'comisiones.solicitar', seccion: 'Comisiones', label: 'Marcar "Comisión solicitada"', defecto: roles('Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador') },
+  { id: 'comisiones.marcar_pagada', seccion: 'Comisiones', label: 'Marcar "Comisión pagada"', defecto: roles('Super Admin', 'Tesorería') },
+
+  // Cobranza (Mesa de Control solo puede descargar la liquidación).
+  { id: 'cobranza.agregar_pagos', seccion: 'Cobranza', label: 'Registrar pagos (enganche y abonos)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.eliminar_pagos', seccion: 'Cobranza', label: 'Eliminar pagos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.editar_montos', seccion: 'Cobranza', label: 'Editar liberación y cuotas condominales', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.marcar_liquidacion', seccion: 'Cobranza', label: 'Marcar "Liquidación final completada"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.descargar_liquidacion', seccion: 'Cobranza', label: 'Descargar la liquidación en PDF', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería', 'Mesa de Control') },
+
   { id: 'planes.editar', seccion: 'Planes de pago', label: 'Crear, editar y eliminar planes de pago', defecto: roles('Super Admin', 'Admin') },
 ];
 
 export const claveAccion = (id) => `accion.${id}`;
 
+// El Super Admin siempre puede, salvo las acciones marcadas sinSuperAdmin
+// (hoy dependen de ser responsable o de ser el asesor del expediente): para
+// no cambiarle lo que ya hace, se rigen solo por su valor de fábrica.
 export const puedeAccion = (rol, id, overrides = {}) => {
-  if (rol === 'Super Admin') return true;
+  const a = ACCIONES.find(x => x.id === id);
+  if (rol === 'Super Admin' && !a?.sinSuperAdmin) return true;
   const ov = overrides?.[claveAccion(id)];
   if (ov !== undefined) return ov;
-  const a = ACCIONES.find(x => x.id === id);
   return a ? a.defecto(rol) : false;
 };

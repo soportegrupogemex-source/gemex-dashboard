@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { enviarPush } from './enviarPush';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 // FIX: "validacion_ine" y "comprobante_apartado" ahora aceptan imagen
 // además de PDF (aceptaImagen). "comprobante_apartado" además admite
@@ -215,16 +216,23 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const esTitulacionRol = miRol === 'Titulación';
   // Asesor Premium: igual que un asesor, pero puede cargar los documentos
   // de los expedientes de CUALQUIER asesor.
-  const esAsesorPremium = miRol === 'Asesor Premium';
   const esAdmin = ROLES_ADMIN.includes(miRol);
   // FIX: Mesa de Control es quien valida expedientes — siempre puede
   // prender/apagar "Expediente completo", además de quien esté configurado
   // como responsable.
-  const soyResponsable = esMesaControl || (miAgente?.correo && responsables.includes(miAgente.correo));
+  const puede = usePuede();
+  // Cada acción tiene su interruptor en el panel Permisos; además, quien esté
+  // en la lista de "Responsables" (por persona) puede marcar completo, enviar
+  // a Titulación y archivar, sin importar su rol.
+  const enListaResponsables = !!(miAgente?.correo && responsables.includes(miAgente.correo));
+  const puedoMarcarCompleto = puede('expedientes.marcar_completo') || enListaResponsables;
+  const puedoEnviarTitulacion = puede('expedientes.enviar_titulacion') || enListaResponsables;
+  const puedoArchivar = puede('expedientes.archivar') || enListaResponsables;
+  const puedeRevisarDocs = puede('expedientes.revisar_documentos');
   // FIX: pestaña "Contratos" — solo Gerentes, Admin y Super Admin pueden
   // subir el contrato ya firmado (Mesa de Control puede entrar a verla,
   // igual que ya hace con "Descargar", pero sin poder cargar el archivo).
-  const puedeCargarContrato = esGerente || esAdmin;
+  const puedeCargarContrato = puede('expedientes.cargar_contrato');
   // FIX: aviso a los responsables de expedientes con documentos por
   // revisar — se muestra una sola vez por sesión (no cada vez que se
   // actualiza algo en pantalla), con el mismo estilo que ya usa el aviso
@@ -233,7 +241,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const yaAvisoPendientesRef = useRef(false);
   const misProyectos = miAgente?.desarrollos_cargo || [];
 
-  const puedeVerDescarga = esAdmin || esGerente || esMesaControl || esTitulacionRol;
+  const puedeVerDescarga = puede('expedientes.ver_descargar');
 
   useEffect(() => {
     cargarMovimientos();
@@ -241,7 +249,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     cargarOcupaciones();
     cargarCutoffBuyerPersona();
     cargarDesarrollos();
-    if (esAdmin) { cargarResponsables(); cargarSuperAdmins(); }
+    if (esAdmin || puede('expedientes.configurar_responsables')) { cargarResponsables(); cargarSuperAdmins(); }
   }, [miRol, miAgente]);
 
   useEffect(() => { cargarContactoBuyerPersona(movSel?.contacto_id); setBuscarOcupacion(''); setShowOcupaciones(false); }, [movSel]);
@@ -432,7 +440,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // FIX: "Expediente completo" — casilla que solo el responsable puede
   // prender/apagar. Marca que la documentación ya está lista.
   const handleToggleExpedienteCompleto = async (mov, valor) => {
-    if (!soyResponsable) return;
+    if (!puedoMarcarCompleto) return;
     const { data, error } = await supabase.from('movimientos').update({ expediente_completo: valor }).eq('id', mov.id).select().single();
     if (error) return;
     setMovSel(data);
@@ -444,7 +452,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // de inmediato, así que el responsable decide por separado cuándo
   // mandarlo (Titulación filtra por esta casilla, no por la anterior).
   const handleToggleEnviarTitulacion = async (mov, valor) => {
-    if (!soyResponsable) return;
+    if (!puedoEnviarTitulacion) return;
     const { data, error } = await supabase.from('movimientos').update({ enviar_titulacion: valor }).eq('id', mov.id).select().single();
     if (error) return;
     setMovSel(data);
@@ -770,7 +778,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // ============ Listas filtradas por pestaña y rol ============
 
   const movimientosCargar = movimientos.filter(m => {
-    if (esVendedorDe(m) || esAsesorPremium) return true;
+    if (esVendedorDe(m) || puede('expedientes.cargar_de_cualquier_asesor')) return true;
     if (esMesaControl) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
     if (esAdmin) return true;
@@ -783,7 +791,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     if (esMesaControl) return true;
     if (esTitulacionRol) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
-    return false;
+    // Otro rol al que el Super Admin le encendió "Ver Descargar": ve todos.
+    return puedeVerDescarga && !esGerente;
   });
 
   // FIX: "Contratos" — mismo criterio de visibilidad que "Descargar",
@@ -810,11 +819,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   );
 
   useEffect(() => {
-    if (!soloEnviadosATitulacion && (esAdmin || esMesaControl) && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
+    if (!soloEnviadosATitulacion && puedeRevisarDocs && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
       yaAvisoPendientesRef.current = true;
       setShowAlertaPendientes(true);
     }
-  }, [esAdmin, esMesaControl, expedientesPorRevisar.length, soloEnviadosATitulacion]);
+  }, [puedeRevisarDocs, expedientesPorRevisar.length, soloEnviadosATitulacion]);
 
   // FIX: bloque reutilizable que muestra quién aprobó/rechazó el
   // documento y cuándo — registro visible SOLO para Super Admin (no
@@ -835,7 +844,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   if (movSel) {
     const docs = docsDe(movSel.id);
     const archivado = expedienteArchivado(movSel.id);
-    const esMio = esVendedorDe(movSel) || esAsesorPremium;
+    const esMio = (puede('expedientes.cargar_documentos') && esVendedorDe(movSel)) || puede('expedientes.cargar_de_cualquier_asesor');
     const soloLectura11 = tab === 'cargar' && !esMio; // Gerente/Admin viendo lo de otros: solo lectura de los 11
     // FIX: "Contrato firmado" lo sube el asesor (antes el Gerente), y
     // solo hasta que el expediente ya esté aprobado ("Expediente
@@ -847,7 +856,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     // pasó el filtro de Mesa de Control — ni se vuelve a aprobar/rechazar
     // documentos, ni se tocan las casillas "Expediente completo"/"Enviar
     // a Titulación", solo se puede ver y descargar.
-    const puedoRevisar = tab === 'descargar' && !soloEnviadosATitulacion && (esAdmin || esMesaControl);
+    const puedoRevisar = tab === 'descargar' && !soloEnviadosATitulacion && puedeRevisarDocs;
     const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
     const esFinanciado = !!cfgFinanciado;
     const docsTitular = docsRequeridos(movSel, 'titular');
@@ -954,13 +963,13 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             <div style={{ fontSize: '13px', color: '#888' }}>{movSel.desarrollo_nombre} — Unidad {movSel.unidad_numero} — Vendedor: {movSel.vendedor}</div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {(esAdmin || esMesaControl || esTitulacionRol || (esGerente && esDeMiProyecto(movSel))) && (
+            {puede('expedientes.descargar_zip') && (!esGerente || esDeMiProyecto(movSel)) && (
               <button onClick={() => handleDescargarZip(movSel)} disabled={generandoZip === movSel.id}
                 style={{ padding: '8px 16px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {generandoZip === movSel.id ? 'Generando ZIP...' : '⬇ Descargar todo (ZIP)'}
               </button>
             )}
-            {soyResponsable && !archivado && tab === 'descargar' && (
+            {puedoArchivar && !archivado && tab === 'descargar' && (
               <button onClick={() => handleArchivar(movSel)} disabled={archivandoId === movSel.id}
                 style={{ padding: '8px 16px', background: '#FFF8E1', color: '#856404', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {archivandoId === movSel.id ? 'Archivando...' : '📦 Archivar (ya respaldado)'}
@@ -983,22 +992,22 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
 
         {tab === 'descargar' && !soloEnviadosATitulacion && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', cursor: soyResponsable ? 'pointer' : 'default' }}>
-              <input type='checkbox' checked={!!movSel.expediente_completo} disabled={!soyResponsable}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', cursor: puedoMarcarCompleto ? 'pointer' : 'default' }}>
+              <input type='checkbox' checked={!!movSel.expediente_completo} disabled={!puedoMarcarCompleto}
                 onChange={e => handleToggleExpedienteCompleto(movSel, e.target.checked)} />
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.expediente_completo ? '#27500A' : '#856404' }}>
-                  Expediente completo{!soyResponsable ? ' — solo el responsable puede cambiarlo' : ''}
+                  Expediente completo{!puedoMarcarCompleto ? ' — solo el responsable puede cambiarlo' : ''}
                 </div>
                 <div style={{ fontSize: '11px', color: '#888' }}>La documentación ya está lista.</div>
               </div>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#EAF3DE' : '#F3F0FF', borderRadius: '8px', cursor: soyResponsable ? 'pointer' : 'default' }}>
-              <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!soyResponsable}
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#EAF3DE' : '#F3F0FF', borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
+              <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
                 onChange={e => handleToggleEnviarTitulacion(movSel, e.target.checked)} />
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#27500A' : '#5B21B6' }}>
-                  Enviar a Titulación{!soyResponsable ? ' — solo el responsable puede cambiarlo' : ''}
+                  Enviar a Titulación{!puedoEnviarTitulacion ? ' — solo el responsable puede cambiarlo' : ''}
                 </div>
                 <div style={{ fontSize: '11px', color: '#888' }}>Al activarla, la unidad pasa a Titulación.</div>
               </div>
@@ -1272,7 +1281,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         </div>
       )}
 
-      {tab === 'descargar' && !soloEnviadosATitulacion && esAdmin && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && puede('expedientes.configurar_responsables') && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button onClick={() => setShowConfigResponsable(true)}
             style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}>
@@ -1281,7 +1290,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         </div>
       )}
 
-      {tab === 'descargar' && !soloEnviadosATitulacion && soyResponsable && pendientesDeArchivar.length > 0 && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && puedoArchivar && pendientesDeArchivar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
           ⚠️ Tienes {pendientesDeArchivar.length} expediente{pendientesDeArchivar.length !== 1 ? 's' : ''} con más de {MESES_PARA_ARCHIVAR} meses sin archivar.
         </div>
@@ -1290,7 +1299,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       {/* FIX: banner permanente (se ve cada vez que estás en "Descargar")
           + modal que solo aparece una vez por sesión, avisando que hay
           documentos subidos esperando revisión. */}
-      {tab === 'descargar' && !soloEnviadosATitulacion && (esAdmin || esMesaControl) && expedientesPorRevisar.length > 0 && (
+      {tab === 'descargar' && !soloEnviadosATitulacion && puedeRevisarDocs && expedientesPorRevisar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
           📋 Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos por revisar.
         </div>
@@ -1377,7 +1386,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             // de un vistazo qué expedientes tienen documentos subidos sin
             // revisar todavía — mismo criterio que expedientesPorRevisar,
             // como refuerzo visual además de la notificación push.
-            const porRevisar = !soloEnviadosATitulacion && (miRol === 'Super Admin' || esMesaControl) && !archivado &&
+            const porRevisar = !soloEnviadosATitulacion && puedeRevisarDocs && !archivado &&
               Object.values(docsDe(m.id)).some(d => d?.archivo_path && d.estado_revision === 'pendiente');
             return (
               <div key={m.id} onClick={() => setMovSel(m)}
@@ -1415,7 +1424,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                       {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
                       {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
                       {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
-                      {!archivado && pendiente && soyResponsable && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
+                      {!archivado && pendiente && puedoArchivar && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
                       <span style={{ fontSize: '12px', fontWeight: '600', color: aprobados === total ? '#2E7D4F' : '#888' }}>{aprobados}/{total}</span>
                     </>
                   )}

@@ -679,9 +679,7 @@ function App() {
     setMiRol(data?.rol || 'Agente');
     cargarExpedientesRechazados(data?.correo);
     if (esPrimerLogin) {
-      if (data?.rol === 'Desarrollador') {
-        setActivePage('dashboard_dir');
-      } else if (data?.rol === 'Construcción') {
+      if (data?.rol === 'Construcción') {
         setActivePage('construccion');
       } else if (data?.rol === 'Tesorería') {
         setActivePage('cobranza');
