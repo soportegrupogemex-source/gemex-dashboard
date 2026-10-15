@@ -17,77 +17,16 @@ import Cobranza from './Cobranza';
 import Comisiones from './Comisiones';
 import AjustesAdministracion from './AjustesAdministracion';
 import Marketing from './Marketing';
+import PanelPermisos from './PanelPermisos';
+import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe } from './permisosMenu';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
-  TrendingUp, Landmark, Percent, SlidersHorizontal, Megaphone,
+  TrendingUp, Landmark, Percent, SlidersHorizontal, Megaphone, ToggleRight,
 } from 'lucide-react';
-
-// Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
-// cómo se agrupan. Un módulo con una sola hoja visible para el rol se
-// muestra como botón directo.
-const MENU_MODULOS = [
-  { id: 'mod_ventas', label: 'Ventas', icon: 'mod_ventas', submenu: [
-    { id: 'dashboard_dir', label: 'Dashboard', icon: 'dashboard_dir' },
-    { id: 'dashboard', label: 'Ranking Gemex', icon: 'dashboard' },
-    { id: 'contactos', label: 'Contactos', icon: 'contactos' },
-    { id: 'negocios', label: 'Negocios', icon: 'negocios' },
-    { id: 'desarrollos', label: 'Desarrollos', icon: 'desarrollos' },
-    { id: 'expedientes', label: 'Expedientes', icon: 'expedientes' },
-    { id: 'objetivos', label: 'Objetivos', icon: 'objetivos' },
-    { id: 'movimientos', label: 'Movimientos', icon: 'movimientos' },
-    { id: 'historial', label: 'Historial', icon: 'historial' },
-    { id: 'buyer_persona', label: 'Buyer Persona', icon: 'buyer_persona' },
-    { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
-    { id: 'marketing', label: 'Marketing', icon: 'marketing' },
-  ]},
-  { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
-    { id: 'construccion', label: 'Construcción', icon: 'construccion' },
-  ]},
-  { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
-    { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
-  ]},
-  { id: 'mod_administracion', label: 'Administración', icon: 'mod_administracion', submenu: [
-    { id: 'cobranza', label: 'Cobranza', icon: 'cobranza' },
-    { id: 'comisiones', label: 'Comisiones', icon: 'comisiones' },
-    { id: 'agentes', label: 'Agentes', icon: 'agentes' },
-    { id: 'ajustes_admin', label: 'Ajustes de administración', icon: 'ajustes_admin' },
-  ]},
-];
-
-// Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
-// decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
-
-const MENU_POR_ROL = {
-  'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
-  'Admin':       ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
-  'Sub Admin':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
-  'Gerente Editor':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
-  // FIX: Gerente Operador ahora también entra a Agentes — es quien da
-  // de alta a su equipo, con acceso completo igual que Admin ahí.
-  'Gerente Operador': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
-  // Mesa de Control — revisa expedientes de TODA la empresa (sin
-  // restricción de desarrollo/equipo, a diferencia de los demás Gerentes).
-  // Sin Ranking Gemex, Contactos, Agentes ni Negocios. Dentro de Dirección
-  // solo ve Movimientos, Historial y Titulación (se filtra en
-  // submenuFiltrado más abajo).
-  'Mesa de Control':  ['desarrollos', 'expedientes', 'direccion'],
-  'Agente':      ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
-  // Asesor Premium: igual que Agente, pero en Expedientes carga los
-  // documentos de cualquier asesor.
-  'Asesor Premium': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
-  'Desarrollador': ['contactos', 'desarrollos', 'direccion'],
-  // FIX: roles de un solo módulo — solo entran a Dirección y ahí solo ven
-  // su propia pantalla (se filtra en submenuFiltrado más abajo), igual
-  // que Mesa de Control con Movimientos/Historial.
-  'Construcción': ['direccion'],
-  'Tesorería': ['direccion'],
-  'Titulación': ['direccion'],
-};
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -140,50 +79,12 @@ const MENU_ICONS = {
   buyer_persona: <UserCheck size={18} />,
 };
 
-function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, isMobile, showAviso, onToggleAviso, rankingBsVisible, onToggleRankingBs, expedientesRechazados }) {
+function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, isMobile, showAviso, onToggleAviso, rankingBsVisible, onToggleRankingBs, expedientesRechazados, permisos }) {
   // FIX: "Dirección" (y cualquier submenú) inicia cerrado por defecto en
   // vez de abierto. Antes: useState('direccion').
   const [submenuAbierto, setSubmenuAbierto] = React.useState(null);
-  const menuPermitido = MENU_POR_ROL[miRol] || [];
-  const hojaVisible = (s) => {
-    // Marketing: leads de Meta — asesores, gerentes y administradores.
-    if (s.id === 'marketing') return ['Agente', 'Asesor Premium', 'Gerente Editor', 'Gerente Operador', 'Admin', 'Sub Admin', 'Super Admin'].includes(miRol);
-    if (!HOJAS_DIRECCION.includes(s.id)) {
-      if (!menuPermitido.includes(s.id)) return false;
-      if (s.id === 'dashboard' && (miRol === 'Agente' || miRol === 'Asesor Premium') && miAgente?.equipo !== 'Gemex') return false;
-      if (s.id === 'dashboard' && miRol === 'Desarrollador') return false;
-      if (s.id === 'dashboard' && miRol !== 'Super Admin' && !rankingBsVisible) return false;
-      return true;
-    }
-    if (!menuPermitido.includes('direccion')) return false;
-    // Comisiones: Super Admin, Admin, Tesorería, los Gerentes (estos solo
-    // ven sus desarrollos y solo pueden solicitar) y Mesa de Control (solo
-    // lectura, toda la empresa); los permisos finos se limitan dentro de la pantalla.
-    if (s.id === 'ajustes_admin') return miRol === 'Super Admin';
-    // Mesa de Control entra a Cobranza solo para ver y descargar la liquidación (PDF).
-    if (s.id === 'cobranza' && miRol === 'Mesa de Control') return true;
-    if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
-    if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
-    // FIX: Mesa de Control entra a revisar Movimientos, Historial
-    // y Titulación (también se encargan de ese módulo) — sin
-    // Dashboard, Cobranza, Objetivos, Tendencias ni Buyer Persona
-    // (a diferencia de los demás Gerentes).
-    if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial' || s.id === 'titulacion';
-    // FIX: Construcción y Tesorería son roles de un solo módulo
-    // — solo ven su propia pantalla.
-    if (miRol === 'Construcción') return s.id === 'construccion';
-    if (miRol === 'Tesorería') return s.id === 'cobranza';
-    if (miRol === 'Titulación') return s.id === 'titulacion';
-    // FIX: Gerente Operador — solo Dashboard (de sus desarrollos a
-    // cargo), Movimientos, Historial, Titulación (solo ver) y
-    // Tendencias; sin Cobranza, Construcción, Objetivos ni Buyer
-    // Persona.
-    if (miRol === 'Gerente Operador') return ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'tendencias_producto'].includes(s.id);
-    if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-    if (s.id === 'tendencias_producto') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
-    if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor';
-    return true;
-  };
+  const ctxPermisos = { equipo: miAgente?.equipo, rankingBsVisible, overrides: permisos };
+  const hojaVisible = (h) => hojaVisibleDe(miRol, h.id, ctxPermisos);
   const modulosVisibles = MENU_MODULOS
     .map(mod => ({ ...mod, hojas: mod.submenu.filter(hojaVisible) }))
     .filter(mod => mod.hojas.length > 0);
@@ -284,6 +185,13 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             <span style={{ display: 'flex', alignItems: 'center' }}><Settings size={18} /></span>
             Mi cuenta
           </button>
+          {miRol === 'Super Admin' && (
+            <button onClick={() => handleNav('permisos')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', cursor: 'pointer', marginBottom: '2px', fontSize: '14px', background: active === 'permisos' ? '#fff' : 'transparent', color: active === 'permisos' ? '#C0203A' : '#aaa', textAlign: 'left' }}>
+              <span style={{ display: 'flex', alignItems: 'center' }}><ToggleRight size={18} /></span>
+              Permisos
+            </button>
+          )}
           <button onClick={onLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', textAlign: 'left' }}>
             <span style={{ display: 'flex', alignItems: 'center' }}><LogOut size={18} /></span>
@@ -707,6 +615,20 @@ function App() {
   const [miAgente, setMiAgente] = useState(null);
   const [miRol, setMiRol] = useState('Agente');
   const [rankingBsVisible, setRankingBsVisible] = useState(true);
+  // Ajustes del Super Admin al menú de mi rol (tabla permisos_rol; solo diferencias).
+  const [permisosRol, setPermisosRol] = useState({});
+  useEffect(() => {
+    if (!session || !miRol || miRol === 'Super Admin') { setPermisosRol({}); return; }
+    let cancelado = false;
+    (async () => {
+      const { data } = await supabase.from('permisos_rol').select('permiso, habilitado').eq('rol', miRol);
+      if (cancelado) return;
+      const m = {};
+      (data || []).forEach(r => { m[r.permiso] = r.habilitado; });
+      setPermisosRol(m);
+    })();
+    return () => { cancelado = true; };
+  }, [session, miRol]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showAviso, setShowAviso] = useState(false);
   // FIX: aviso automático al entrar al CRM si tengo documentos de
@@ -795,12 +717,15 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const puedeVer = (id) => hojaVisibleDe(miRol, id, { equipo: miAgente?.equipo, rankingBsVisible, overrides: permisosRol });
   const renderPage = () => {
+    // Una pantalla que el rol no tiene encendida no se abre aunque se llegue a ella.
+    if (HOJAS_CONFIGURABLES.some(h => h.id === activePage) && !puedeVer(activePage) && activePage !== 'desarrollos') {
+      return <Desarrollos miRol={miRol} miAgente={miAgente} />;
+    }
     switch (activePage) {
+      case 'permisos': return miRol === 'Super Admin' ? <PanelPermisos miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'dashboard':
-        if ((miRol === 'Agente' || miRol === 'Asesor Premium') && miAgente?.equipo !== 'Gemex') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
-        if (miRol === 'Mesa de Control') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
-        if (miRol !== 'Super Admin' && !rankingBsVisible) return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         return <Dashboard />;
       case 'contactos': return <Contactos />;
       case 'negocios': return <Negocios />;
@@ -809,7 +734,7 @@ function App() {
       case 'expedientes': return <Expedientes miRol={miRol} miAgente={miAgente} />;
       case 'movimientos': return <Movimientos />;
       case 'dashboard_dir': return <DashboardDireccion miRol={miRol} miAgente={miAgente} />;
-      case 'historial': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Mesa de Control') ? <HistorialMovimientos miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
+      case 'historial': return <HistorialMovimientos miRol={miRol} miAgente={miAgente} />;
       case 'objetivos': return <Objetivos miRol={miRol} miAgente={miAgente} />;
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
@@ -817,11 +742,8 @@ function App() {
       case 'marketing': return <Marketing miRol={miRol} miAgente={miAgente} />;
       case 'ajustes_admin': return miRol === 'Super Admin' ? <AjustesAdministracion /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
-      case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
-      case 'buyer_persona':
-        return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor')
-          ? <BuyerPersona miRol={miRol} miAgente={miAgente} />
-          : <Desarrollos miRol={miRol} miAgente={miAgente} />;
+      case 'tendencias_producto': return <TendenciasProducto miRol={miRol} miAgente={miAgente} />;
+      case 'buyer_persona': return <BuyerPersona miRol={miRol} miAgente={miAgente} />;
       case 'micuenta': return <MiCuenta user={session.user} miRol={miRol} />;
       default: return <Desarrollos miRol={miRol} miAgente={miAgente} />;
     }
@@ -847,6 +769,7 @@ function App() {
         rankingBsVisible={rankingBsVisible}
         onToggleRankingBs={handleToggleRankingBs}
         expedientesRechazados={expedientesRechazados}
+        permisos={permisosRol}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {isMobile && <TopBar onMenuOpen={() => setSidebarOpen(true)} miAgente={miAgente} />}
