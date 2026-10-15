@@ -165,6 +165,44 @@ export const ACCIONES = [
   { id: 'cobranza.marcar_liquidacion', seccion: 'Cobranza', label: 'Marcar "Liquidación final completada"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.descargar_liquidacion', seccion: 'Cobranza', label: 'Descargar la liquidación en PDF', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería', 'Mesa de Control') },
 
+  // Titulación (Gerente Operador, de fábrica, solo ve).
+  { id: 'titulacion.editar_seguimiento', seccion: 'Titulación', label: 'Editar fechas y casillas del seguimiento', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
+  { id: 'titulacion.cargar_archivos', seccion: 'Titulación', label: 'Cargar archivos (avalúo, autorizaciones, carta de liberación, trámites)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
+  { id: 'titulacion.capturar_montos', seccion: 'Titulación', label: 'Capturar montos de Autorización financiera 1 y 2', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
+
+  // Movimientos: qué tipos de movimiento puede registrar cada rol.
+  { id: 'movimientos.registrar_apartado', seccion: 'Movimientos', label: 'Registrar Apartados', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'movimientos.registrar_venta', seccion: 'Movimientos', label: 'Registrar Ventas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'movimientos.registrar_cancelacion', seccion: 'Movimientos', label: 'Registrar Cancelaciones', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'movimientos.registrar_cambio_unidad', seccion: 'Movimientos', label: 'Registrar Cambios de unidad', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'movimientos.registrar_post_venta', seccion: 'Movimientos', label: 'Registrar movimientos de Titulación y Cobranza', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'movimientos.fuera_de_ventana', seccion: 'Movimientos', label: 'Cargar y editar movimientos fuera de la ventana de martes a lunes', defecto: (rol) => !['Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(rol) },
+
+  // Historial (los Gerentes y Mesa de Control, además, solo dentro de la ventana de martes a lunes).
+  { id: 'historial.editar_movimientos', seccion: 'Historial', label: 'Editar movimientos', defecto: roles('Super Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'historial.cambiar_tipo', seccion: 'Historial', label: 'Cambiar el tipo de un movimiento (Apartado, Vendida, Cancelación…)', defecto: roles('Super Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'historial.marcar_comisionable', seccion: 'Historial', label: 'Marcar un movimiento como "Comisionable"', defecto: roles('Super Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'historial.eliminar_movimientos', seccion: 'Historial', label: 'Eliminar movimientos', defecto: roles('Super Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+  { id: 'historial.corregir_unidad', seccion: 'Historial', label: 'Corregir la unidad de un movimiento', defecto: roles('Super Admin') },
+  { id: 'historial.configurar_ventana', seccion: 'Historial', label: 'Configurar la hora de cierre de la ventana', defecto: roles('Super Admin') },
+  { id: 'historial.exportar', seccion: 'Historial', label: 'Exportar el historial', defecto: roles('Super Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },
+
+  // Contactos (cada asesor solo ve y trabaja sus propios contactos; eso no cambia).
+  { id: 'contactos.crear', seccion: 'Contactos', label: 'Crear contactos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'contactos.elegir_asesor', seccion: 'Contactos', label: 'Elegir el asesor de ventas al crear un contacto', defecto: roles('Super Admin', 'Admin') },
+  { id: 'contactos.editar_datos_personales', seccion: 'Contactos', label: 'Editar datos personales de un contacto', defecto: roles('Super Admin', 'Admin') },
+  { id: 'contactos.eliminar', seccion: 'Contactos', label: 'Eliminar contactos', defecto: roles('Super Admin') },
+  { id: 'contactos.exportar', seccion: 'Contactos', label: 'Exportar contactos', defecto: roles('Super Admin') },
+  { id: 'contactos.importar_historico', seccion: 'Contactos', label: 'Importar histórico de contactos', defecto: roles('Super Admin') },
+  { id: 'contactos.configurar_vigencia', seccion: 'Contactos', label: 'Configurar vigencia y alertas', defecto: roles('Super Admin') },
+
+  // Negocios
+  { id: 'negocios.crear', seccion: 'Negocios', label: 'Crear negocios', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'negocios.editar', seccion: 'Negocios', label: 'Editar negocios', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'negocios.cambiar_etapa', seccion: 'Negocios', label: 'Mover negocios de etapa', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'negocios.eliminar', seccion: 'Negocios', label: 'Eliminar negocios', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'negocios.reasignar_asesor', seccion: 'Negocios', label: 'Reasignar el asesor de un negocio', defecto: roles('Super Admin') },
+
   { id: 'planes.editar', seccion: 'Planes de pago', label: 'Crear, editar y eliminar planes de pago', defecto: roles('Super Admin', 'Admin') },
 ];
 

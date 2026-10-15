@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 // FIX: al editar el tipo de un movimiento aquí (p. ej. de Apartado a
@@ -116,7 +117,15 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
     return ahora <= limite;
   };
 
-  const puedeEditar = miRol === 'Super Admin' || (esGerente && dentroDeVentana());
+  // Interruptores del panel Permisos. Quienes no tengan "fuera de ventana"
+  // (de fábrica, los Gerentes y Mesa de Control) solo editan de martes a lunes.
+  const puede = usePuede();
+  const sinVentana = puede('movimientos.fuera_de_ventana');
+  const enHorario = sinVentana || dentroDeVentana();
+  const puedeEditar = puede('historial.editar_movimientos') && enHorario;
+  const puedeEliminar = puede('historial.eliminar_movimientos') && enHorario;
+  const puedeCambiarTipo = puede('historial.cambiar_tipo');
+  const puedeMarcarComisionable = puede('historial.marcar_comisionable');
 
   useEffect(() => { cargarConfigVentana(); }, []);
   useEffect(() => { cargarMovimientos(); cargarDesarrollos(); cargarAgentes(); }, [filtroTipo, filtroDesarrollo, miAgente]);
@@ -208,7 +217,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   // lista, en vez de dejar escribir un número que no exista en inventario.
   const handleEditar = async (m) => {
     setForm({ ...m }); setEditando(m.id); setMovDetalle(null);
-    if (miRol === 'Super Admin' && m.desarrollo_id) {
+    if (puede('historial.corregir_unidad') && m.desarrollo_id) {
       const { data } = await supabase.from('inventario').select('id, numero').eq('desarrollo_id', m.desarrollo_id).order('numero');
       setUnidadesDesarrollo(data || []);
     } else {
@@ -217,6 +226,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   };
 
   const handleGuardar = async () => {
+    if (!puedeEditar) return; // respaldo de seguridad
     setGuardando(true);
     await supabase.from('movimientos').update({
       tipo: form.tipo, monto: form.monto, plan_pago: form.plan_pago, tipo_compra: form.tipo_compra,
@@ -236,6 +246,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   };
 
   const handleEliminar = async (id) => {
+    if (!puedeEliminar) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar este movimiento? Esto no revertirá el estatus del inventario.')) return;
     const { error } = await supabase.from('movimientos').delete().eq('id', id);
     if (error) {
@@ -416,7 +427,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
         </div>
         {/* FIX: solo Super Admin puede corregir la unidad — se elige de la
             lista real del inventario de ese desarrollo, no texto libre. */}
-        {miRol === 'Super Admin' && (
+        {puede('historial.corregir_unidad') && (
           <div style={{ marginBottom: '12px' }}>
             <label style={labelStyle}>Unidad <span style={{ color: '#e53e3e' }}>(corrección — Super Admin)</span></label>
             <select value={form.unidad_id || ''} onChange={e => {
@@ -434,7 +445,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           <label style={labelStyle}>Tipo</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
             {TIPOS.map(t => (
-              <button key={t} onClick={() => setForm({ ...form, tipo: t })}
+              <button key={t} onClick={() => { if (puedeCambiarTipo) setForm({ ...form, tipo: t }); }}
                 style={{ padding: '10px', border: `1px solid ${form.tipo === t ? colorTipo[t] : '#ddd'}`, borderRadius: '8px', background: form.tipo === t ? bgTipo[t] : '#fff', color: form.tipo === t ? colorTipo[t] : '#333', cursor: 'pointer', fontSize: '13px', fontWeight: form.tipo === t ? '600' : '400' }}>
                 {t}
               </button>
@@ -484,7 +495,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           </>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div onClick={() => setForm({ ...form, comisionable: !form.comisionable })}
+          <div onClick={() => { if (puedeMarcarComisionable) setForm({ ...form, comisionable: !form.comisionable }); }}
             style={{ width: '48px', height: '26px', borderRadius: '13px', background: form.comisionable ? '#C0203A' : '#ccc', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
             <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: form.comisionable ? '24px' : '2px', transition: 'left 0.2s' }} />
           </div>
@@ -496,10 +507,10 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           style={{ flex: 1, padding: '14px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>
           {guardando ? 'Guardando...' : 'Guardar cambios'}
         </button>
-        <button onClick={() => { handleEliminar(editando); setEditando(null); }}
+        {puedeEliminar && <button onClick={() => { handleEliminar(editando); setEditando(null); }}
           style={{ padding: '14px 18px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
           🗑
-        </button>
+        </button>}
       </div>
     </div>
   );
@@ -549,14 +560,14 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           </div>
         )}
       </div>
-      {puedeEditar && (
+      {(puedeEditar || puedeEliminar) && (
         <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid #f0f0f0', display: 'flex', gap: '8px' }}>
-          <button onClick={() => handleEditar(m)} style={{ flex: 1, padding: '12px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontWeight: '500' }}>
+          {puedeEditar && <button onClick={() => handleEditar(m)} style={{ flex: 1, padding: '12px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontWeight: '500' }}>
             Editar
-          </button>
-          <button onClick={() => handleEliminar(m.id)} style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
+          </button>}
+          {puedeEliminar && <button onClick={() => handleEliminar(m.id)} style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
             🗑
-          </button>
+          </button>}
         </div>
       )}
     </div>
@@ -571,12 +582,12 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           <div style={{ fontSize: '13px', color: '#888' }}>{movsFiltrados.length} movimientos</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <button onClick={handleExportarPorProyecto}
+          {puede('historial.exportar') && <button onClick={handleExportarPorProyecto}
             style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}
             title="Descarga el historial filtrado, con una hoja por proyecto">
             ⬇ Exportar por proyecto
-          </button>
-          {miRol === 'Super Admin' && (
+          </button>}
+          {puede('historial.configurar_ventana') && (
             <button onClick={() => setShowConfigVentana(true)}
               style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}
               title="Configurar hasta qué hora del lunes pueden cargar/editar los Gerentes">
@@ -595,7 +606,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       </div>
 
       {/* FIX: aviso a los Gerentes cuando la ventana de edición está cerrada */}
-      {esGerente && !dentroDeVentana() && (
+      {!sinVentana && !dentroDeVentana() && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1rem' }}>
           🔒 La ventana de carga/edición está cerrada por hoy (lunes después de las {horaCierre}). Puedes seguir viendo el historial, pero no editar ni cargar movimientos nuevos hasta el martes.
         </div>
@@ -772,7 +783,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                     {label}{flecha(key)}
                   </th>
                 ))}
-                {puedeEditar && <th style={{ padding: '10px 12px' }}></th>}
+                {(puedeEditar || puedeEliminar) && <th style={{ padding: '10px 12px' }}></th>}
               </tr>
             </thead>
             <tbody>
@@ -821,17 +832,17 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                   <td style={{ padding: '10px 12px', color: '#555', fontSize: '11px', whiteSpace: 'nowrap' }}>{m.fecha_movimiento ? fmtFechaHora(m.fecha_movimiento) : '—'}</td>
                   <td style={{ padding: '10px 12px', color: '#555', fontSize: '11px', whiteSpace: 'nowrap' }}>{nombreCargador(m)}</td>
                   <td style={{ padding: '10px 12px', color: '#555', fontSize: '11px', whiteSpace: 'nowrap' }}>{nombreEditor(m)}</td>
-                  {puedeEditar && (
+                  {(puedeEditar || puedeEliminar) && (
                     <td style={{ padding: '10px 12px' }}>
                       <div style={{ display: 'flex', gap: '6px' }}>
-                        <button onClick={() => handleEditar(m)}
+                        {puedeEditar && <button onClick={() => handleEditar(m)}
                           style={{ background: 'none', border: '0.5px solid #ddd', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '11px', color: '#333' }}>
                           Editar
-                        </button>
-                        <button onClick={() => handleEliminar(m.id)}
+                        </button>}
+                        {puedeEliminar && <button onClick={() => handleEliminar(m.id)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>
                           🗑
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   )}

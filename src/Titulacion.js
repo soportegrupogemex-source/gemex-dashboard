@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Expedientes from './Expedientes';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 // FIX: Titulación ahora solo trabaja el Paso 2 (Titulación -> Escritura)
 // — el Paso 1 (Avance de obra, DTU, Lista para avalúo) lo captura el
@@ -95,7 +96,11 @@ export default function Titulacion({ miRol, miAgente }) {
   const idsPermitidos = desarrollosPermitidos.map(d => d.id);
   // FIX: el Gerente Operador solo puede VER Titulación (sin editar
   // fechas, casillas ni cargar archivos).
-  const soloLectura = miRol === 'Gerente Operador';
+  const puede = usePuede();
+  const puedeEditarSeg = puede('titulacion.editar_seguimiento');
+  const puedeArchivos = puede('titulacion.cargar_archivos');
+  const puedeMontos = puede('titulacion.capturar_montos');
+  const soloLectura = !puedeEditarSeg && !puedeArchivos && !puedeMontos;
 
   const cargarTodo = async () => {
     setCargando(true);
@@ -183,7 +188,7 @@ export default function Titulacion({ miRol, miAgente }) {
   };
 
   const guardar = async () => {
-    if (soloLectura) return;
+    if (!puedeEditarSeg && !puedeMontos) return;
     setGuardando(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload = {
@@ -222,7 +227,7 @@ export default function Titulacion({ miRol, miAgente }) {
   // al botón "Guardar" general (mismo patrón que el comprobante de pago
   // en Cobranza).
   const handleSubirTramite = async (campoPath, archivo) => {
-    if (!archivo || soloLectura) return;
+    if (!archivo || !puedeArchivos) return;
     setSubiendoTramite(campoPath);
     const ext = archivo.name.split('.').pop();
     const path = `${unidadAbierta.id}/${campoPath}-${Date.now()}.${ext}`;
@@ -359,13 +364,13 @@ export default function Titulacion({ miRol, miAgente }) {
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de solicitud</label>
-                <input type="date" disabled={soloLectura} value={form.fecha_solicitud_avaluo || ''}
+                <input type="date" disabled={!puedeEditarSeg} value={form.fecha_solicitud_avaluo || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_solicitud_avaluo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
-                <input type="date" disabled={soloLectura} value={form.fecha_terminacion_avaluo || ''}
+                <input type="date" disabled={!puedeEditarSeg} value={form.fecha_terminacion_avaluo || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_avaluo: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
@@ -377,7 +382,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   📄 Ver avalúo
                 </button>
               )}
-              {!soloLectura && <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+              {puedeArchivos && <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                 {subiendoTramite === 'avaluo_path' ? 'Subiendo...' : (form.avaluo_path ? 'Reemplazar avalúo' : '📎 Cargar avalúo')}
                 <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === 'avaluo_path'}
                   onChange={e => handleSubirTramite('avaluo_path', e.target.files[0])} />
@@ -388,13 +393,13 @@ export default function Titulacion({ miRol, miAgente }) {
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de solicitud</label>
-                <input type="date" disabled={soloLectura} value={form.fecha_solicitud_seguro_calidad || ''}
+                <input type="date" disabled={!puedeEditarSeg} value={form.fecha_solicitud_seguro_calidad || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_solicitud_seguro_calidad: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Fecha de terminación</label>
-                <input type="date" disabled={soloLectura} value={form.fecha_terminacion_seguro_calidad || ''}
+                <input type="date" disabled={!puedeEditarSeg} value={form.fecha_terminacion_seguro_calidad || ''}
                   onChange={e => setForm(f => ({ ...f, fecha_terminacion_seguro_calidad: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
@@ -404,13 +409,13 @@ export default function Titulacion({ miRol, miAgente }) {
             {PASO2.map(p => (
               <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  <input type="checkbox" disabled={!puedeEditarSeg} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
                 {p.campoMonto && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#555' }}>
                     Monto $
-                    <InputDinero disabled={soloLectura} value={form[p.campoMonto] === 0 ? '' : form[p.campoMonto]} placeholder="0.00"
+                    <InputDinero disabled={!puedeMontos} value={form[p.campoMonto] === 0 ? '' : form[p.campoMonto]} placeholder="0.00"
                       onChange={e => setForm(f => ({ ...f, [p.campoMonto]: e.target.value }))}
                       style={{ width: '120px', padding: '4px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px' }} />
                   </span>
@@ -433,7 +438,7 @@ export default function Titulacion({ miRol, miAgente }) {
                     📄 Ver archivo
                   </button>
                 ) : null)}
-                {p.campoPath && !soloLectura && (
+                {p.campoPath && puedeArchivos && (
                   <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                     {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
                     <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
@@ -447,7 +452,7 @@ export default function Titulacion({ miRol, miAgente }) {
             {TRAMITES.map(p => (
               <div key={p.campo} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#333', cursor: 'pointer' }}>
-                  <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
+                  <input type="checkbox" disabled={!puedeEditarSeg} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
                 {form[p.campoPath] ? (
@@ -456,7 +461,7 @@ export default function Titulacion({ miRol, miAgente }) {
                     📄 Ver archivo
                   </button>
                 ) : null}
-                {!soloLectura && (
+                {puedeArchivos && (
                 <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
                   {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
                   <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
@@ -471,7 +476,7 @@ export default function Titulacion({ miRol, miAgente }) {
                 style={{ flex: 1, padding: '10px', background: '#fff', color: '#666', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {soloLectura ? 'Cerrar' : 'Cancelar'}
               </button>
-              {!soloLectura && <button onClick={guardar} disabled={guardando}
+              {(puedeEditarSeg || puedeMontos) && <button onClick={guardar} disabled={guardando}
                 style={{ flex: 1, padding: '10px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {guardando ? 'Guardando...' : 'Guardar'}
               </button>}

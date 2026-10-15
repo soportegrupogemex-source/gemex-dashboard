@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const ETAPAS = [
   { id: 'Leads', color: '#0EA5E9' },
@@ -25,7 +26,6 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 // asignados para el selector/dropdown — pero a diferencia de Editor/
 // Operador, además se restringe a "su gente" (ver cargarNegocios).
 const ROLES_GERENTE_TODOS = [...ROLES_GERENTE, 'Mesa de Control'];
-const ROLES_ASIGNAR = ['Super Admin'];
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -38,6 +38,7 @@ function useIsMobile() {
 }
 
 export default function Negocios() {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [negocios, setNegocios] = useState([]);
   const [contactos, setContactos] = useState([]);
@@ -272,7 +273,7 @@ export default function Negocios() {
     let asesorVentas = form.asesor_ventas;
     let asesorCorreo = form.asesor_correo;
     if (editando) {
-      if (ROLES_ASIGNAR.includes(miRol)) {
+      if (puede('negocios.reasignar_asesor')) {
         asesorVentas = form.asesor_ventas;
         asesorCorreo = form.asesor_correo;
       } else {
@@ -307,12 +308,14 @@ export default function Negocios() {
   };
 
   const handleEliminar = async (id) => {
+    if (!puede('negocios.eliminar')) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar este negocio?')) return;
     await supabase.from('negocios').delete().eq('id', id);
     setNegocioDetalle(null); cargarNegocios();
   };
 
   const handleCambiarEtapa = async (id, nuevaEtapa) => {
+    if (!puede('negocios.cambiar_etapa')) return; // respaldo de seguridad
     await supabase.from('negocios').update({ etapa: nuevaEtapa }).eq('id', id);
     cargarNegocios();
   };
@@ -339,7 +342,7 @@ export default function Negocios() {
 
   const totalPorEtapa = (etapa) => negociosPorEtapa(etapa).reduce((sum, n) => sum + Number(n.valor || 0), 0);
   const asesoresUnicos = [...new Set(negocios.map(n => n.asesor_ventas).filter(Boolean))];
-  const esSuperAdmin = ROLES_ASIGNAR.includes(miRol);
+  const esSuperAdmin = puede('negocios.reasignar_asesor');
   // FIX: los Gerentes también ven varios negocios ahora, así que también
   // les sirve el filtro por asesor (antes solo Super Admin/Admin/Sub Admin)
   const puedeFiltrarPorAsesor = ROLES_VER_TODOS.includes(miRol) || ROLES_GERENTE_TODOS.includes(miRol);
@@ -352,12 +355,12 @@ export default function Negocios() {
           <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '2px' }}>Negocios</h2>
           <div style={{ fontSize: '13px', color: '#888' }}>{negocios.length} negocios</div>
         </div>
-        <button onClick={() => {
+        {puede('negocios.crear') && <button onClick={() => {
           setForm({ ...formVacio(), asesor_ventas: miAgente ? `${miAgente.nombre} ${miAgente.apellidos}`.trim() : '', asesor_correo: miAgente?.correo || '' });
           setEditando(null); setShowForm(true);
         }} style={{ ...btnPrimary, padding: isMobile ? '10px 14px' : '8px 16px', fontSize: isMobile ? '14px' : '13px' }}>
           + {isMobile ? 'Nuevo' : 'Crear negocio'}
-        </button>
+        </button>}
       </div>
 
       {/* Filtros */}
@@ -498,7 +501,7 @@ export default function Negocios() {
                 <div style={{ fontSize: '13px', color: '#333', lineHeight: '1.6' }}>{negocioDetalle.descripcion}</div>
               </div>
             )}
-            <div style={{ marginTop: '1.5rem' }}>
+            {puede('negocios.cambiar_etapa') && <div style={{ marginTop: '1.5rem' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>MOVER A ETAPA</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                 {ETAPAS.filter(e => e.id !== negocioDetalle.etapa).map(e => (
@@ -508,7 +511,7 @@ export default function Negocios() {
                   </button>
                 ))}
               </div>
-            </div>
+            </div>}
 
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>TAREAS</div>
@@ -548,16 +551,16 @@ export default function Negocios() {
             </div>
           </div>
           <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid #f0f0f0', flexShrink: 0, display: 'flex', gap: '8px' }}>
-            <button onClick={() => {
+            {puede('negocios.editar') && <button onClick={() => {
               setForm({ ...formVacio(), ...negocioDetalle });
               setEditando(negocioDetalle.id);
               setNegocioDetalle(null);
               setShowForm(true);
-            }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', padding: '12px' }}>Editar</button>
-            <button onClick={() => handleEliminar(negocioDetalle.id)}
+            }} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', padding: '12px' }}>Editar</button>}
+            {puede('negocios.eliminar') && <button onClick={() => handleEliminar(negocioDetalle.id)}
               style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
               Eliminar
-            </button>
+            </button>}
           </div>
         </div>
       )}

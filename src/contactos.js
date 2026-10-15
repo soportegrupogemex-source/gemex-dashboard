@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import DetalleContacto from './DetalleContacto';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
@@ -12,7 +13,6 @@ const TIPO_COMPRA_OPCIONES = ['Contado', 'Crédito hipotecario', 'Infonavit', 'F
 const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 // FIX: para elegir libremente el asesor de ventas al crear un contacto,
 // el requisito es más estricto que ROLES_VER_TODOS — excluye a Sub Admin.
-const ROLES_ELIGEN_ASESOR = ['Super Admin', 'Admin'];
 
 const LADAS = [
   { code: '+52', flag: '🇲🇽', abbr: 'MX', country: 'México' },
@@ -129,6 +129,7 @@ function BadgeVigencia({ dias, alertaDias, vigenciaActiva, estatus }) {
 }
 
 export default function Contactos() {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [contactos, setContactos] = useState([]);
   const [desarrollos, setDesarrollos] = useState([]);
@@ -604,7 +605,7 @@ export default function Contactos() {
 
   // FIX: solo Super Admin/Admin pueden asignar el contacto a cualquier
   // asesor; el resto de roles solo puede darlo de alta bajo su propio usuario.
-  const puedeElegirAsesor = ROLES_ELIGEN_ASESOR.includes(miRol);
+  const puedeElegirAsesor = puede('contactos.elegir_asesor');
 
   const handleCrear = async () => {
     setErrorMsg('');
@@ -687,7 +688,7 @@ export default function Contactos() {
   };
 
   const handleEliminar = async (id) => {
-    if (miRol !== 'Super Admin') return; // FIX: solo Super Admin puede eliminar contactos
+    if (!puede('contactos.eliminar')) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar este contacto?')) return;
     await supabase.from('contactos').delete().eq('id', id);
     cargarContactos();
@@ -815,7 +816,7 @@ export default function Contactos() {
       )}
 
       {/* FIX: modal del importador de histórico masivo */}
-      {showImportHistorico && miRol === 'Super Admin' && (
+      {showImportHistorico && puede('contactos.importar_historico') && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={handleCerrarImportHistorico}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}
@@ -895,29 +896,29 @@ export default function Contactos() {
           <div style={{ fontSize: '13px', color: '#888' }}>{total} registros</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {miRol === 'Super Admin' && !isMobile && (
+          {puede('contactos.configurar_vigencia') && !isMobile && (
             <button onClick={() => setShowVigenciaModal(true)} style={btnOutline} title="Días de vigencia total">⏱ {vigenciaDias}d</button>
           )}
-          {miRol === 'Super Admin' && !isMobile && (
+          {puede('contactos.configurar_vigencia') && !isMobile && (
             <button onClick={() => setShowAlertaDiasModal(true)} style={btnOutline} title="Días de anticipación de la alerta">⚠️ {alertaDias}d</button>
           )}
-          {miRol === 'Super Admin' && !isMobile && (
+          {!isMobile && (
             <>
-              <button onClick={handleExportar} style={btnOutline}>Exportar</button>
-              <button onClick={() => { setShowImportHistorico(true); setFilasHistorico([]); setNombreArchivoHistorico(''); setErroresHistorico([]); setMsgHistorico(''); setProgresoHistorico({ procesados: 0, total: 0, exitosos: 0, saltados: 0, errores: 0 }); }}
+              {puede('contactos.exportar') && <button onClick={handleExportar} style={btnOutline}>Exportar</button>}
+              {puede('contactos.importar_historico') && <button onClick={() => { setShowImportHistorico(true); setFilasHistorico([]); setNombreArchivoHistorico(''); setErroresHistorico([]); setMsgHistorico(''); setProgresoHistorico({ procesados: 0, total: 0, exitosos: 0, saltados: 0, errores: 0 }); }}
                 style={btnOutline}>
                 ⬆ Importar histórico
-              </button>
+              </button>}
             </>
           )}
-          <button onClick={() => {
+          {puede('contactos.crear') && <button onClick={() => {
             setShowForm(true);
-            if (!ROLES_ELIGEN_ASESOR.includes(miRol) && miAgente) {
+            if (!puedeElegirAsesor && miAgente) {
               setForm(f => ({ ...f, asesor_ventas: `${miAgente.nombre} ${miAgente.apellidos}`.trim() }));
             }
           }} style={{ ...btnPrimary, padding: isMobile ? '10px 14px' : '8px 16px', fontSize: isMobile ? '14px' : '13px' }}>
             + {isMobile ? 'Nuevo' : 'Crear un contacto'}
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -1072,7 +1073,7 @@ export default function Contactos() {
                       <td style={{ padding: '12px 14px', color: '#888', fontSize: '12px' }}>{c.asesor_ventas || '—'}</td>
                     )}
                     <td style={{ padding: '12px 14px' }}>
-                      {miRol === 'Super Admin' && (
+                      {puede('contactos.eliminar') && (
                         <button onClick={() => handleEliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '16px' }}>🗑</button>
                       )}
                     </td>

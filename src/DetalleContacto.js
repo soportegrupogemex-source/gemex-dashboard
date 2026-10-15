@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
@@ -432,7 +433,8 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   };
 
   // FIX: solo Super Admin/Admin pueden editar los datos personales del contacto
-  const puedeEditarPersonal = miRol === 'Super Admin' || miRol === 'Admin';
+  const puede = usePuede();
+  const puedeEditarPersonal = puede('contactos.editar_datos_personales');
 
   const handleGuardar = async () => {
     setGuardando(true);

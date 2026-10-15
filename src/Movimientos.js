@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 // FIX: Titulación y Cobranza se agregan como tipos de movimiento
 // posteriores a la Venta — no cambian el estatus de Inventario (la
@@ -15,7 +16,6 @@ const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2
 const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario', 'Showroom'];
 const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
 // FIX: Mesa de Control entra a la misma ventana martes-lunes que los demás Gerentes
-const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -28,6 +28,7 @@ function useIsMobile() {
 }
 
 export default function Movimientos() {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [tipo, setTipo] = useState('Apartado');
   const [desarrollos, setDesarrollos] = useState([]);
@@ -87,7 +88,6 @@ export default function Movimientos() {
     if (data && data.length > 0 && data[0].valor) setHoraCierre(data[0].valor);
   };
 
-  const esGerente = ROLES_GERENTE.includes(miAgente?.rol);
 
   const dentroDeVentana = () => {
     const ahora = new Date();
@@ -98,7 +98,9 @@ export default function Movimientos() {
     return ahora <= limite;
   };
 
-  const ventanaCerrada = esGerente && !dentroDeVentana();
+  // Fuera de la ventana de martes a lunes solo cargan quienes tengan el interruptor
+  // "fuera de ventana" (de fábrica, todos menos Gerentes y Mesa de Control).
+  const ventanaCerrada = !puede('movimientos.fuera_de_ventana') && !dentroDeVentana();
 
   // FIX: el Gerente Operador solo puede cargar movimientos de los
   // desarrollos que tiene a su cargo.
@@ -284,6 +286,17 @@ export default function Movimientos() {
     : unidadesEnEstructura;
   const unidadesNuevas = unidadesFiltradas.filter(u => u.id !== form.unidad_id && u.estatus === 'Libre');
 
+  const PERMISO_DE_TIPO = {
+    'Apartado': 'movimientos.registrar_apartado', 'Vendida': 'movimientos.registrar_venta',
+    'Cancelación': 'movimientos.registrar_cancelacion', 'Cambio de Unidad': 'movimientos.registrar_cambio_unidad',
+    'Titulación': 'movimientos.registrar_post_venta', 'Cobranza': 'movimientos.registrar_post_venta',
+  };
+  const tiposPermitidos = TIPOS.filter(t => puede(PERMISO_DE_TIPO[t]));
+  // Si el tipo elegido ya no está permitido para este rol, pasa al primero que sí.
+  useEffect(() => {
+    if (tiposPermitidos.length > 0 && !tiposPermitidos.includes(tipo)) setTipo(tiposPermitidos[0]);
+  }, [tiposPermitidos.join('|'), tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const btnTipo = (t) => (
     <button key={t} onClick={() => setTipo(t)}
       style={{ flex: 1, padding: isMobile ? '12px 6px' : '10px', border: `1px solid ${tipo === t ? '#C0203A' : '#ddd'}`, borderRadius: '8px', background: tipo === t ? '#C0203A' : '#fff', color: tipo === t ? '#fff' : '#333', cursor: 'pointer', fontSize: isMobile ? '12px' : '13px', fontWeight: tipo === t ? '600' : '400' }}>
@@ -316,7 +329,7 @@ export default function Movimientos() {
         <div style={{ marginBottom: '20px' }}>
           <div style={{ fontSize: '13px', fontWeight: '500', color: '#333', marginBottom: '10px' }}>Tipo de Movimiento</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {TIPOS.map(t => btnTipo(t))}
+            {tiposPermitidos.map(t => btnTipo(t))}
           </div>
         </div>
 
