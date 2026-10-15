@@ -153,10 +153,23 @@ export default function PanelPermisos({ miAgente }) {
   return (
     <div style={{ padding: '1.5rem' }}>
       <h2 style={{ fontSize: '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Permisos</h2>
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>Qué secciones ve cada rol y qué puede modificar dentro de ellas. El Super Admin siempre puede todo.</div>
-      <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '1rem' }}>
-        ● distinto al valor de fábrica · ⚠ sección que ese rol no tenía por defecto: al activarla verá los datos como la sección los muestra, y algunas no limitan por desarrollo o equipo para ese rol. Las restricciones por desarrollo o equipo (por ejemplo Mesa de Control solo en sus desarrollos) siguen aplicando aunque el interruptor esté encendido. Los cambios se aplican cuando la persona recarga o vuelve a iniciar sesión. Marcar "Expediente completo", enviar a Titulación y archivar valen además para las personas que se elijan como Responsables dentro de Expedientes, sin importar su rol; esas tres funciones y "cargar de cualquier asesor" no se le dan al Super Admin automáticamente. IMPORTANTE: hoy la base de datos solo permite modificar Inventario y Planes de pago a Super Admin y Admin. Si le activas esas funciones a otro rol verá los botones, pero el guardado será rechazado hasta que se ajuste la base. Para quitárselas a Admin, apagar el interruptor basta.
+      <div style={{ fontSize: '13px', color: '#666', marginBottom: '10px' }}>
+        Enciende o apaga lo que cada rol puede ver y hacer. El Super Admin siempre puede todo.
       </div>
+      <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', fontSize: '12px', color: '#555', marginBottom: '8px' }}>
+        <span><span style={{ color: '#C0203A' }}>●</span> Distinto al valor de fábrica</span>
+        <span><span style={{ color: '#B45309' }}>⚠</span> Sección que ese rol no tenía: verá los datos como esa sección los muestra</span>
+        <span>🔄 Los cambios se aplican cuando la persona recarga o vuelve a entrar</span>
+      </div>
+      <details style={{ marginBottom: '1rem', fontSize: '12px', color: '#666' }}>
+        <summary style={{ cursor: 'pointer', color: '#3B82F6', fontWeight: '500' }}>Ver notas importantes</summary>
+        <ul style={{ margin: '8px 0 0', paddingLeft: '20px', lineHeight: '1.7' }}>
+          <li><strong>Alcance de datos:</strong> las restricciones por desarrollo, equipo o "solo lo mío" siguen aplicando aunque el interruptor esté encendido (por ejemplo, Mesa de Control solo opera Inventario en sus desarrollos).</li>
+          <li><strong>Responsables de Expedientes:</strong> marcar "Expediente completo", enviar a Titulación y archivar también valen para las personas elegidas como Responsables en Expedientes, sin importar su rol.</li>
+          <li><strong>Super Admin:</strong> esas tres funciones y "cargar de cualquier asesor" no se le dan automáticamente.</li>
+          <li><strong>Inventario y Planes de pago:</strong> la base de datos solo deja modificarlos a Super Admin y Admin. Quitárselos a Admin funciona apagando el interruptor; si se los activas a otro rol verá los botones, pero el guardado será rechazado hasta ajustar la base.</li>
+        </ul>
+      </details>
 
       <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '12px 16px', marginBottom: '1rem', display: 'flex', gap: '8px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div>
