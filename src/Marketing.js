@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { enviarPush } from './enviarPush';
+import { usePuede } from './PermisosContext';
 
 // Marketing — leads de Meta que marketing envía por API (función
 // `recibir-lead`), asignados al asesor de guardia del desarrollo.
@@ -67,7 +68,10 @@ export default function Marketing({ miRol, miAgente }) {
 
   const nombreAg = (a) => `${a.nombre || ''} ${a.apellidos || ''}`.trim();
   const desarrollosVisibles = esGerente ? desarrollos.filter(d => misDesarrollos.includes(d.nombre)) : desarrollos;
-  const tabs = [['leads', 'Leads'], ['guardias', 'Guardias'], ...(esAdmin ? [['api', 'API'], ['ajustes', 'Ajustes']] : [])];
+  const puede = usePuede();
+  const verApi = puede('marketing.gestionar_api');
+  const verAjustes = puede('marketing.ajustes');
+  const tabs = [['leads', 'Leads'], ['guardias', 'Guardias'], ...(verApi ? [['api', 'API']] : []), ...(verAjustes ? [['ajustes', 'Ajustes']] : [])];
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
@@ -83,14 +87,15 @@ export default function Marketing({ miRol, miAgente }) {
       </div>
       {tab === 'leads' && <LeadsTab {...{ miRol, miAgente, esAdmin, esGerente, misDesarrollos, desarrollos: desarrollosVisibles, agentes, nombreAg, isMobile }} />}
       {tab === 'guardias' && <GuardiasTab {...{ miAgente, esAdmin, esGerente, desarrollos: desarrollosVisibles, agentes, nombreAg, isMobile }} />}
-      {tab === 'api' && esAdmin && <ApiTab miAgente={miAgente} />}
-      {tab === 'ajustes' && esAdmin && <AjustesTab />}
+      {tab === 'api' && verApi && <ApiTab miAgente={miAgente} />}
+      {tab === 'ajustes' && verAjustes && <AjustesTab />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------- Leads
 function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, agentes, nombreAg, isMobile }) {
+  const puede = usePuede();
   const [leads, setLeads] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [filtroEstatus, setFiltroEstatus] = useState('');
@@ -114,7 +119,8 @@ function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, a
     (!filtroEstatus || l.estatus === filtroEstatus) &&
     (!filtroDesarrollo || l.desarrollo_nombre === filtroDesarrollo));
 
-  const puedeGestionar = (l) => esAdmin || esGerente || l.asesor_correo === miAgente?.correo;
+  const puedeGestionar = (l) => puede('marketing.marcar_atendido') && (esAdmin || esGerente || l.asesor_correo === miAgente?.correo);
+  const puedeReasignar = puede('marketing.reasignar_leads');
 
   const marcarAtendido = async (l) => {
     const { data, error } = await supabase.from('leads').update({
@@ -125,6 +131,7 @@ function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, a
   };
 
   const reasignar = async (l, correo) => {
+    if (!puede('marketing.reasignar_leads')) return;
     const ag = agentes.find(a => a.correo === correo);
     if (!ag) return;
     if (!window.confirm(`¿Reasignar este lead a ${nombreAg(ag)}?`)) return;
@@ -190,7 +197,7 @@ function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, a
                   {l.estatus === 'asignado' && puedeGestionar(l) && (
                     <button onClick={() => marcarAtendido(l)} style={{ ...btnStyle, color: '#27500A', borderColor: '#27500A' }}>✓ Atendido</button>
                   )}
-                  {(esAdmin || esGerente) && (
+                  {puedeReasignar && (
                     <select value="" onChange={e => reasignar(l, e.target.value)} style={{ ...inputStyle, padding: '5px 8px', fontSize: '12px', width: isMobile ? '100%' : '150px' }}>
                       <option value="">Reasignar a...</option>
                       {agentes.filter(a => a.correo !== l.asesor_correo).map(a => <option key={a.correo} value={a.correo}>{nombreAg(a)}</option>)}
@@ -208,11 +215,12 @@ function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, a
 
 // ------------------------------------------------------------- Guardias
 function GuardiasTab({ miAgente, esAdmin, esGerente, desarrollos, agentes, nombreAg, isMobile }) {
+  const puede = usePuede();
   const [desarrollo, setDesarrollo] = useState('');
   const [semana, setSemana] = useState(lunesDe(new Date()));
   const [guardias, setGuardias] = useState([]);
   const [cfg, setCfg] = useState(CFG_DEFAULT);
-  const puedeEditar = esAdmin || esGerente;
+  const puedeEditar = puede('marketing.editar_guardias');
 
   useEffect(() => { if (!desarrollo && desarrollos.length > 0) setDesarrollo(desarrollos[0].nombre); }, [desarrollos]); // eslint-disable-line
   useEffect(() => { if (desarrollo) cargar(); }, [desarrollo, semana]); // eslint-disable-line

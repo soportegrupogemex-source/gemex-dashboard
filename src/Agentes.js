@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación'];
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
@@ -19,6 +20,7 @@ function useIsMobile() {
 }
 
 export default function Agentes() {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [agentes, setAgentes] = useState([]);
   const [desarrollos, setDesarrollos] = useState([]);
@@ -172,6 +174,7 @@ export default function Agentes() {
   };
 
   const handleGuardar = async () => {
+    if (!(editando ? puede('agentes.editar') : puede('agentes.crear'))) return; // respaldo de seguridad
     if (!form.nombre.trim()) return;
     if (!form.correo.trim()) { alert('El correo es obligatorio'); return; }
     setGuardando(true);
@@ -266,7 +269,7 @@ export default function Agentes() {
   const handleVerDetalle = (a) => { setShowDetalle(a); setShowForm(false); setNuevaPass(''); setMsgPass(''); };
 
   const handleEliminar = async (agente) => {
-    if (miRol !== 'Super Admin') return; // FIX: solo Super Admin puede eliminar agentes
+    if (!puede('agentes.eliminar')) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar este agente? Esto también elimina su cuenta de acceso.')) return;
     // FIX: antes solo se borraba la fila de `agentes`, dejando la cuenta
     // real de acceso huérfana en Auth — eso bloqueaba volver a dar de
@@ -289,6 +292,7 @@ export default function Agentes() {
   };
 
   const handleToggleActivo = async (agente) => {
+    if (!puede('agentes.activar_desactivar')) return;
     await supabase.from('agentes').update({ activo: !agente.activo }).eq('id', agente.id);
     cargarAgentes();
     if (showDetalle?.id === agente.id) setShowDetalle({ ...agente, activo: !agente.activo });
@@ -520,7 +524,10 @@ export default function Agentes() {
   // FIX: Gerente Operador ahora tiene acceso completo a Agentes, igual
   // que Admin — es quien da de alta a su equipo. Eliminar cuentas sigue
   // siendo exclusivo de Super Admin (candado aparte, más abajo).
-  const esAdmin = miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Operador';
+  // Interruptores del panel Permisos (de fábrica: Super Admin, Admin y Gerente Operador).
+  const puedeCrear = puede('agentes.crear');
+  const puedeEditar = puede('agentes.editar');
+  const puedeEliminar = puede('agentes.eliminar');
 
   const formatFecha = (fecha) => {
     if (!fecha) return 'Sin registro';
@@ -622,19 +629,19 @@ export default function Agentes() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {miRol === 'Super Admin' && (
+          {puede('agentes.configurar_inactividad') && (
             <button onClick={() => setShowConfigInactividad(true)}
               style={{ ...btnOutline, fontSize: isMobile ? '12px' : '13px' }}>
               ⏱ {diasInactividad}d inactividad
             </button>
           )}
-          {esAdmin && !isMobile && (
+          {puede('agentes.importar') && !isMobile && (
             <button onClick={() => { setShowImportModal(true); setFilasImport([]); setNombreArchivoImport(''); setErroresImport([]); setMsgImport(''); setProgresoImport({ procesados: 0, total: 0, exitosos: 0, errores: 0, saltados: 0 }); }}
               style={{ ...btnOutline, fontSize: '13px' }}>
               ⬆ Importar agentes
             </button>
           )}
-          {esAdmin && (
+          {puedeCrear && (
             <button onClick={() => { setShowForm(true); setShowDetalle(null); setEditando(null); setForm(formVacio()); setNuevaInmobiliariaNombre(''); setBuscarAgenteCargo(''); }}
               style={{ ...btnPrimary, padding: isMobile ? '10px 14px' : '8px 16px', fontSize: isMobile ? '14px' : '13px' }}>
               + {isMobile ? 'Agregar' : 'Agregar agente'}
@@ -669,7 +676,7 @@ export default function Agentes() {
         </div>
       )}
 
-      {showImportModal && esAdmin && (
+      {showImportModal && puede('agentes.importar') && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={handleCerrarImportModal}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}
@@ -745,7 +752,7 @@ export default function Agentes() {
       )}
 
       {/* FIX: modal para gestionar (buscar y renombrar) inmobiliarias */}
-      {showGestionInmobiliarias && esAdmin && (
+      {showGestionInmobiliarias && (puedeCrear || puedeEditar) && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
           onClick={() => setShowGestionInmobiliarias(false)}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '560px', width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}
@@ -1095,7 +1102,7 @@ export default function Agentes() {
                   {showDetalle.activo ? 'Activo' : 'Inactivo'}
                 </span>
                 {showDetalle.activo && <BadgeVenceEn agente={showDetalle} />}
-                {esAdmin && (
+                {puede('agentes.activar_desactivar') && (
                   <button onClick={() => handleToggleActivo(showDetalle)}
                     style={{ background: 'none', border: '0.5px solid #ddd', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '13px', color: '#555' }}>
                     {showDetalle.activo ? 'Desactivar' : 'Activar'}
@@ -1111,7 +1118,7 @@ export default function Agentes() {
               </div>
             )}
 
-            {esAdmin && (
+            {puede('agentes.cambiar_contrasena') && (
               <div style={{ marginBottom: '1.5rem', padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#888', fontWeight: '500', marginBottom: '12px' }}>CAMBIAR CONTRASEÑA</div>
                 <input type="text" value={nuevaPass} onChange={e => setNuevaPass(e.target.value)} placeholder="Nueva contraseña"
@@ -1129,10 +1136,10 @@ export default function Agentes() {
             )}
           </div>
 
-          {esAdmin && (
+          {(puedeEditar || puedeEliminar) && (
             <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid #f0f0f0', flexShrink: 0, display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleEditar(showDetalle)} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', padding: '12px' }}>Editar datos</button>
-              {miRol === 'Super Admin' && (
+              {puedeEditar && <button onClick={() => handleEditar(showDetalle)} style={{ ...btnPrimary, flex: 1, justifyContent: 'center', padding: '12px' }}>Editar datos</button>}
+              {puedeEliminar && (
                 <button onClick={() => handleEliminar(showDetalle)}
                   style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   Eliminar
@@ -1143,7 +1150,7 @@ export default function Agentes() {
         </div>
       )}
 
-      {showForm && esAdmin && (
+      {showForm && (editando ? puedeEditar : puedeCrear) && (
         <div style={{ position: 'fixed', top: 0, right: 0, width: isMobile ? '100%' : '420px', height: '100dvh', background: '#fff', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ fontSize: '16px', fontWeight: '500', margin: 0 }}>{editando ? 'Editar agente' : 'Agregar agente'}</h3>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import jsPDF from 'jspdf';
+import { usePuede } from './PermisosContext';
 
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const COLORES_PLAN = ['#3B82F6', '#F59E0B', '#10B981', '#8B5CF6'];
@@ -36,6 +37,7 @@ function useIsMobile() {
 }
 
 export default function DashboardDireccion({ miRol, miAgente }) {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [movimientos, setMovimientos] = useState([]);
   const [desarrollos, setDesarrollos] = useState([]);
@@ -588,10 +590,10 @@ export default function DashboardDireccion({ miRol, miAgente }) {
                   <option value='Externos'>Solo externos</option>
                 </select>
               )}
-              <button onClick={handleDescargarPDF} disabled={generandoPDF}
+              {puede('dashboard.descargar_reporte') && <button onClick={handleDescargarPDF} disabled={generandoPDF}
                 style={{ padding: '8px 16px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 {generandoPDF ? 'Generando...' : '⬇ Descargar Reporte'}
-              </button>
+              </button>}
             </div>
           )}
         </div>
@@ -618,10 +620,10 @@ export default function DashboardDireccion({ miRol, miAgente }) {
                 <option value='Externos'>Solo externos</option>
               </select>
             )}
-            <button onClick={handleDescargarPDF} disabled={generandoPDF}
+            {puede('dashboard.descargar_reporte') && <button onClick={handleDescargarPDF} disabled={generandoPDF}
               style={{ padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
               {generandoPDF ? 'Generando...' : '⬇ Descargar Reporte PDF'}
-            </button>
+            </button>}
           </div>
         )}
       </div>

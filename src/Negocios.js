@@ -189,6 +189,7 @@ export default function Negocios() {
   };
 
   const handleAgregarTarea = async () => {
+    if (!puede('negocios.gestionar_tareas')) return;
     if (!nuevaTarea.descripcion.trim() || !negocioDetalle) return;
     setGuardandoTarea(true);
     const { data, error } = await supabase.from('negocio_tareas').insert([{
@@ -206,11 +207,13 @@ export default function Negocios() {
   };
 
   const handleToggleTarea = async (tarea) => {
+    if (!puede('negocios.gestionar_tareas')) return;
     const { data, error } = await supabase.from('negocio_tareas').update({ completada: !tarea.completada }).eq('id', tarea.id).select().single();
     if (!error && data) setTareas(prev => prev.map(t => t.id === data.id ? data : t));
   };
 
   const handleEliminarTarea = async (tareaId) => {
+    if (!puede('negocios.gestionar_tareas')) return;
     await supabase.from('negocio_tareas').delete().eq('id', tareaId);
     setTareas(prev => prev.filter(t => t.id !== tareaId));
   };
@@ -515,6 +518,7 @@ export default function Negocios() {
 
             <div style={{ marginTop: '1.5rem' }}>
               <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>TAREAS</div>
+              {puede('negocios.gestionar_tareas') && <>
               <input placeholder='Nueva tarea...' value={nuevaTarea.descripcion}
                 onChange={e => setNuevaTarea(t => ({ ...t, descripcion: e.target.value }))}
                 style={{ ...inputStyle, marginBottom: '8px' }} />
@@ -531,11 +535,12 @@ export default function Negocios() {
                 style={{ ...btnPrimary, width: '100%', justifyContent: 'center', padding: '10px', marginBottom: '1rem' }}>
                 {guardandoTarea ? 'Agregando...' : 'Agregar tarea'}
               </button>
+              </>}
               {tareas.length === 0 ? (
                 <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '0.5rem 0' }}>Sin tareas aún</div>
               ) : tareas.map(t => (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 0', borderBottom: '0.5px solid #f5f5f5' }}>
-                  <input type='checkbox' checked={!!t.completada} onChange={() => handleToggleTarea(t)} style={{ marginTop: '3px', cursor: 'pointer' }} />
+                  <input type='checkbox' disabled={!puede('negocios.gestionar_tareas')} checked={!!t.completada} onChange={() => handleToggleTarea(t)} style={{ marginTop: '3px', cursor: 'pointer' }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '13px', color: t.completada ? '#aaa' : '#333', textDecoration: t.completada ? 'line-through' : 'none' }}>{t.descripcion}</div>
                     {(t.fecha || t.hora) && (
@@ -545,7 +550,7 @@ export default function Negocios() {
                       </div>
                     )}
                   </div>
-                  <button onClick={() => handleEliminarTarea(t.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}>✕</button>
+                  {puede('negocios.gestionar_tareas') && <button onClick={() => handleEliminarTarea(t.id)} style={{ background: 'none', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: '13px' }}>✕</button>}
                 </div>
               ))}
             </div>

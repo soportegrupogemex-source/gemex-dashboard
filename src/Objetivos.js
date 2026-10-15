@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
@@ -19,6 +20,8 @@ const TIPOS_META = [
 ];
 
 export default function Objetivos({ miRol, miAgente }) {
+  const puede = usePuede();
+  const puedeEditarMetas = puede('objetivos.editar_metas');
   const [desarrollos, setDesarrollos] = useState([]);
   const [objetivos, setObjetivos] = useState([]);
   const [año, setAño] = useState(new Date().getFullYear());
@@ -62,6 +65,7 @@ export default function Objetivos({ miRol, miAgente }) {
     objetivosVisibles.find(o => o.desarrollo_id === desarrolloId && o.mes === mes);
 
   const handleEditar = (desarrolloId, mes) => {
+    if (!puedeEditarMetas) return;
     const obj = getObjetivo(desarrolloId, mes);
     setFormEdit({ unidades: obj?.[tipo.colUnidades] || 0, monto: obj?.[tipo.colMonto] || 0 });
     setEditando({ desarrolloId, mes });
@@ -185,7 +189,7 @@ export default function Objetivos({ miRol, miAgente }) {
                           </div>
                         </div>
                       ) : (
-                        <div onClick={() => handleEditar(d.id, i + 1)} style={{ cursor: 'pointer', padding: '4px', borderRadius: '6px', transition: 'background 0.1s' }}
+                        <div onClick={() => handleEditar(d.id, i + 1)} style={{ cursor: puedeEditarMetas ? 'pointer' : 'default', padding: '4px', borderRadius: '6px', transition: 'background 0.1s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           {obj && (obj[tipo.colUnidades] > 0 || obj[tipo.colMonto] > 0) ? (

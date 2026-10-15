@@ -19,7 +19,7 @@ import AjustesAdministracion from './AjustesAdministracion';
 import Marketing from './Marketing';
 import PanelPermisos from './PanelPermisos';
 import { PermisosContext } from './PermisosContext';
-import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe } from './permisosMenu';
+import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe, puedeAccion } from './permisosMenu';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
@@ -117,7 +117,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             const puntoRojo = (hoja) => hoja.id === 'expedientes' && expedientesRechazados > 0 && (
               <span style={{ position: 'absolute', top: '-3px', right: '-4px', width: '9px', height: '9px', borderRadius: '50%', background: '#E53935', border: '1.5px solid #6B1524' }} />
             );
-            const toggleRanking = (hoja) => hoja.id === 'dashboard' && miRol === 'Super Admin' && (
+            const toggleRanking = (hoja) => hoja.id === 'dashboard' && puedeAccion(miRol, 'ranking.alternar_visibilidad', permisos) && (
               <span onClick={e => { e.stopPropagation(); onToggleRankingBs(); }}
                 title={rankingBsVisible ? 'Visible para todos — click para ocultar' : 'Oculto para los demás roles — click para mostrar'}
                 style={{ width: '32px', height: '18px', borderRadius: '10px', background: rankingBsVisible ? '#2E7D4F' : '#444', position: 'relative', flexShrink: 0, cursor: 'pointer' }}>
@@ -664,6 +664,7 @@ function App() {
   };
 
   const handleToggleRankingBs = async () => {
+    if (!puedeAccion(miRol, 'ranking.alternar_visibilidad', permisosRol)) return;
     const nuevoValor = !rankingBsVisible;
     setRankingBsVisible(nuevoValor);
     const { error } = await supabase.from('configuracion').upsert({ clave: 'ranking_bs_visible', valor: String(nuevoValor) }, { onConflict: 'clave' });

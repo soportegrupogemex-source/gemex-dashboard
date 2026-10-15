@@ -164,6 +164,7 @@ function PanelActividad({
   fechaTarea, setFechaTarea, horaTarea, setHoraTarea,
   handleAgregarNota, handleAgregarTarea, handleToggleTarea,
 }) {
+  const puede = usePuede();
   return (
     <div style={{ background: '#fff', borderRadius: '12px', border: '0.5px solid #e0e0e0', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: isMobile ? 'auto' : '400px' }}>
       <div style={{ display: 'flex', borderBottom: '0.5px solid #e0e0e0', flexShrink: 0 }}>
@@ -188,11 +189,11 @@ function PanelActividad({
         )}
         {activeTab === 'notas' && (
           <div>
-            <div style={{ marginBottom: '12px' }}>
+            {puede('contactos.agregar_notas') && <div style={{ marginBottom: '12px' }}>
               <textarea value={nota} onChange={e => setNota(e.target.value)} placeholder='Escribe una nota...' rows={3}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', resize: 'vertical' }} />
               <button onClick={handleAgregarNota} style={{ ...btnPrimary, marginTop: '6px', width: '100%', justifyContent: 'center', padding: '12px' }}>Agregar nota</button>
-            </div>
+            </div>}
             {notas.length === 0 && <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '1rem' }}>Sin notas aún</div>}
             {notas.map((n, i) => (
               <div key={n.id || i} style={{ padding: '10px', background: '#f9f9f9', borderRadius: '8px', marginBottom: '8px', fontSize: '13px' }}>
@@ -204,7 +205,7 @@ function PanelActividad({
         )}
         {activeTab === 'tareas' && (
           <div>
-            <div style={{ marginBottom: '12px' }}>
+            {puede('contactos.gestionar_tareas') && <div style={{ marginBottom: '12px' }}>
               <input value={tarea} onChange={e => setTarea(e.target.value)} placeholder='Nueva tarea...'
                 onKeyDown={e => e.key === 'Enter' && handleAgregarTarea()}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', marginBottom: '8px' }} />
@@ -216,14 +217,14 @@ function PanelActividad({
               </div>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '8px' }}>Fecha y hora son opcionales — si las pones, te llega un aviso 5 minutos antes y al llegar la hora.</div>
               <button onClick={handleAgregarTarea} style={{ ...btnPrimary, width: '100%', justifyContent: 'center', padding: '12px' }}>Agregar tarea</button>
-            </div>
+            </div>}
             {tareas.length === 0 && <div style={{ fontSize: '13px', color: '#aaa', textAlign: 'center', padding: '1rem' }}>Sin tareas aún</div>}
             {tareas.map((t, i) => {
               const vencida = t.fecha_hora && !t.completada && new Date(t.fecha_hora) < new Date();
               return (
                 <div key={t.id || i} style={{ padding: '10px', background: '#f9f9f9', borderRadius: '8px', marginBottom: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <input type='checkbox' checked={t.completada} onChange={() => handleToggleTarea(t)} style={{ marginTop: '3px', width: '18px', height: '18px', flexShrink: 0 }} />
+                    <input type='checkbox' disabled={!puede('contactos.gestionar_tareas')} checked={t.completada} onChange={() => handleToggleTarea(t)} style={{ marginTop: '3px', width: '18px', height: '18px', flexShrink: 0 }} />
                     <span style={{ fontSize: isMobile ? '14px' : '13px', color: '#333', textDecoration: t.completada ? 'line-through' : 'none', flex: 1 }}>{t.texto}</span>
                   </div>
                   <div style={{ fontSize: '11px', color: vencida ? '#A32D2D' : '#aaa', marginTop: '6px', paddingLeft: '28px' }}>
@@ -317,6 +318,7 @@ function SeccionVenta({ isMobile, dropdownField }) {
 // con su etapa actual y botones para moverla, igual que en Negocios.js.
 // Si el contacto no tiene negocio todavía, ofrece crearlo con un click.
 function SeccionNegocio({ isMobile, contacto, negocio, loadingNegocio, onCrearNegocio, onCambiarEtapa, creandoNegocio }) {
+  const puede = usePuede();
   return (
     <div style={{ background: '#fff', borderRadius: '12px', padding: isMobile ? '1.25rem' : '1.5rem', marginBottom: '12px', border: '0.5px solid #e0e0e0' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px', fontWeight: '500' }}>NEGOCIO</div>
@@ -327,9 +329,9 @@ function SeccionNegocio({ isMobile, contacto, negocio, loadingNegocio, onCrearNe
           <div style={{ fontSize: '13px', color: '#888', marginBottom: '12px' }}>
             Este contacto todavía no tiene un negocio en seguimiento.
           </div>
-          <button onClick={onCrearNegocio} disabled={creandoNegocio} style={btnPrimary}>
+          {puede('negocios.crear') && <button onClick={onCrearNegocio} disabled={creandoNegocio} style={btnPrimary}>
             {creandoNegocio ? 'Creando...' : '+ Crear negocio'}
-          </button>
+          </button>}
         </div>
       ) : (
         <div>
@@ -342,7 +344,7 @@ function SeccionNegocio({ isMobile, contacto, negocio, loadingNegocio, onCrearNe
             color: ETAPAS.find(e => e.id === negocio.etapa)?.color }}>
             {negocio.etapa}
           </div>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>MOVER A ETAPA</div>
+          {puede('negocios.cambiar_etapa') && <><div style={{ fontSize: '11px', color: '#888', marginBottom: '8px' }}>MOVER A ETAPA</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {ETAPAS.filter(e => e.id !== negocio.etapa).map(e => (
               <button key={e.id} onClick={() => onCambiarEtapa(e.id)}
@@ -350,7 +352,7 @@ function SeccionNegocio({ isMobile, contacto, negocio, loadingNegocio, onCrearNe
                 {e.id}
               </button>
             ))}
-          </div>
+          </div></>}
         </div>
       )}
     </div>
@@ -435,8 +437,10 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   // FIX: solo Super Admin/Admin pueden editar los datos personales del contacto
   const puede = usePuede();
   const puedeEditarPersonal = puede('contactos.editar_datos_personales');
+  const puedeEditarSeg = puede('contactos.editar_seguimiento');
 
   const handleGuardar = async () => {
+    if (!puedeEditarSeg && !puedeEditarPersonal) return; // respaldo de seguridad
     setGuardando(true);
     const ladaReal = lada === '+1CA' ? '+1' : lada;
     // FIX: si el asesor marca el contacto como "No interesado", se libera
@@ -457,6 +461,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   };
 
   const handleAgregarNota = async () => {
+    if (!puede('contactos.agregar_notas')) return;
     if (!nota.trim()) return;
     const texto = nota.trim();
     const { data, error } = await supabase.from('contacto_notas').insert([{ contacto_id: contactoId, texto, created_at: new Date().toISOString() }]).select().single();
@@ -470,6 +475,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   };
 
   const handleAgregarTarea = async () => {
+    if (!puede('contactos.gestionar_tareas')) return;
     if (!tarea.trim()) return;
     const texto = tarea.trim();
     const payload = { contacto_id: contactoId, texto, completada: false, created_at: new Date().toISOString() };
@@ -494,6 +500,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   };
 
   const handleToggleTarea = async (t) => {
+    if (!puede('contactos.gestionar_tareas')) return;
     const nuevoEstado = !t.completada;
     await supabase.from('contacto_tareas').update({ completada: nuevoEstado }).eq('id', t.id);
     setTareas(prev => prev.map(x => x.id === t.id ? { ...x, completada: nuevoEstado } : x));
@@ -505,6 +512,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   // FIX: crea un negocio nuevo ligado a este contacto, con los datos que
   // ya tiene el contacto (nombre, desarrollo, asesor). Etapa inicial: Cotización.
   const handleCrearNegocio = async () => {
+    if (!puede('negocios.crear')) return;
     setCreandoNegocio(true);
     const agenteMatch = agentes.find(a => `${a.nombre} ${a.apellidos}`.trim() === contacto.asesor_ventas);
     const payload = {
@@ -526,6 +534,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   };
 
   const handleCambiarEtapaNegocio = async (nuevaEtapa) => {
+    if (!puede('negocios.cambiar_etapa')) return;
     await supabase.from('negocios').update({ etapa: nuevaEtapa }).eq('id', negocio.id);
     setNegocio(prev => ({ ...prev, etapa: nuevaEtapa }));
     await registrarActividad(`Negocio movido a etapa: ${nuevaEtapa}`);
@@ -569,9 +578,9 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setActiveTab('notas')} style={btnOutline}>+ Nota</button>
               <button onClick={() => setActiveTab('tareas')} style={btnOutline}>+ Tarea</button>
-              <button onClick={handleGuardar} disabled={guardando} style={btnPrimary}>
+              {(puedeEditarSeg || puedeEditarPersonal) && <button onClick={handleGuardar} disabled={guardando} style={btnPrimary}>
                 {guardando ? 'Guardando...' : 'Guardar cambios'}
-              </button>
+              </button>}
             </div>
           )}
         </div>
@@ -638,7 +647,7 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
 
           {/* Botón guardar fijo en móvil */}
           {seccionActiva !== 'actividad' && seccionActiva !== 'negocio' && (
-            <div style={{ position: 'sticky', bottom: '1rem', marginTop: '12px' }}>
+            (puedeEditarSeg || puedeEditarPersonal) && <div style={{ position: 'sticky', bottom: '1rem', marginTop: '12px' }}>
               <button onClick={handleGuardar} disabled={guardando}
                 style={{ ...btnPrimary, width: '100%', justifyContent: 'center', padding: '16px', fontSize: '15px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
                 {guardando ? 'Guardando...' : 'Guardar cambios'}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 
@@ -24,6 +25,7 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 // Gerente Editor/Operador (solo sus desarrollos a cargo — la RLS de
 // cotizaciones_log ya lo restringe también a nivel de base).
 export default function TendenciasProducto({ miRol, miAgente }) {
+  const puede = usePuede();
   const isMobile = useIsMobile();
   const [tab, setTab] = useState('productos');
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
   // actual), ya que la intención es limpiar por completo el ruido.
   const [eliminando, setEliminando] = useState(null);
   const handleEliminarUnidad = async (unidadId, unidadNumero) => {
+    if (!puede('tendencias.eliminar_registros')) return;
     if (!window.confirm(`¿Eliminar todos los registros de cotización de la unidad ${unidadNumero}? Esta acción no se puede deshacer.`)) return;
     setEliminando(unidadId);
     await supabase.from('cotizaciones_log').delete().eq('unidad_id', unidadId);
@@ -280,7 +283,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div style={{ fontSize: '15px', fontWeight: '700', color: '#F97316' }}>{u.count}</div>
-                      {miRol === 'Super Admin' && (
+                      {puede('tendencias.eliminar_registros') && (
                         <button onClick={() => handleEliminarUnidad(u.unidad_id, u.unidad_numero)} disabled={eliminando === u.unidad_id}
                           title="Eliminar registros de esta unidad (limpiar prueba)"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>

@@ -203,6 +203,39 @@ export const ACCIONES = [
   { id: 'negocios.eliminar', seccion: 'Negocios', label: 'Eliminar negocios', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
   { id: 'negocios.reasignar_asesor', seccion: 'Negocios', label: 'Reasignar el asesor de un negocio', defecto: roles('Super Admin') },
 
+  // Detalle de un contacto (cada asesor solo ve y trabaja los suyos).
+  { id: 'contactos.editar_seguimiento', seccion: 'Contactos', label: 'Editar datos de seguimiento del contacto (estatus, presupuesto, etc.)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'contactos.agregar_notas', seccion: 'Contactos', label: 'Agregar notas a un contacto', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'contactos.gestionar_tareas', seccion: 'Contactos', label: 'Crear y completar tareas de un contacto', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'negocios.gestionar_tareas', seccion: 'Negocios', label: 'Crear, completar y eliminar tareas de un negocio', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+
+  // Dashboard y Ranking
+  { id: 'dashboard.descargar_reporte', seccion: 'Dashboard y Ranking', label: 'Descargar el reporte del Dashboard (PDF)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
+  { id: 'ranking.alternar_visibilidad', seccion: 'Dashboard y Ranking', label: 'Mostrar u ocultar el Ranking Gemex para todos (interruptor del menú)', defecto: roles('Super Admin') },
+
+  // Objetivos, Tendencias, Construcción
+  { id: 'objetivos.editar_metas', seccion: 'Objetivos', label: 'Capturar y editar las metas (unidades y monto)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor') },
+  { id: 'tendencias.eliminar_registros', seccion: 'Tendencias', label: 'Eliminar registros de cotización de una unidad', defecto: roles('Super Admin') },
+  { id: 'construccion.editar_avance', seccion: 'Construcción', label: 'Capturar el avance de obra (%)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
+  { id: 'construccion.marcar_dtu', seccion: 'Construcción', label: 'Marcar DTU', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
+  { id: 'construccion.marcar_lista_avaluo', seccion: 'Construcción', label: 'Marcar "Lista para avalúo"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
+
+  // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
+  { id: 'marketing.marcar_atendido', seccion: 'Marketing', label: 'Marcar un lead como atendido', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
+  { id: 'marketing.reasignar_leads', seccion: 'Marketing', label: 'Reasignar leads a otro asesor', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
+  { id: 'marketing.editar_guardias', seccion: 'Marketing', label: 'Editar el calendario de guardias', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
+  { id: 'marketing.gestionar_api', seccion: 'Marketing', label: 'Ver y administrar las llaves de API', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+  { id: 'marketing.ajustes', seccion: 'Marketing', label: 'Cambiar tiempo de reasignación y horarios de los turnos', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+
+  // Agentes (Gerente Operador da de alta a su equipo).
+  { id: 'agentes.crear', seccion: 'Agentes', label: 'Agregar agentes', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
+  { id: 'agentes.editar', seccion: 'Agentes', label: 'Editar datos de un agente', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
+  { id: 'agentes.activar_desactivar', seccion: 'Agentes', label: 'Activar y desactivar agentes', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
+  { id: 'agentes.cambiar_contrasena', seccion: 'Agentes', label: 'Cambiar la contraseña de un agente', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
+  { id: 'agentes.importar', seccion: 'Agentes', label: 'Importar agentes desde Excel', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
+  { id: 'agentes.eliminar', seccion: 'Agentes', label: 'Eliminar agentes', defecto: roles('Super Admin') },
+  { id: 'agentes.configurar_inactividad', seccion: 'Agentes', label: 'Configurar los días de inactividad', defecto: roles('Super Admin') },
+
   { id: 'planes.editar', seccion: 'Planes de pago', label: 'Crear, editar y eliminar planes de pago', defecto: roles('Super Admin', 'Admin') },
 ];
 

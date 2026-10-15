@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 // FIX: módulo de Construcción — reporta el Paso 1 del proceso de
 // Titulación (Avance de obra, DTU, Lista para avalúo) para TODAS las
@@ -26,6 +27,10 @@ function useIsMobile() {
 }
 
 export default function Construccion() {
+  const puede = usePuede();
+  const puedeAvance = puede('construccion.editar_avance');
+  const puedeDtu = puede('construccion.marcar_dtu');
+  const puedeLista = puede('construccion.marcar_lista_avaluo');
   const isMobile = useIsMobile();
   const [desarrollos, setDesarrollos] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -157,7 +162,7 @@ export default function Construccion() {
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>Avance de obra</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input type="number" min="0" max="100" value={form.avance_obra_pct}
+                <input type="number" min="0" max="100" disabled={!puedeAvance} value={form.avance_obra_pct}
                   onChange={e => setForm(f => ({ ...f, avance_obra_pct: e.target.value }))}
                   style={{ width: '90px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
                 <span style={{ fontSize: '13px', color: '#555' }}>%</span>
@@ -165,7 +170,7 @@ export default function Construccion() {
             </div>
 
             <label style={{ fontSize: '13px', color: '#333', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', cursor: 'pointer' }}>
-              <input type="checkbox" checked={!!form.lista_avaluo} onChange={e => setForm(f => ({ ...f, lista_avaluo: e.target.checked }))} />
+              <input type="checkbox" disabled={!puedeLista} checked={!!form.lista_avaluo} onChange={e => setForm(f => ({ ...f, lista_avaluo: e.target.checked }))} />
               Lista para avalúo
             </label>
 
@@ -173,7 +178,7 @@ export default function Construccion() {
               const habilitado = dtuHabilitado(form.avance_obra_pct);
               return (
                 <label style={{ fontSize: '13px', color: habilitado ? '#333' : '#bbb', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', cursor: habilitado ? 'pointer' : 'not-allowed' }}>
-                  <input type="checkbox" checked={habilitado && !!form.dtu} disabled={!habilitado}
+                  <input type="checkbox" checked={habilitado && !!form.dtu} disabled={!habilitado || !puedeDtu}
                     onChange={e => setForm(f => ({ ...f, dtu: e.target.checked }))} />
                   DTU
                 </label>
