@@ -10,6 +10,7 @@ const RAZON_NO_COMPRA = ['Precio alto', 'Ya compró otro', 'Sin financiamiento',
 // FIX: mismas etapas que Negocios.js (no se exportan de ahí, así que se
 // replican aquí para poder mostrar/mover la etapa desde el detalle del contacto)
 const ETAPAS = [
+  { id: 'Leads', color: '#0EA5E9' },
   { id: 'Cotización', color: '#F59E0B' },
   { id: 'Cita', color: '#3B82F6' },
   { id: 'Seguimiento', color: '#8B5CF6' },

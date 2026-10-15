@@ -16,13 +16,14 @@ import Titulacion from './Titulacion';
 import Cobranza from './Cobranza';
 import Comisiones from './Comisiones';
 import AjustesAdministracion from './AjustesAdministracion';
+import Marketing from './Marketing';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
-  TrendingUp, Landmark, Percent, SlidersHorizontal,
+  TrendingUp, Landmark, Percent, SlidersHorizontal, Megaphone,
 } from 'lucide-react';
 
 // Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
@@ -41,6 +42,7 @@ const MENU_MODULOS = [
     { id: 'historial', label: 'Historial', icon: 'historial' },
     { id: 'buyer_persona', label: 'Buyer Persona', icon: 'buyer_persona' },
     { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
+    { id: 'marketing', label: 'Marketing', icon: 'marketing' },
   ]},
   { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
     { id: 'construccion', label: 'Construcción', icon: 'construccion' },
@@ -131,6 +133,7 @@ const MENU_ICONS = {
   cobranza: <Banknote size={18} />,
   comisiones: <Percent size={18} />,
   ajustes_admin: <SlidersHorizontal size={18} />,
+  marketing: <Megaphone size={18} />,
   construccion: <HardHat size={18} />,
   objetivos: <Target size={18} />,
   tendencias_producto: <Flame size={18} />,
@@ -143,6 +146,8 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
   const [submenuAbierto, setSubmenuAbierto] = React.useState(null);
   const menuPermitido = MENU_POR_ROL[miRol] || [];
   const hojaVisible = (s) => {
+    // Marketing: leads de Meta — asesores, gerentes y administradores.
+    if (s.id === 'marketing') return ['Agente', 'Asesor Premium', 'Gerente Editor', 'Gerente Operador', 'Admin', 'Sub Admin', 'Super Admin'].includes(miRol);
     if (!HOJAS_DIRECCION.includes(s.id)) {
       if (!menuPermitido.includes(s.id)) return false;
       if (s.id === 'dashboard' && (miRol === 'Agente' || miRol === 'Asesor Premium') && miAgente?.equipo !== 'Gemex') return false;
@@ -807,6 +812,7 @@ function App() {
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
       case 'comisiones': return <Comisiones miRol={miRol} miAgente={miAgente} />;
+      case 'marketing': return <Marketing miRol={miRol} miAgente={miAgente} />;
       case 'ajustes_admin': return miRol === 'Super Admin' ? <AjustesAdministracion /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
       case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;

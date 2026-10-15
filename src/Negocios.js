@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 
 const ETAPAS = [
+  { id: 'Leads', color: '#0EA5E9' },
   { id: 'Cotización', color: '#F59E0B' },
   { id: 'Cita', color: '#3B82F6' },
   { id: 'Seguimiento', color: '#8B5CF6' },
