@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import Expedientes from './Expedientes';
 import { InputDinero } from './dinero';
 import { usePuede } from './PermisosContext';
+import { cargarFirmantes, construirLiquidacionPdf } from './liquidacionPdf';
 
 // FIX: Titulación ahora solo trabaja el Paso 2 (Titulación -> Escritura)
 // — el Paso 1 (Avance de obra, DTU, Lista para avalúo) lo captura el
@@ -75,6 +76,8 @@ export default function Titulacion({ miRol, miAgente }) {
   const [tiposCompra, setTiposCompra] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [etapaSel, setEtapaSel] = useState('');
+  const [cotejoSel, setCotejoSel] = useState('');
+  const [generandoEstado, setGenerandoEstado] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(VACIO);
@@ -100,6 +103,7 @@ export default function Titulacion({ miRol, miAgente }) {
   const puedeEditarSeg = puede('titulacion.editar_seguimiento');
   const puedeArchivos = puede('titulacion.cargar_archivos');
   const puedeMontos = puede('titulacion.capturar_montos');
+  const puedeVerLiquidacion = puede('titulacion.ver_liquidacion');
   const soloLectura = !puedeEditarSeg && !puedeArchivos && !puedeMontos;
 
   const cargarTodo = async () => {
@@ -169,6 +173,8 @@ export default function Titulacion({ miRol, miAgente }) {
       const s = seguimientos[u.id] || VACIO;
       if (calcularEtapa(s) !== etapaSel) return false;
     }
+    if (cotejoSel === 'cotejadas' && !liquidacionesCobranza[u.id]) return false;
+    if (cotejoSel === 'sin_cotejar' && liquidacionesCobranza[u.id]) return false;
     return true;
   });
 
@@ -267,6 +273,46 @@ export default function Titulacion({ miRol, miAgente }) {
     document.body.appendChild(a); a.click(); a.remove();
   };
 
+  // Estado de cuenta en vivo: arma la liquidación con lo que Cobranza lleve
+  // capturado hasta hoy (pagos, cuotas) y los montos de autorización
+  // financiera de esta misma pantalla — sin esperar a que Cobranza coteje.
+  const generarEstadoDeCuenta = async (unidad, accion) => {
+    if (generandoEstado) return;
+    // La pestaña se abre antes del await para que el navegador no la bloquee.
+    const ventana = accion === 'ver' ? window.open('', '_blank') : null;
+    setGenerandoEstado(true);
+    try {
+      const [{ data: movs }, { data: pagos }, { data: cob }, { data: tit }, firmantes] = await Promise.all([
+        supabase.from('movimientos').select('tipo, contacto_nombre, monto, tipo_compra, created_at')
+          .eq('unidad_id', unidad.id).in('tipo', ['Vendida', 'Apartado']).order('created_at', { ascending: false }),
+        supabase.from('cobranza_pagos').select('monto').eq('unidad_id', unidad.id),
+        supabase.from('cobranza_seguimiento').select('cuotas_condominales').eq('unidad_id', unidad.id).maybeSingle(),
+        supabase.from('titulacion_seguimiento').select('autorizacion_financiera_1_monto, autorizacion_financiera_2_monto').eq('unidad_id', unidad.id).maybeSingle(),
+        cargarFirmantes(supabase),
+      ]);
+      const venta = (movs || []).find(m => m.tipo === 'Vendida') || (movs || [])[0] || {};
+      const { doc, cliente } = await construirLiquidacionPdf({
+        cliente: venta.contacto_nombre || compradores[unidad.id], tipoCompra: venta.tipo_compra || tiposCompra[unidad.id],
+        unidadNumero: unidad.numero, desarrolloNombre: unidad.desarrollo_nombre,
+        valorVenta: Number(venta.monto || 0),
+        pagado: (pagos || []).reduce((t, p) => t + Number(p.monto || 0), 0),
+        f1: tit?.autorizacion_financiera_1_monto, f2: tit?.autorizacion_financiera_2_monto,
+        cuotas: cob?.cuotas_condominales, firmantes, preliminar: true,
+      });
+      if (accion === 'ver') {
+        const url = URL.createObjectURL(doc.output('blob'));
+        if (ventana) ventana.location.href = url; else window.open(url, '_blank');
+      } else {
+        doc.save(`${cliente} - Estado de cuenta.pdf`);
+      }
+    } catch (err) {
+      if (ventana) ventana.close();
+      alert('No se pudo generar el estado de cuenta: ' + (err?.message || err));
+    } finally {
+      setGenerandoEstado(false);
+    }
+  };
+
   const conteos = { 'Contrato y Expediente': 0, 'Titulación': 0, 'Escriturado': 0 };
   unidadesVisibles.forEach(u => { conteos[calcularEtapa(seguimientos[u.id] || VACIO)]++; });
 
@@ -302,6 +348,12 @@ export default function Titulacion({ miRol, miAgente }) {
           <option value=''>Todas las etapas</option>
           {Object.keys(COLOR_ETAPA).map(e => <option key={e} value={e}>{e}</option>)}
         </select>
+        <select value={cotejoSel} onChange={e => setCotejoSel(e.target.value)}
+          style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
+          <option value=''>Cotejo: todas</option>
+          <option value='cotejadas'>Unidad cotejada</option>
+          <option value='sin_cotejar'>Sin cotejar</option>
+        </select>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem', maxWidth: isMobile ? 'none' : '600px' }}>
@@ -332,6 +384,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {liquidacionesCobranza[u.id] && <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>}
                   {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: COLOR_ETAPA[etapa], borderRadius: '20px', padding: '4px 12px' }}>{etapa}</div>
@@ -422,16 +475,33 @@ export default function Titulacion({ miRol, miAgente }) {
                 )}
                 {p.desdeCobranza && (liquidacionesCobranza[unidadAbierta.id] ? (
                   <>
-                    <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
-                      style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                      📄 Ver liquidación final
-                    </button>
-                    <button type="button" onClick={() => descargarLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id], unidadAbierta)}
-                      style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                      ⬇ Descargar
-                    </button>
+                    <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>
+                    {puedeVerLiquidacion && <>
+                      <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
+                        style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                        📄 Ver liquidación final
+                      </button>
+                      <button type="button" onClick={() => descargarLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id], unidadAbierta)}
+                        style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                        ⬇ Descargar
+                      </button>
+                    </>}
                   </>
-                ) : <span style={{ fontSize: '11px', color: '#aaa' }}>Pendiente de Cobranza</span>)}
+                ) : (
+                  <>
+                    <span style={{ fontSize: '11px', color: '#aaa' }}>Sin cotejar por Cobranza</span>
+                    {puedeVerLiquidacion && <>
+                      <button type="button" disabled={generandoEstado} onClick={() => generarEstadoDeCuenta(unidadAbierta, 'ver')}
+                        style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                        📄 {generandoEstado ? 'Generando...' : 'Ver estado de cuenta'}
+                      </button>
+                      <button type="button" disabled={generandoEstado} onClick={() => generarEstadoDeCuenta(unidadAbierta, 'descargar')}
+                        style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                        ⬇ Descargar
+                      </button>
+                    </>}
+                  </>
+                ))}
                 {p.campoPath && (form[p.campoPath] ? (
                   <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
                     style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>

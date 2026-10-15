@@ -162,13 +162,14 @@ export const ACCIONES = [
   { id: 'cobranza.agregar_pagos', seccion: 'Cobranza', label: 'Registrar pagos (enganche y abonos)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.eliminar_pagos', seccion: 'Cobranza', label: 'Eliminar pagos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.editar_montos', seccion: 'Cobranza', label: 'Editar liberación y cuotas condominales', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
-  { id: 'cobranza.marcar_liquidacion', seccion: 'Cobranza', label: 'Marcar "Liquidación final completada"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.marcar_liquidacion', seccion: 'Cobranza', label: 'Marcar "Unidad cotejada"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.descargar_liquidacion', seccion: 'Cobranza', label: 'Descargar la liquidación en PDF', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería', 'Mesa de Control') },
 
   // Titulación (Gerente Operador, de fábrica, solo ve).
   { id: 'titulacion.editar_seguimiento', seccion: 'Titulación', label: 'Editar fechas y casillas del seguimiento', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
   { id: 'titulacion.cargar_archivos', seccion: 'Titulación', label: 'Cargar archivos (avalúo, autorizaciones, carta de liberación, trámites)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
   { id: 'titulacion.capturar_montos', seccion: 'Titulación', label: 'Capturar montos de Autorización financiera 1 y 2', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control', 'Titulación') },
+  { id: 'titulacion.ver_liquidacion', seccion: 'Titulación', label: 'Ver y descargar la liquidación final / estado de cuenta de la unidad', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Titulación') },
 
   // Movimientos: qué tipos de movimiento puede registrar cada rol.
   { id: 'movimientos.registrar_apartado', seccion: 'Movimientos', label: 'Registrar Apartados', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control') },

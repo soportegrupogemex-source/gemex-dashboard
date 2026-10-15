@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
 import { supabase } from './supabase';
-import { CLAVE_TITULADOR, CLAVE_TESORERO } from './AjustesAdministracion';
+import { cargarFirmantes, construirLiquidacionPdf, etiquetasCredito } from './liquidacionPdf';
 import { fmtDinero, InputDinero } from './dinero';
 import { usePuede } from './PermisosContext';
 
@@ -16,38 +15,6 @@ const fmt = (n) => fmtDinero(n, { centavos: true });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0, cuotas_condominales: 0 };
-
-// A qué crédito corresponde cada "Financiera" según el tipo de compra
-// (se usa en la pantalla y en la liquidación final en PDF).
-const ETIQUETAS_CREDITO = {
-  Infonavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
-  Fovissste: { f1: 'Crédito Fovissste', f2: 'Crédito bancario' },
-  Cofinavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
-  Bancario: { f1: 'Crédito bancario', f2: 'Otro crédito' },
-};
-const etiquetasCredito = (tipo) => ETIQUETAS_CREDITO[tipo] || { f1: 'Financiera 1', f2: 'Financiera 2' };
-
-const MESES_ABREV = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const fechaCorta = (d = new Date()) => `${String(d.getDate()).padStart(2, '0')}-${MESES_ABREV[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;
-const fmtN = (n) => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-// "C203" -> edificio "C", departamento "203". Sin letra (ej. "103") el edificio queda vacío.
-const partirUnidad = (numero) => {
-  const m = String(numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)[\s-]*(\d.*)$/);
-  return m ? { edificio: m[1].toUpperCase(), departamento: m[2] } : { edificio: '', departamento: String(numero || '') };
-};
-
-const cargarLogo = () => new Promise(resolve => {
-  const img = new Image();
-  img.onload = () => {
-    const c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
-    c.getContext('2d').drawImage(img, 0, 0);
-    resolve({ data: c.toDataURL('image/jpeg', 0.92), w: img.naturalWidth, h: img.naturalHeight });
-  };
-  img.onerror = () => resolve(null);
-  img.src = process.env.PUBLIC_URL + '/logo-gemex.jpg';
-});
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -96,9 +63,7 @@ export default function Cobranza({ miRol, miAgente }) {
     setCargando(true);
     const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
     // Nombres de las firmas: se capturan en Administración → Ajustes de administración.
-    const { data: cfg } = await supabase.from('configuracion').select('clave, valor').in('clave', [CLAVE_TITULADOR, CLAVE_TESORERO]);
-    const valorDe = (clave) => ((cfg || []).find(c => c.clave === clave)?.valor || '').trim().toUpperCase();
-    setFirmantes({ titulacion: valorDe(CLAVE_TITULADOR), tesorero: valorDe(CLAVE_TESORERO) });
+    setFirmantes(await cargarFirmantes(supabase));
     setDesarrollos(des || []);
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
@@ -236,99 +201,14 @@ export default function Cobranza({ miRol, miAgente }) {
 
   // Liquidación final: mismo formato que el que usa Tesorería.
   const construirLiquidacion = async () => {
-    const { valorVenta, pagado, saldoNeto } = calc(unidadAbierta.id, form);
+    const { valorVenta, pagado } = calc(unidadAbierta.id, form);
     const venta = ventaPorUnidad[unidadAbierta.id] || {};
-    const cliente = (venta.contacto_nombre || 'Sin comprador registrado').replace(/\s+/g, ' ').trim().toUpperCase();
-    const { edificio, departamento } = partirUnidad(unidadAbierta.numero);
-    const et = etiquetasCredito(venta.tipo_compra);
-    const f1 = r2(form.financiera_1_monto);
-    const f2 = r2(form.financiera_2_monto);
-    const cuotas = r2(form.cuotas_condominales);
-    const totalPagos = r2(pagado + f1 + f2);
-
-    const doc = new jsPDF('p', 'mm', 'letter');
-    const L = 22;          // margen izquierdo de etiquetas
-    const V = 100;         // columna de valores de texto
-    const R = 150;         // borde derecho de los importes
-    const linea = (y, x1 = L, x2 = R, grosor = 0.3) => { doc.setLineWidth(grosor); doc.line(x1, y, x2, y); };
-    const fila = (y, etiqueta, valor, negrita = false) => {
-      doc.setFont('helvetica', negrita ? 'bold' : 'normal');
-      doc.text(etiqueta, L, y);
-      doc.text(valor, R, y, { align: 'right' });
-    };
-
-    const logo = await cargarLogo();
-    if (logo) {
-      const h = 24; const w = h * (logo.w / logo.h);
-      doc.addImage(logo.data, 'JPEG', L, 14, w, h);
-    }
-
-    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
-    doc.text('LIQUIDACIÓN FINAL', 62, 52);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal'); doc.text('FECHA', 138, 52);
-    doc.setFont('helvetica', 'bold'); doc.text(fechaCorta(), 165, 52);
-
-    doc.setFontSize(10);
-    let y = 66;
-    const dato = (etiqueta, valor, negrita = true) => {
-      doc.setFont('helvetica', 'normal'); doc.text(etiqueta, L, y);
-      doc.setFont('helvetica', negrita ? 'bold' : 'normal');
-      const lineas = doc.splitTextToSize(String(valor || ''), 95);
-      doc.text(lineas, V, y);
-      y += 6 * Math.max(lineas.length, 1) + 1;
-    };
-    dato('DESARROLLO', (unidadAbierta.desarrollo_nombre || '').toUpperCase(), false);
-    dato('TIPO DE CRÉDITO', (venta.tipo_compra || '').toUpperCase());
-    dato('EDIFICIO', edificio);
-    dato('DEPARTAMENTO', departamento);
-    y += 5;
-    dato('NOMBRE DEL CLIENTE', cliente);
-
-    y += 8;
-    fila(y, 'PRECIO DE LISTA', fmtN(valorVenta)); y += 6;
-    fila(y, 'DESCUENTO', fmtN(0)); y += 3;
-    linea(y, L, R, 0.5); y += 5;
-    fila(y, 'VALOR DE VENTA NETO', fmtN(valorVenta), true); y += 2;
-    linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);
-
-    y += 11;
-    fila(y, 'ENGANCHE (+)', fmtN(pagado)); y += 6;
-    fila(y, et.f1.toUpperCase(), fmtN(f1)); y += 6;
-    fila(y, et.f2.toUpperCase(), fmtN(f2)); y += 3;
-    linea(y, L, R, 0.5); y += 5;
-    fila(y, 'TOTAL PAGOS', fmtN(totalPagos), true); y += 2;
-    linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);
-
-    y += 14;
-    doc.setFontSize(10);
-    fila(y, 'DIFERENCIA A PAGAR', fmtN(saldoNeto), true);
-    linea(y - 5, R - 38, R, 0.4); linea(y + 2, R - 38, R, 0.4);
-
-    if (cuotas > 0) {
-      y += 17;
-      doc.setFont('helvetica', 'normal'); doc.text('PAGO DE CUOTAS CONDOMINALES / DOS MESES', L, y);
-      doc.setFont('helvetica', 'bold');
-      doc.rect(R - 38, y - 5, 38, 8);
-      doc.text(fmtN(cuotas), R - 2, y, { align: 'right' });
-    }
-
-    // Firmas
-    const yFirma = 232;
-    const firmas = [
-      { x: 20, nombre: firmantes.titulacion, rol: 'TITULACIÓN' },
-      { x: 82, nombre: firmantes.tesorero, rol: 'TESORERO' },
-      { x: 144, nombre: cliente, rol: 'CLIENTE' },
-    ];
-    firmas.forEach(f => {
-      linea(yFirma, f.x, f.x + 56, 0.3);
-      doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
-      doc.text(doc.splitTextToSize(f.nombre || '', 56), f.x + 28, yFirma + 5, { align: 'center' });
-      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
-      doc.text(f.rol, f.x + 28, yFirma + 13, { align: 'center' });
+    return construirLiquidacionPdf({
+      cliente: venta.contacto_nombre, tipoCompra: venta.tipo_compra,
+      unidadNumero: unidadAbierta.numero, desarrolloNombre: unidadAbierta.desarrollo_nombre,
+      valorVenta, pagado, f1: form.financiera_1_monto, f2: form.financiera_2_monto, cuotas: form.cuotas_condominales,
+      firmantes,
     });
-
-    return { doc, cliente };
   };
 
   const descargarPDF = async () => {
@@ -336,7 +216,7 @@ export default function Cobranza({ miRol, miAgente }) {
     doc.save(`${cliente} - Liquidación final.pdf`);
   };
 
-  // Al marcar "Liquidación final completada" se guarda el seguimiento, se
+  // Al marcar "Unidad cotejada" se guarda el seguimiento, se
   // genera el PDF y se sube al bucket 'cobranza' para que Titulación lo vea.
   // Al desmarcar se borra el archivo. El PDF es una foto del momento: si
   // cambian pagos o montos después, hay que desmarcar y volver a marcar.
@@ -506,10 +386,10 @@ export default function Cobranza({ miRol, miAgente }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: form.liquidacion_final_completada ? '#EAF3DE' : '#f9f9f9', borderRadius: '10px', marginBottom: '8px', cursor: 'pointer', fontSize: '13px' }}>
                 <input type="checkbox" checked={!!form.liquidacion_final_completada} disabled={procesandoLiquidacion || !puedeMarcarLiquidacion}
                   onChange={e => toggleLiquidacionFinal(e.target.checked)} style={{ width: '16px', height: '16px' }} />
-                <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{procesandoLiquidacion ? 'Procesando...' : 'Liquidación final completada'}</span>
+                <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{procesandoLiquidacion ? 'Procesando...' : 'Unidad cotejada'}</span>
               </label>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px' }}>
-                Al marcarla se guarda el PDF y Titulación lo puede ver. Si cambias pagos o montos después, desmárcala y vuélvela a marcar para actualizarlo.
+                Titulación ya ve el estado de cuenta en vivo con lo que vayas capturando. Al cotejar la unidad se guarda la liquidación final definitiva y Titulación la ve marcada como "Unidad cotejada". Si cambias pagos o montos después, desmárcala y vuélvela a marcar para actualizarla.
               </div>
 
               <div style={{ background: '#f9f9f9', borderRadius: '10px', padding: '12px', fontSize: '13px', marginBottom: '20px' }}>
