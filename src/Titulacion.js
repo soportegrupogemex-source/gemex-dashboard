@@ -15,8 +15,8 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const PASO2 = [
   { campo: 'saldo_cobrado', label: 'Saldo cobrado' },
   { campo: 'asignar_sofom', label: 'Asignar SOFOM' },
-  { campo: 'autorizacion_financiera_1', label: 'Autorización financiera 1', campoPath: 'autorizacion_financiera_1_path' },
-  { campo: 'autorizacion_financiera_2', label: 'Autorización financiera 2', campoPath: 'autorizacion_financiera_2_path' },
+  { campo: 'autorizacion_financiera_1', label: 'Autorización financiera 1', campoPath: 'autorizacion_financiera_1_path', campoMonto: 'autorizacion_financiera_1_monto' },
+  { campo: 'autorizacion_financiera_2', label: 'Autorización financiera 2', campoPath: 'autorizacion_financiera_2_path', campoMonto: 'autorizacion_financiera_2_monto' },
   // El archivo de la liquidación final lo genera Cobranza al marcarla completada; aquí solo se ve.
   { campo: 'liquidacion_final', label: 'Liquidación final', desdeCobranza: true },
   { campo: 'carta_liberacion', label: 'Carta liberación', campoPath: 'carta_liberacion_path' },
@@ -36,6 +36,7 @@ const VACIO = {
   cna_agua: false, cuotas_predial: false,
   cna_agua_path: null, cuotas_predial_path: null, carta_liberacion_path: null, avaluo_path: null,
   autorizacion_financiera_1_path: null, autorizacion_financiera_2_path: null,
+  autorizacion_financiera_1_monto: 0, autorizacion_financiera_2_monto: 0,
 };
 
 function calcularEtapa(s) {
@@ -185,6 +186,9 @@ export default function Titulacion({ miRol, miAgente }) {
       asignar_sofom: !!form.asignar_sofom,
       autorizacion_financiera_1: !!form.autorizacion_financiera_1,
       autorizacion_financiera_2: !!form.autorizacion_financiera_2,
+      // Estos montos se reflejan solos en Cobranza (Financiera 1 y 2).
+      autorizacion_financiera_1_monto: Math.round((Number(form.autorizacion_financiera_1_monto) || 0) * 100) / 100,
+      autorizacion_financiera_2_monto: Math.round((Number(form.autorizacion_financiera_2_monto) || 0) * 100) / 100,
       liquidacion_final: !!form.liquidacion_final,
       carta_liberacion: !!form.carta_liberacion,
       cna_agua: !!form.cna_agua,
@@ -382,6 +386,14 @@ export default function Titulacion({ miRol, miAgente }) {
                   <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
+                {p.campoMonto && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#555' }}>
+                    Monto $
+                    <input type="number" step="0.01" min="0" disabled={soloLectura} value={form[p.campoMonto] === 0 ? '' : form[p.campoMonto]} placeholder="0.00"
+                      onChange={e => setForm(f => ({ ...f, [p.campoMonto]: e.target.value }))}
+                      style={{ width: '120px', padding: '4px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px' }} />
+                  </span>
+                )}
                 {p.desdeCobranza && (liquidacionesCobranza[unidadAbierta.id] ? (
                   <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
                     style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>

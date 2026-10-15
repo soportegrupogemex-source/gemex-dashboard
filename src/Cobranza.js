@@ -62,6 +62,8 @@ export default function Cobranza({ miRol, miAgente }) {
   const [desarrollos, setDesarrollos] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [seguimientos, setSeguimientos] = useState({});
+  // Financiera 1 y 2 vienen de Titulación (Autorización financiera 1 y 2); aquí solo se leen.
+  const [montosTit, setMontosTit] = useState({}); // unidad_id -> { f1, f2 }
   const [pagosPorUnidad, setPagosPorUnidad] = useState({});
   const [ventaPorUnidad, setVentaPorUnidad] = useState({}); // unidad_id -> {contacto_nombre, monto, tipo_compra}
   const [desarrolloSel, setDesarrolloSel] = useState('');
@@ -106,6 +108,12 @@ export default function Cobranza({ miRol, miAgente }) {
       (seg || []).forEach(s => { mapa[s.unidad_id] = s; });
       setSeguimientos(mapa);
 
+      const { data: tit } = await supabase.from('titulacion_seguimiento')
+        .select('unidad_id, autorizacion_financiera_1_monto, autorizacion_financiera_2_monto').in('unidad_id', unidadIds);
+      const mapaTit = {};
+      (tit || []).forEach(t => { mapaTit[t.unidad_id] = { f1: Number(t.autorizacion_financiera_1_monto || 0), f2: Number(t.autorizacion_financiera_2_monto || 0) }; });
+      setMontosTit(mapaTit);
+
       const { data: pagos } = await supabase.from('cobranza_pagos').select('*').in('unidad_id', unidadIds).order('fecha');
       const mapaPagos = {};
       (pagos || []).forEach(p => { (mapaPagos[p.unidad_id] = mapaPagos[p.unidad_id] || []).push(p); });
@@ -121,6 +129,7 @@ export default function Cobranza({ miRol, miAgente }) {
       setVentaPorUnidad(mapaVenta);
     } else {
       setSeguimientos({});
+      setMontosTit({});
       setPagosPorUnidad({});
       setVentaPorUnidad({});
     }
@@ -139,14 +148,16 @@ export default function Cobranza({ miRol, miAgente }) {
     const valorVenta = Number(ventaPorUnidad[unidadId]?.monto || 0);
     const pagado = totalPagos(unidadId);
     const diferenciaPorCubrir = r2(valorVenta - pagado);
-    const saldoNeto = r2(diferenciaPorCubrir - Number(s.financiera_1_monto || 0) - Number(s.financiera_2_monto || 0));
-    const remanente = r2(Number(s.financiera_1_monto || 0) + Number(s.financiera_2_monto || 0) - Number(s.liberacion_monto || 0));
+    const f1 = Number(montosTit[unidadId]?.f1 || 0);
+    const f2 = Number(montosTit[unidadId]?.f2 || 0);
+    const saldoNeto = r2(diferenciaPorCubrir - f1 - f2);
+    const remanente = r2(f1 + f2 - Number(s.liberacion_monto || 0));
     return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente };
   };
 
   const abrirUnidad = (u) => {
     setUnidadAbierta(u);
-    setForm({ ...SEG_VACIO, ...(seguimientos[u.id] || {}) });
+    setForm({ ...SEG_VACIO, ...(seguimientos[u.id] || {}), financiera_1_monto: montosTit[u.id]?.f1 || 0, financiera_2_monto: montosTit[u.id]?.f2 || 0 });
     setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
   };
 
@@ -156,8 +167,6 @@ export default function Cobranza({ miRol, miAgente }) {
     const payload = {
       unidad_id: unidadAbierta.id,
       desarrollo_id: unidadAbierta.desarrollo_id,
-      financiera_1_monto: r2(form.financiera_1_monto),
-      financiera_2_monto: r2(form.financiera_2_monto),
       liberacion_monto: r2(form.liberacion_monto),
       cuotas_condominales: r2(form.cuotas_condominales),
       actualizado_por: user?.email || null,
@@ -460,20 +469,15 @@ export default function Cobranza({ miRol, miAgente }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 1 — {etiquetasCredito(venta.tipo_compra).f1}</label>
-                  <input type="number" step="0.01" min="0" value={form.financiera_1_monto}
-                    onChange={e => setForm(f => ({ ...f, financiera_1_monto: e.target.value }))}
-                    style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 2 — {etiquetasCredito(venta.tipo_compra).f2}</label>
-                  <input type="number" step="0.01" min="0" value={form.financiera_2_monto}
-                    onChange={e => setForm(f => ({ ...f, financiera_2_monto: e.target.value }))}
-                    style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
-                </div>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
+                {[['Financiera 1', etiquetasCredito(venta.tipo_compra).f1, form.financiera_1_monto], ['Financiera 2', etiquetasCredito(venta.tipo_compra).f2, form.financiera_2_monto]].map(([t, e, monto]) => (
+                  <div key={t} style={{ flex: 1 }}>
+                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '4px' }}>{t} — {e}</div>
+                    <div style={{ padding: '8px 10px', background: '#f3f3f3', border: '0.5px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#1a1a2e' }}>{fmt(monto)}</div>
+                  </div>
+                ))}
               </div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>Estos montos se capturan en Titulación (Autorización financiera 1 y 2).</div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
                 <input type="number" step="0.01" min="0" value={form.liberacion_monto}
