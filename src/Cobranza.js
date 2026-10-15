@@ -81,7 +81,7 @@ export default function Cobranza({ miRol, miAgente }) {
 
   const cargarTodo = async () => {
     setCargando(true);
-    const { data: des } = await supabase.from('desarrollos').select('id, nombre, direccion, ciudad').eq('activo', true).order('nombre');
+    const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
     const { data: firm } = await supabase.from('agentes').select('nombre, apellidos, rol').in('rol', ['Titulación', 'Tesorería']).eq('activo', true);
     const nombreDe = (rol) => { const a = (firm || []).find(x => x.rol === rol); return a ? `${a.nombre || ''} ${a.apellidos || ''}`.trim().toUpperCase() : ''; };
     setFirmantes({ titulacion: nombreDe('Titulación'), tesorero: nombreDe('Tesorería') });
@@ -214,7 +214,6 @@ export default function Cobranza({ miRol, miAgente }) {
     const { valorVenta, pagado, saldoNeto } = calc(unidadAbierta.id, form);
     const venta = ventaPorUnidad[unidadAbierta.id] || {};
     const cliente = (venta.contacto_nombre || 'Sin comprador registrado').replace(/\s+/g, ' ').trim().toUpperCase();
-    const desarrollo = desarrollos.find(d => d.id === unidadAbierta.desarrollo_id) || {};
     const { edificio, departamento } = partirUnidad(unidadAbierta.numero);
     const et = etiquetasCredito(venta.tipo_compra);
     const f1 = r2(form.financiera_1_monto);
@@ -255,7 +254,6 @@ export default function Cobranza({ miRol, miAgente }) {
       y += 6 * Math.max(lineas.length, 1) + 1;
     };
     dato('DESARROLLO', (unidadAbierta.desarrollo_nombre || '').toUpperCase(), false);
-    dato('DOMICILIO', (desarrollo.direccion || '').toUpperCase(), false);
     dato('TIPO DE CRÉDITO', (venta.tipo_compra || '').toUpperCase());
     dato('EDIFICIO', edificio);
     dato('DEPARTAMENTO', departamento);
