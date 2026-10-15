@@ -167,9 +167,19 @@ export default function Titulacion({ miRol, miAgente }) {
     return true;
   });
 
-  const abrirUnidad = (u) => {
+  const abrirUnidad = async (u) => {
     setUnidadAbierta(u);
     setForm({ ...VACIO, ...(seguimientos[u.id] || {}) });
+    // La liquidación final la sube Cobranza en cualquier momento: se vuelve a
+    // consultar al abrir la unidad para no depender de lo cargado antes.
+    const { data } = await supabase.from('cobranza_seguimiento')
+      .select('liquidacion_final_completada, liquidacion_final_path').eq('unidad_id', u.id).maybeSingle();
+    setLiquidacionesCobranza(prev => {
+      const n = { ...prev };
+      if (data?.liquidacion_final_completada && data?.liquidacion_final_path) n[u.id] = data.liquidacion_final_path;
+      else delete n[u.id];
+      return n;
+    });
   };
 
   const guardar = async () => {
@@ -240,6 +250,16 @@ export default function Titulacion({ miRol, miAgente }) {
   const verLiquidacionFinal = async (path) => {
     const { data } = await supabase.storage.from('cobranza').createSignedUrl(path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const descargarLiquidacionFinal = async (path, unidad) => {
+    const nombre = `Liquidación final ${unidad?.numero || ''}${compradores[unidad?.id] ? ' - ' + compradores[unidad.id] : ''}.pdf`.replace(/\s+/g, ' ');
+    const { data, error } = await supabase.storage.from('cobranza').createSignedUrl(path, 300, { download: nombre });
+    if (error || !data?.signedUrl) { alert('No se pudo descargar el archivo: ' + (error?.message || '')); return; }
+    const a = document.createElement('a');
+    a.href = data.signedUrl;
+    a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
   };
 
   const conteos = { 'Contrato y Expediente': 0, 'Titulación': 0, 'Escriturado': 0 };
@@ -396,10 +416,16 @@ export default function Titulacion({ miRol, miAgente }) {
                   </span>
                 )}
                 {p.desdeCobranza && (liquidacionesCobranza[unidadAbierta.id] ? (
-                  <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
-                    style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                    📄 Ver liquidación final
-                  </button>
+                  <>
+                    <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
+                      style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                      📄 Ver liquidación final
+                    </button>
+                    <button type="button" onClick={() => descargarLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id], unidadAbierta)}
+                      style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
+                      ⬇ Descargar
+                    </button>
+                  </>
                 ) : <span style={{ fontSize: '11px', color: '#aaa' }}>Pendiente de Cobranza</span>)}
                 {p.campoPath && (form[p.campoPath] ? (
                   <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
