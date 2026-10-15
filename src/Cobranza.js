@@ -8,7 +8,9 @@ import { supabase } from './supabase';
 // Cobranza: Financiera 1/2 y Liberación. Cada abono (cobranza_pagos)
 // puede llevar un comprobante adjunto (bucket privado 'cobranza').
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
-const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
+// Importes con centavos (los pagos y montos de cobranza pueden llevarlos).
+const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0 };
 
@@ -92,14 +94,14 @@ export default function Cobranza({ miRol, miAgente }) {
     return true;
   });
 
-  const totalPagos = (unidadId) => (pagosPorUnidad[unidadId] || []).reduce((s, p) => s + Number(p.monto || 0), 0);
+  const totalPagos = (unidadId) => r2((pagosPorUnidad[unidadId] || []).reduce((s, p) => s + Number(p.monto || 0), 0));
 
   const calc = (unidadId, s) => {
     const valorVenta = Number(ventaPorUnidad[unidadId]?.monto || 0);
     const pagado = totalPagos(unidadId);
-    const diferenciaPorCubrir = valorVenta - pagado;
-    const saldoNeto = diferenciaPorCubrir - Number(s.financiera_1_monto || 0) - Number(s.financiera_2_monto || 0);
-    const remanente = Number(s.financiera_1_monto || 0) + Number(s.financiera_2_monto || 0) - Number(s.liberacion_monto || 0);
+    const diferenciaPorCubrir = r2(valorVenta - pagado);
+    const saldoNeto = r2(diferenciaPorCubrir - Number(s.financiera_1_monto || 0) - Number(s.financiera_2_monto || 0));
+    const remanente = r2(Number(s.financiera_1_monto || 0) + Number(s.financiera_2_monto || 0) - Number(s.liberacion_monto || 0));
     return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente };
   };
 
@@ -115,9 +117,9 @@ export default function Cobranza({ miRol, miAgente }) {
     const payload = {
       unidad_id: unidadAbierta.id,
       desarrollo_id: unidadAbierta.desarrollo_id,
-      financiera_1_monto: Number(form.financiera_1_monto) || 0,
-      financiera_2_monto: Number(form.financiera_2_monto) || 0,
-      liberacion_monto: Number(form.liberacion_monto) || 0,
+      financiera_1_monto: r2(form.financiera_1_monto),
+      financiera_2_monto: r2(form.financiera_2_monto),
+      liberacion_monto: r2(form.liberacion_monto),
       actualizado_por: user?.email || null,
       updated_at: new Date().toISOString(),
     };
@@ -125,13 +127,14 @@ export default function Cobranza({ miRol, miAgente }) {
       .upsert(payload, { onConflict: 'unidad_id' })
       .select().single();
     setGuardando(false);
-    if (!error && data) {
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    if (data) {
       setSeguimientos(prev => ({ ...prev, [unidadAbierta.id]: data }));
     }
   };
 
   const agregarPago = async () => {
-    if (!nuevoPago.monto || Number(nuevoPago.monto) <= 0) return;
+    if (!nuevoPago.monto || r2(nuevoPago.monto) <= 0) return;
     setSubiendoComprobante(true);
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -146,12 +149,13 @@ export default function Cobranza({ miRol, miAgente }) {
     const { data, error } = await supabase.from('cobranza_pagos').insert([{
       unidad_id: unidadAbierta.id,
       fecha: nuevoPago.fecha,
-      monto: Number(nuevoPago.monto),
+      monto: r2(nuevoPago.monto),
       comprobante_path: comprobantePath,
       capturado_por: user?.email || null,
     }]).select().single();
     setSubiendoComprobante(false);
-    if (!error && data) {
+    if (error) { alert('No se pudo registrar el pago: ' + error.message); return; }
+    if (data) {
       setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: [...(prev[unidadAbierta.id] || []), data] }));
       setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
     }
@@ -286,7 +290,7 @@ export default function Cobranza({ miRol, miAgente }) {
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <input type="date" value={nuevoPago.fecha} onChange={e => setNuevoPago(p => ({ ...p, fecha: e.target.value }))}
                   style={{ flex: 1, minWidth: '120px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
-                <input type="number" placeholder="Monto" value={nuevoPago.monto} onChange={e => setNuevoPago(p => ({ ...p, monto: e.target.value }))}
+                <input type="number" step="0.01" min="0" placeholder="Monto" value={nuevoPago.monto} onChange={e => setNuevoPago(p => ({ ...p, monto: e.target.value }))}
                   style={{ flex: 1, minWidth: '90px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
                 <input type="file" onChange={e => setNuevoPago(p => ({ ...p, archivo: e.target.files[0] || null }))}
                   style={{ flex: 1, minWidth: '140px', fontSize: '12px' }} />
@@ -307,20 +311,20 @@ export default function Cobranza({ miRol, miAgente }) {
               <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 1</label>
-                  <input type="number" value={form.financiera_1_monto}
+                  <input type="number" step="0.01" min="0" value={form.financiera_1_monto}
                     onChange={e => setForm(f => ({ ...f, financiera_1_monto: e.target.value }))}
                     style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Financiera 2</label>
-                  <input type="number" value={form.financiera_2_monto}
+                  <input type="number" step="0.01" min="0" value={form.financiera_2_monto}
                     onChange={e => setForm(f => ({ ...f, financiera_2_monto: e.target.value }))}
                     style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
                 </div>
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
-                <input type="number" value={form.liberacion_monto}
+                <input type="number" step="0.01" min="0" value={form.liberacion_monto}
                   onChange={e => setForm(f => ({ ...f, liberacion_monto: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
               </div>
