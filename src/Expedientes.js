@@ -95,11 +95,21 @@ const docsRequeridos = (movimiento, persona = 'titular') => {
   return [...base, ...comunes, ...soloTitular];
 };
 
+// Coacreditado y Conyugal piden exactamente los mismos documentos (la segunda
+// persona del crédito); solo cambia cómo se nombra el tipo de crédito.
+const hayOtraPersona = (m) => !!(m?.tiene_coacreditado || m?.tiene_conyugal);
+const etiquetaCredito = (m) => {
+  if (!m?.tipo_compra) return '';
+  if (m.tiene_conyugal) return `${m.tipo_compra} conyugal`;
+  if (m.tiene_coacreditado) return `${m.tipo_compra} coacreditado`;
+  return m.tipo_compra;
+};
+
 // Lista completa para conteos/ZIP: Titular + Coacreditado (si aplica) +
 // Contrato firmado.
 const docsRequeridosCompletos = (movimiento) => {
   const titular = docsRequeridos(movimiento, 'titular');
-  const coacreditado = movimiento?.tiene_coacreditado ? docsRequeridos(movimiento, 'coacreditado') : [];
+  const coacreditado = hayOtraPersona(movimiento) ? docsRequeridos(movimiento, 'coacreditado') : [];
   return [...titular, ...coacreditado, DOC_ORDEN_CONTRATO];
 };
 
@@ -392,16 +402,20 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // aplica" en el resto del checklist) — al marcarlo, la segunda columna
   // de documentos debe aparecer de inmediato, sin un paso extra de
   // "Guardar" en medio.
-  const handleToggleCoacreditado = async (valor) => {
+  // 'coacreditado' y 'conyugal' son excluyentes (la segunda persona es una u
+  // otra); los documentos que se piden son los mismos.
+  const handleToggleCoacreditado = async (campo, valor) => {
     if (!movSel) return;
-    const { data, error } = await supabase.from('movimientos').update({
-      tiene_coacreditado: valor,
-      coacreditado_nombre: valor ? movSel.coacreditado_nombre : null,
-    }).eq('id', movSel.id).select().single();
+    const otro = campo === 'tiene_coacreditado' ? 'tiene_conyugal' : 'tiene_coacreditado';
+    const cambios = { [campo]: valor };
+    if (valor) cambios[otro] = false;
+    const sigueHabiendo = valor || !!movSel[otro];
+    cambios.coacreditado_nombre = sigueHabiendo ? movSel.coacreditado_nombre : null;
+    const { data, error } = await supabase.from('movimientos').update(cambios).eq('id', movSel.id).select().single();
     if (error) { alert('No se pudo guardar: ' + error.message); return; }
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
-    setFormCoacreditado(f => ({ ...f, tiene_coacreditado: valor, coacreditado_nombre: data.coacreditado_nombre || '' }));
+    setFormCoacreditado(f => ({ ...f, tiene_coacreditado: !!data.tiene_coacreditado, coacreditado_nombre: data.coacreditado_nombre || '' }));
   };
 
   // FIX: el nombre del coacreditado sí se edita en memoria y se guarda
@@ -806,7 +820,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
     (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo) &&
-    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra)
+    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra || etiquetaCredito(m) === filtroTipoCompra)
   );
 
   const rechazados = misDocumentosRechazados();
@@ -860,7 +874,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
     const esFinanciado = !!cfgFinanciado;
     const docsTitular = docsRequeridos(movSel, 'titular');
-    const docsCoacreditado = movSel.tiene_coacreditado ? docsRequeridos(movSel, 'coacreditado') : [];
+    const docsCoacreditado = hayOtraPersona(movSel) ? docsRequeridos(movSel, 'coacreditado') : [];
 
     // FIX: card de un documento — se reutiliza para Titular y Coacreditado,
     // ya que ambos viven en el mismo mapa plano de documentos (el id del
@@ -980,7 +994,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '1.5rem 0 1rem', flexWrap: 'wrap' }}>
           <div style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a2e' }}>EXPEDIENTE PERSONA FÍSICA</div>
           {movSel.tipo_compra && (
-            <span style={{ fontSize: '14px', padding: '5px 14px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{movSel.tipo_compra}</span>
+            <span style={{ fontSize: '14px', padding: '5px 14px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{etiquetaCredito(movSel)}</span>
           )}
         </div>
 
@@ -1059,14 +1073,21 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
               menos los que son exclusivos del Titular). */}
           {esFinanciado && (
             <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
-                <input type='checkbox' disabled={!esMio || archivado} checked={!!movSel.tiene_coacreditado}
-                  onChange={e => handleToggleCoacreditado(e.target.checked)} />
-                ¿Hay coacreditado?
-              </label>
-              {movSel.tiene_coacreditado && (
+              <div style={{ display: 'flex', gap: '22px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
+                  <input type='checkbox' disabled={!esMio || archivado} checked={!!movSel.tiene_coacreditado}
+                    onChange={e => handleToggleCoacreditado('tiene_coacreditado', e.target.checked)} />
+                  ¿Hay coacreditado?
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
+                  <input type='checkbox' disabled={!esMio || archivado} checked={!!movSel.tiene_conyugal}
+                    onChange={e => handleToggleCoacreditado('tiene_conyugal', e.target.checked)} />
+                  ¿Es conyugal?
+                </label>
+              </div>
+              {hayOtraPersona(movSel) && (
                 <>
-                  <input placeholder='Nombre del coacreditado' disabled={!esMio || archivado}
+                  <input placeholder={movSel.tiene_conyugal ? 'Nombre del cónyuge' : 'Nombre del coacreditado'} disabled={!esMio || archivado}
                     value={formCoacreditado.coacreditado_nombre}
                     onChange={e => setFormCoacreditado(f => ({ ...f, coacreditado_nombre: e.target.value }))}
                     style={{ width: '100%', padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', marginTop: '10px', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
@@ -1087,7 +1108,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           {docsCoacreditado.length > 0 && (
             <>
               <div style={{ fontSize: '12px', fontWeight: '700', color: '#666', textTransform: 'uppercase', marginTop: '10px' }}>
-                Documentación del Coacreditado{movSel.coacreditado_nombre ? ` — ${movSel.coacreditado_nombre}` : ''}
+                Documentación del {movSel.tiene_conyugal ? 'Cónyuge' : 'Coacreditado'}{movSel.coacreditado_nombre ? ` — ${movSel.coacreditado_nombre}` : ''}
               </div>
               {docsCoacreditado.map(renderDocCard)}
             </>
@@ -1365,7 +1386,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <select value={filtroTipoCompra} onChange={e => setFiltroTipoCompra(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
           <option value=''>Todos los tipos de crédito</option>
-          {['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'].map(t => <option key={t} value={t}>{t}</option>)}
+          {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
       </div>
 
@@ -1398,7 +1419,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {m.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{m.tipo_compra}</span>}
+                  {m.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{etiquetaCredito(m)}</span>}
                   {tab === 'contratos' ? (
                     <>
                       {m.contrato_firmado_path && (
