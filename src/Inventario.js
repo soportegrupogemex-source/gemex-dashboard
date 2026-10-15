@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import Cotizador from './Cotizador';
 import { InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const ESTATUS_OPCIONES = ['Libre', 'Bloqueado', 'Apartado', 'Vendido'];
 const ORIENTACION_OPCIONES = ['', 'Norte', 'Sur', 'Este', 'Oeste', 'Noreste', 'Noroeste', 'Sureste', 'Suroeste'];
@@ -142,13 +143,20 @@ export default function Inventario({ desarrollo, onBack }) {
   // los desarrollos que tiene asignados a su cargo — a diferencia de
   // Super Admin/Admin que pueden en cualquier desarrollo.
   const esMesaControlDeEsteDesarrollo = miRol === 'Mesa de Control' && misDesarrollosCargo.includes(desarrollo.nombre);
-  const puedeGestionarEstatus = miRol === 'Super Admin' || miRol === 'Admin' || esMesaControlDeEsteDesarrollo;
+  const puede = usePuede();
+  // Interruptores del panel Permisos + el alcance por desarrollo de Mesa de Control.
+  const dentroDeAlcance = miRol !== 'Mesa de Control' || esMesaControlDeEsteDesarrollo;
+  const puedeGestionarEstatus = puede('inventario.cambiar_disponibilidad') && dentroDeAlcance;
+  const puedeCrearUnidades = puede('inventario.crear_unidades') && dentroDeAlcance;
+  const puedeEditarUnidades = puede('inventario.editar_unidades') && dentroDeAlcance;
+  const puedeEliminarUnidades = puede('inventario.eliminar_unidades') && dentroDeAlcance;
+  const puedeCargaMasiva = puede('inventario.carga_masiva');
   // FIX: los precios (precio de lista, en línea, en el formulario y en la
   // carga masiva) solo los mueve Super Admin — Admin y Mesa de Control
   // conservan el resto de la gestión del inventario (estatus, datos de la
   // unidad), pero no el precio.
-  const puedeCambiarPrecio = miRol === 'Super Admin';
-  const puedeVerPrecioOculto = miRol === 'Super Admin';
+  const puedeCambiarPrecio = puede('inventario.cambiar_precio');
+  const puedeVerPrecioOculto = puede('inventario.ver_precio_vendidas');
   // FIX BUG DE SEGURIDAD: antes los botones "+ Cargar unidad", "Editar" y
   // "Eliminar" (menú "···" en escritorio y panel de detalle en móvil) no
   // tenían NINGÚN candado de rol — cualquier Agente podía crear, editar o
@@ -157,7 +165,6 @@ export default function Inventario({ desarrollo, onBack }) {
   // el mismo set de roles que ya gestiona estatus/precio, y además se
   // agrega el mismo candado DENTRO de handleGuardar/handleEditar/
   // handleEliminar como respaldo, no solo ocultando el botón en pantalla.
-  const puedeEditarInventario = puedeGestionarEstatus;
 
   const precioVisible = (u) => {
     if (u.estatus === 'Vendido' || u.estatus === 'Apartado') return puedeVerPrecioOculto;
@@ -207,7 +214,7 @@ const { data } = await query.limit(5000);
   const fmt = (n) => `$${Number(n).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 
   const handleGuardar = async () => {
-    if (!puedeEditarInventario) return; // FIX: respaldo de seguridad
+    if (!(editandoId ? puedeEditarUnidades : puedeCrearUnidades)) return; // respaldo de seguridad
     setGuardando(true);
     // Sin permiso de precio: al editar no se toca el precio; al crear
     // la unidad queda en 0 hasta que Super Admin le ponga precio.
@@ -231,13 +238,13 @@ const { data } = await query.limit(5000);
   };
 
   const handleEditar = (u) => {
-    if (!puedeEditarInventario) return; // FIX: respaldo de seguridad
+    if (!puedeEditarUnidades) return; // respaldo de seguridad
     setForm({ ...formVacio(), ...u });
     setEditandoId(u.id); setShowForm(true); setMenuAccion(null); setUnidadDetalle(null);
   };
 
   const handleEliminar = async (id) => {
-    if (!puedeEditarInventario) return; // FIX: respaldo de seguridad
+    if (!puedeEliminarUnidades) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar esta unidad?')) return;
     await supabase.from('inventario').delete().eq('id', id);
     setMenuAccion(null); setUnidadDetalle(null);
@@ -245,8 +252,10 @@ const { data } = await query.limit(5000);
   };
 
   const handleCambiarEstatus = async (id, nuevoEstatus) => {
-    await supabase.from('inventario').update({ estatus: nuevoEstatus }).eq('id', id);
+    if (!puedeGestionarEstatus) return; // respaldo de seguridad
+    const { error } = await supabase.from('inventario').update({ estatus: nuevoEstatus }).eq('id', id);
     setMenuEstatus(null);
+    if (error) { alert('No se pudo cambiar el estatus: ' + error.message); return; }
     if (unidadDetalle?.id === id) setUnidadDetalle(prev => ({ ...prev, estatus: nuevoEstatus }));
     cargarUnidades();
   };
@@ -367,7 +376,7 @@ const { data } = await query.limit(5000);
   };
 
   const handleGuardarMasivo = async () => {
-    if (!puedeEditarInventario) return; // FIX: respaldo de seguridad
+    if (!puedeCargaMasiva || !puedeCrearUnidades) return; // respaldo de seguridad
     const validas = filasMasivas.filter(f => f.numero.toString().trim() !== '');
     if (validas.length === 0) { setMsgMasivo('Agrega al menos un número de unidad.'); return; }
     setGuardandoMasivo(true);
@@ -603,21 +612,21 @@ const { data } = await query.limit(5000);
           ← {isMobile ? 'Volver' : 'Volver a Desarrollos'}
         </button>
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {!isMobile && miRol === 'Super Admin' && <button onClick={handleExportar} style={btnOutline}>Exportar</button>}
+          {!isMobile && puede('inventario.exportar') && <button onClick={handleExportar} style={btnOutline}>Exportar</button>}
           {!isMobile && (
             <button onClick={() => setShowComparar(!showComparar)}
               style={{ ...btnOutline, background: showComparar ? '#f0f0f0' : '#fff' }}>
               Comparar {seleccionadas.length > 0 && `(${seleccionadas.length})`}
             </button>
           )}
-          {!isMobile && (miRol === 'Super Admin' || miRol === 'Admin') && (
+          {!isMobile && puedeCargaMasiva && puedeCrearUnidades && (
             <button onClick={handleAbrirMasiva} style={btnOutline}>
               ⬆ Carga masiva
             </button>
           )}
           {/* FIX: candado de rol — antes este botón era visible y funcional
               para CUALQUIER rol (incluyendo Agente), en móvil y escritorio. */}
-          {puedeEditarInventario && (
+          {puedeCrearUnidades && (
             <button onClick={() => { setShowForm(true); setEditandoId(null); setForm(formVacio()); }}
               style={{ ...btnPrimary, padding: isMobile ? '10px 14px' : '8px 16px', fontSize: isMobile ? '14px' : '13px' }}>
               + {isMobile ? 'Nueva' : 'Cargar unidad'}
@@ -947,7 +956,7 @@ const { data } = await query.limit(5000);
                     <td style={{ padding: '12px 14px', position: 'relative' }} onClick={e => e.stopPropagation()}>
                       {/* FIX: candado de rol — antes este menú "···" (con Editar y
                           Eliminar) era visible y funcional para CUALQUIER rol. */}
-                      {puedeEditarInventario && (
+                      {(puedeEditarUnidades || puedeEliminarUnidades) && (
                         <>
                           <button onClick={() => setMenuAccion(menuAccion === u.id ? null : u.id)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#666' }}>
@@ -955,14 +964,14 @@ const { data } = await query.limit(5000);
                           </button>
                           {menuAccion === u.id && (
                             <div style={{ position: 'absolute', right: 0, top: '36px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 1000, minWidth: '130px' }}>
-                              <button onClick={() => handleEditar(u)}
+                              {puedeEditarUnidades && <button onClick={() => handleEditar(u)}
                                 style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', textAlign: 'left', color: '#333' }}>
                                 ✏️ Editar
-                              </button>
-                              <button onClick={() => handleEliminar(u.id)}
+                              </button>}
+                              {puedeEliminarUnidades && <button onClick={() => handleEliminar(u.id)}
                                 style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', textAlign: 'left', color: '#e53935' }}>
                                 🗑 Eliminar
-                              </button>
+                              </button>}
                             </div>
                           )}
                         </>
@@ -1082,23 +1091,23 @@ const { data } = await query.limit(5000);
                 funcionales para CUALQUIER rol en el panel de detalle de móvil.
                 Esta era la vía más directa por la que un Agente podía editar
                 inventario desde el celular. */}
-            {puedeEditarInventario && (
+            {(puedeEditarUnidades || puedeEliminarUnidades) && (
               <>
-                <button onClick={() => handleEditar(unidadDetalle)}
+                {puedeEditarUnidades && <button onClick={() => handleEditar(unidadDetalle)}
                   style={{ flex: 1, padding: '12px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer', fontWeight: '500' }}>
                   Editar
-                </button>
-                <button onClick={() => handleEliminar(unidadDetalle.id)}
+                </button>}
+                {puedeEliminarUnidades && <button onClick={() => handleEliminar(unidadDetalle.id)}
                   style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
                   🗑
-                </button>
+                </button>}
               </>
             )}
           </div>
         </div>
       )}
 
-      {showForm && puedeEditarInventario && (
+      {showForm && (editandoId ? puedeEditarUnidades : puedeCrearUnidades) && (
         <div style={{ position: 'fixed', top: 0, right: 0, width: isMobile ? '100%' : '360px', height: '100dvh', background: '#fff', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ fontSize: '16px', fontWeight: '500', margin: 0 }}>{editandoId ? 'Editar unidad' : 'Cargar unidad'}</h3>

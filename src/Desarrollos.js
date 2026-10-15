@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import Inventario from './Inventario';
 import Planes from './Planes';
 import { fmtDinero, InputDinero } from './dinero';
+import { usePuede } from './PermisosContext';
 
 const OPCIONES_NUM = ['0','1','1.5','1 a 2','1 a 3','1 a 4','2 a 3','2 a 4','2','2.5','3 a 4','3 a 5','3','3.5','4 a 5','4','4.5','5'];
 const CIUDADES = ['Guadalajara','Zapopan','Tlaquepaque','Tonalá','Mazatlán','Ciudad de México','Monterrey','Cancún','Puerto Vallarta','Los Cabos'];
@@ -192,10 +193,13 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
     }
   };
 
+  const puede = usePuede();
+  // Interruptor del panel Permisos + alcance: Gerente Editor y Mesa de Control
+  // solo sobre los desarrollos que tienen a su cargo.
   const puedeEditar = (desarrollo) => {
-    if (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin') return true;
+    if (!puede('desarrollos.editar')) return false;
     if (miRol === 'Gerente Editor' || miRol === 'Mesa de Control') return (miAgente?.desarrollos_cargo || []).includes(desarrollo.nombre);
-    return false;
+    return true;
   };
 
   // FIX: cuando se crea un desarrollo NUEVO, se le agrega automáticamente
@@ -214,6 +218,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
   const handleGuardar = async () => {
     if (!form.nombre.trim()) return;
+    if (!(editando ? puede('desarrollos.editar') : puede('desarrollos.crear'))) return; // respaldo de seguridad
     setGuardando(true);
     // fecha_entrega es columna `date` — '' no es una fecha válida para Postgres.
     const payload = { ...form, fecha_entrega: form.fecha_entrega || null };
@@ -259,6 +264,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
   };
 
   const handleEliminar = async (id) => {
+    if (!puede('desarrollos.eliminar')) return; // respaldo de seguridad
     if (!window.confirm('¿Eliminar este desarrollo y todos sus datos?')) return;
 
     const desarrollo = desarrollos.find(d => d.id === id);
@@ -467,7 +473,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
           <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Desarrollos</h2>
           <div style={{ fontSize: '13px', color: '#888' }}>{desarrollosFiltrados.length} desarrollos</div>
         </div>
-        {(miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin') && (
+        {puede('desarrollos.crear') && (
           <button onClick={() => { setShowForm(true); setEditando(null); setForm(formVacio()); setOtraCiudad(false); setTabForm('general'); setEstructurasData({}); }}
             style={{ ...btnPrimary, padding: isMobile ? '10px 14px' : '8px 16px', fontSize: isMobile ? '14px' : '13px' }}>
             + {isMobile ? 'Nuevo' : 'Crear desarrollo'}
@@ -591,7 +597,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </button>
                     {showMenu === d.id && (
                       <div style={{ position: 'absolute', right: 0, top: '32px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, minWidth: '170px' }}>
-                        {(miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin' || miRol === 'Gerente Editor' || miRol === 'Mesa de Control') && (
+                        {puede('desarrollos.ver_planes') && (
                           <button onClick={() => { setVistaPlanes(d); setShowMenu(null); }}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
                             💳 Planes
@@ -633,7 +639,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                             ✏️ Editar
                           </button>
                         )}
-                        {(miRol === 'Super Admin' || miRol === 'Admin') && (
+                        {puede('desarrollos.eliminar') && (
                           <button onClick={() => handleEliminar(d.id)}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#e53935' }}>
                             🗑 Eliminar
@@ -654,7 +660,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
         </div>
       )}
 
-      {showForm && (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin') && (
+      {showForm && (editando ? puede('desarrollos.editar') : puede('desarrollos.crear')) && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, overflowY: 'auto' }}>
           <div style={{ background: '#fff', margin: '0', minHeight: '100vh', padding: isMobile ? '1rem' : '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '0.5px solid #f0f0f0', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
@@ -667,7 +673,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
               <div style={{ display: 'flex', background: '#f5f5f5', borderRadius: '10px', padding: '4px', marginBottom: '16px', gap: '4px', overflowX: 'auto' }}>
                 {[
                   ['general', 'General'], ['amenidades', 'Amenidades'], ['precios', 'Precios'], ['media', 'Fotos'],
-                  ...(miRol === 'Super Admin' ? [['web', 'Web']] : []),
+                  ...(puede('desarrollos.editar_web') ? [['web', 'Web']] : []),
                 ].map(([key, label]) => (
                   <button key={key} onClick={() => setTabForm(key)}
                     style={{ flex: 1, padding: '8px 6px', border: 'none', borderRadius: '7px', cursor: 'pointer', fontSize: '12px', fontWeight: tabForm === key ? '600' : '400', background: tabForm === key ? '#C0203A' : 'transparent', color: tabForm === key ? '#fff' : '#888', whiteSpace: 'nowrap' }}>
@@ -771,7 +777,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
                 {tabForm === 'precios' && (
                   <div>
-                    {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'dinero')}
+                    {puede('desarrollos.cambiar_precio_desde') && inp('Precio desde', 'precio_desde', 'dinero')}
                     {inp('Apartado', 'apartado', 'dinero')}
                     {sel('Precio en', 'precio_en', MONEDAS)}
                     {inp('Fecha de entrega', 'fecha_entrega', 'date')}
@@ -820,7 +826,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </div>
                   </div>
                 )}
-                {tabForm === 'web' && miRol === 'Super Admin' && (
+                {tabForm === 'web' && puede('desarrollos.editar_web') && (
                   <div>
                     <div style={{ marginBottom: '20px', padding: '14px', background: form.mostrar_web ? '#EAF3DE' : '#f9f9f9', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div onClick={() => setForm({ ...form, mostrar_web: !form.mostrar_web })}
@@ -943,7 +949,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </div>
                   </div>
                   {inp('Mensaje WhatsApp', 'mensaje_whatsapp')}
-                  {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'dinero')}
+                  {puede('desarrollos.cambiar_precio_desde') && inp('Precio desde', 'precio_desde', 'dinero')}
                   {inp('Apartado', 'apartado', 'dinero')}
                   {sel('Precio en', 'precio_en', MONEDAS)}
                   {inp('Fecha de entrega', 'fecha_entrega', 'date')}
@@ -1009,7 +1015,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
               </div>
 
               {/* FIX: sección Web — controla qué se publica en bsh.mx — solo Super Admin */}
-              {miRol === 'Super Admin' && (
+              {puede('desarrollos.editar_web') && (
               <div style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid #f0f0f0' }}>
                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e', marginBottom: '16px' }}>Página Web</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>

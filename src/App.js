@@ -18,6 +18,7 @@ import Comisiones from './Comisiones';
 import AjustesAdministracion from './AjustesAdministracion';
 import Marketing from './Marketing';
 import PanelPermisos from './PanelPermisos';
+import { PermisosContext } from './PermisosContext';
 import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe } from './permisosMenu';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
@@ -774,7 +775,9 @@ function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {isMobile && <TopBar onMenuOpen={() => setSidebarOpen(true)} miAgente={miAgente} />}
         <main style={{ flex: 1, overflow: 'auto' }}>
-          {renderPage()}
+          <PermisosContext.Provider value={{ rol: miRol, overrides: permisosRol }}>
+            {renderPage()}
+          </PermisosContext.Provider>
         </main>
       </div>
       {showAviso && <AvisoPrivacidadModal onClose={() => setShowAviso(false)} />}

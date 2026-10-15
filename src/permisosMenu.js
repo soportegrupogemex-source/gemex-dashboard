@@ -116,3 +116,42 @@ export const hojaVisible = (miRol, id, ctx = {}) => {
   }
   return reglaPorDefecto(miRol, id, ctx);
 };
+
+// ---------------------------------------------------------------------------
+// Funciones dentro de cada sección (no solo ver la pantalla, sino QUÉ se puede
+// modificar). Cada una tiene un valor de fábrica por rol (= lo que ya
+// permitía el sistema) y el Super Admin lo puede cambiar desde el panel:
+// se guarda en permisos_rol como 'accion.<id>'. El Super Admin siempre puede.
+// Las restricciones de alcance (por desarrollo o por equipo) siguen aplicando
+// en cada pantalla ADEMÁS del interruptor.
+const roles = (...lista) => (rol) => lista.includes(rol);
+
+export const ACCIONES = [
+  { id: 'inventario.crear_unidades', seccion: 'Inventario', label: 'Cargar unidades nuevas', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
+  { id: 'inventario.carga_masiva', seccion: 'Inventario', label: 'Carga masiva de unidades', defecto: roles('Super Admin', 'Admin') },
+  { id: 'inventario.editar_unidades', seccion: 'Inventario', label: 'Editar datos de una unidad', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
+  { id: 'inventario.eliminar_unidades', seccion: 'Inventario', label: 'Eliminar unidades', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
+  { id: 'inventario.cambiar_disponibilidad', seccion: 'Inventario', label: 'Cambiar disponibilidad (estatus)', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
+  { id: 'inventario.cambiar_precio', seccion: 'Inventario', label: 'Cambiar precios', defecto: roles('Super Admin') },
+  { id: 'inventario.ver_precio_vendidas', seccion: 'Inventario', label: 'Ver precio de unidades vendidas o apartadas', defecto: roles('Super Admin') },
+  { id: 'inventario.exportar', seccion: 'Inventario', label: 'Exportar inventario', defecto: roles('Super Admin') },
+
+  { id: 'desarrollos.crear', seccion: 'Desarrollos', label: 'Crear desarrollos', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+  { id: 'desarrollos.editar', seccion: 'Desarrollos', label: 'Editar desarrollos', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+  { id: 'desarrollos.eliminar', seccion: 'Desarrollos', label: 'Eliminar desarrollos', defecto: roles('Super Admin', 'Admin') },
+  { id: 'desarrollos.cambiar_precio_desde', seccion: 'Desarrollos', label: 'Cambiar "Precio desde"', defecto: roles('Super Admin') },
+  { id: 'desarrollos.editar_web', seccion: 'Desarrollos', label: 'Editar publicación en la página web', defecto: roles('Super Admin') },
+  { id: 'desarrollos.ver_planes', seccion: 'Desarrollos', label: 'Ver planes de pago del desarrollo', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Mesa de Control') },
+
+  { id: 'planes.editar', seccion: 'Planes de pago', label: 'Crear, editar y eliminar planes de pago', defecto: roles('Super Admin', 'Admin') },
+];
+
+export const claveAccion = (id) => `accion.${id}`;
+
+export const puedeAccion = (rol, id, overrides = {}) => {
+  if (rol === 'Super Admin') return true;
+  const ov = overrides?.[claveAccion(id)];
+  if (ov !== undefined) return ov;
+  const a = ACCIONES.find(x => x.id === id);
+  return a ? a.defecto(rol) : false;
+};

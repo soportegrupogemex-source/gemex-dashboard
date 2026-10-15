@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { usePuede } from './PermisosContext';
 
 // FIX: antes este componente no recibía miRol/miAgente en absoluto —
 // cualquiera que llegara a esta pantalla (por ejemplo un Agente, si
@@ -14,7 +15,8 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
   // FIX: selector de torre/etapa, igual que en Inventario
   const [estructuraSel, setEstructuraSel] = useState(desarrollo.tiene_etapas ? `${desarrollo.tipo_estructura} 1` : null);
 
-  const puedeEditar = miRol === 'Super Admin' || miRol === 'Admin';
+  const puede = usePuede();
+  const puedeEditar = puede('planes.editar');
 
   useEffect(() => {
     // Si no tiene etapas, carga directo. Si tiene etapas, espera a que
