@@ -70,6 +70,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const [form, setForm] = useState(SEG_VACIO);
   const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
   const [guardando, setGuardando] = useState(false);
+  const [procesandoLiquidacion, setProcesandoLiquidacion] = useState(false);
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
   const [firmantes, setFirmantes] = useState({ titulacion: '', tesorero: '' });
 
@@ -166,10 +167,11 @@ export default function Cobranza({ miRol, miAgente }) {
       .upsert(payload, { onConflict: 'unidad_id' })
       .select().single();
     setGuardando(false);
-    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    if (error) { alert('No se pudo guardar: ' + error.message); return null; }
     if (data) {
       setSeguimientos(prev => ({ ...prev, [unidadAbierta.id]: data }));
     }
+    return data;
   };
 
   const agregarPago = async () => {
@@ -212,7 +214,7 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   // Liquidación final: mismo formato que el que usa Tesorería.
-  const descargarPDF = async () => {
+  const construirLiquidacion = async () => {
     const { valorVenta, pagado, saldoNeto } = calc(unidadAbierta.id, form);
     const venta = ventaPorUnidad[unidadAbierta.id] || {};
     const cliente = (venta.contacto_nombre || 'Sin comprador registrado').replace(/\s+/g, ' ').trim().toUpperCase();
@@ -305,7 +307,56 @@ export default function Cobranza({ miRol, miAgente }) {
       doc.text(f.rol, f.x + 28, yFirma + 13, { align: 'center' });
     });
 
+    return { doc, cliente };
+  };
+
+  const descargarPDF = async () => {
+    const { doc, cliente } = await construirLiquidacion();
     doc.save(`${cliente} - Liquidación final.pdf`);
+  };
+
+  // Al marcar "Liquidación final completada" se guarda el seguimiento, se
+  // genera el PDF y se sube al bucket 'cobranza' para que Titulación lo vea.
+  // Al desmarcar se borra el archivo. El PDF es una foto del momento: si
+  // cambian pagos o montos después, hay que desmarcar y volver a marcar.
+  const toggleLiquidacionFinal = async (marcada) => {
+    if (procesandoLiquidacion) return;
+    setProcesandoLiquidacion(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const ahora = new Date().toISOString();
+      const actual = seguimientos[unidadAbierta.id] || {};
+      if (!marcada) {
+        if (actual.liquidacion_final_path) await supabase.storage.from('cobranza').remove([actual.liquidacion_final_path]);
+        const { data, error } = await supabase.from('cobranza_seguimiento').upsert({
+          unidad_id: unidadAbierta.id, desarrollo_id: unidadAbierta.desarrollo_id,
+          liquidacion_final_completada: false, liquidacion_final_path: null,
+          liquidacion_final_fecha: null, liquidacion_final_por: null, updated_at: ahora,
+        }, { onConflict: 'unidad_id' }).select().single();
+        if (error) { alert('No se pudo guardar: ' + error.message); return; }
+        setSeguimientos(prev => ({ ...prev, [unidadAbierta.id]: data }));
+        setForm(f => ({ ...f, liquidacion_final_completada: false, liquidacion_final_path: null }));
+        return;
+      }
+      const guardado = await guardarSeguimiento();
+      if (!guardado) return;
+      const { doc } = await construirLiquidacion();
+      const blob = doc.output('blob');
+      const path = `${unidadAbierta.id}/liquidacion_final_${Date.now()}.pdf`;
+      const { error: errUpload } = await supabase.storage.from('cobranza').upload(path, blob, { contentType: 'application/pdf' });
+      if (errUpload) { alert('No se pudo subir la liquidación: ' + errUpload.message); return; }
+      if (actual.liquidacion_final_path) await supabase.storage.from('cobranza').remove([actual.liquidacion_final_path]);
+      const { data, error } = await supabase.from('cobranza_seguimiento').upsert({
+        unidad_id: unidadAbierta.id, desarrollo_id: unidadAbierta.desarrollo_id,
+        liquidacion_final_completada: true, liquidacion_final_path: path,
+        liquidacion_final_fecha: ahora, liquidacion_final_por: user?.email || null, updated_at: ahora,
+      }, { onConflict: 'unidad_id' }).select().single();
+      if (error) { alert('No se pudo guardar: ' + error.message); return; }
+      setSeguimientos(prev => ({ ...prev, [unidadAbierta.id]: data }));
+      setForm(f => ({ ...f, liquidacion_final_completada: true, liquidacion_final_path: path }));
+    } finally {
+      setProcesandoLiquidacion(false);
+    }
   };
 
   return (
@@ -434,6 +485,15 @@ export default function Cobranza({ miRol, miAgente }) {
                 <input type="number" step="0.01" min="0" value={form.cuotas_condominales}
                   onChange={e => setForm(f => ({ ...f, cuotas_condominales: e.target.value }))}
                   style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px', background: form.liquidacion_final_completada ? '#EAF3DE' : '#f9f9f9', borderRadius: '10px', marginBottom: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                <input type="checkbox" checked={!!form.liquidacion_final_completada} disabled={procesandoLiquidacion}
+                  onChange={e => toggleLiquidacionFinal(e.target.checked)} style={{ width: '16px', height: '16px' }} />
+                <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{procesandoLiquidacion ? 'Procesando...' : 'Liquidación final completada'}</span>
+              </label>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '16px' }}>
+                Al marcarla se guarda el PDF y Titulación lo puede ver. Si cambias pagos o montos después, desmárcala y vuélvela a marcar para actualizarlo.
               </div>
 
               <div style={{ background: '#f9f9f9', borderRadius: '10px', padding: '12px', fontSize: '13px', marginBottom: '20px' }}>

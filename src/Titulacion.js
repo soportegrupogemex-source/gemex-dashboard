@@ -15,9 +15,10 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const PASO2 = [
   { campo: 'saldo_cobrado', label: 'Saldo cobrado' },
   { campo: 'asignar_sofom', label: 'Asignar SOFOM' },
-  { campo: 'autorizacion_financiera_1', label: 'Autorización financiera 1' },
-  { campo: 'autorizacion_financiera_2', label: 'Autorización financiera 2' },
-  { campo: 'liquidacion_final', label: 'Liquidación final' },
+  { campo: 'autorizacion_financiera_1', label: 'Autorización financiera 1', campoPath: 'autorizacion_financiera_1_path' },
+  { campo: 'autorizacion_financiera_2', label: 'Autorización financiera 2', campoPath: 'autorizacion_financiera_2_path' },
+  // El archivo de la liquidación final lo genera Cobranza al marcarla completada; aquí solo se ve.
+  { campo: 'liquidacion_final', label: 'Liquidación final', desdeCobranza: true },
   { campo: 'carta_liberacion', label: 'Carta liberación', campoPath: 'carta_liberacion_path' },
 ];
 const TRAMITES = [
@@ -34,6 +35,7 @@ const VACIO = {
   liquidacion_final: false, carta_liberacion: false,
   cna_agua: false, cuotas_predial: false,
   cna_agua_path: null, cuotas_predial_path: null, carta_liberacion_path: null, avaluo_path: null,
+  autorizacion_financiera_1_path: null, autorizacion_financiera_2_path: null,
 };
 
 function calcularEtapa(s) {
@@ -73,6 +75,7 @@ export default function Titulacion({ miRol, miAgente }) {
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(VACIO);
+  const [liquidacionesCobranza, setLiquidacionesCobranza] = useState({});
   const [guardando, setGuardando] = useState(false);
   const [subiendoTramite, setSubiendoTramite] = useState(null);
   // FIX: apartado "Expedientes" dentro de Titulación — de solo lectura,
@@ -133,6 +136,14 @@ export default function Titulacion({ miRol, miAgente }) {
     const mapa = {};
     (seg || []).forEach(s => { mapa[s.unidad_id] = s; });
     setSeguimientos(mapa);
+
+    // Liquidación final que Cobranza marcó como completada (archivo para ver).
+    const { data: liqs } = await supabase.from('cobranza_seguimiento')
+      .select('unidad_id, liquidacion_final_completada, liquidacion_final_path')
+      .in('unidad_id', idsConExpediente);
+    const mapaLiq = {};
+    (liqs || []).forEach(l => { if (l.liquidacion_final_completada && l.liquidacion_final_path) mapaLiq[l.unidad_id] = l.liquidacion_final_path; });
+    setLiquidacionesCobranza(mapaLiq);
 
     // FIX: el contacto ya viene directo del mismo registro (Apartado o
     // Vendida, según en qué vaya la unidad) — antes se buscaba aparte
@@ -218,6 +229,11 @@ export default function Titulacion({ miRol, miAgente }) {
 
   const verArchivoTramite = async (path) => {
     const { data } = await supabase.storage.from('titulacion').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const verLiquidacionFinal = async (path) => {
+    const { data } = await supabase.storage.from('cobranza').createSignedUrl(path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
 
@@ -366,6 +382,12 @@ export default function Titulacion({ miRol, miAgente }) {
                   <input type="checkbox" disabled={soloLectura} checked={!!form[p.campo]} onChange={e => setForm(f => ({ ...f, [p.campo]: e.target.checked }))} />
                   {p.label}
                 </label>
+                {p.desdeCobranza && (liquidacionesCobranza[unidadAbierta.id] ? (
+                  <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
+                    style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
+                    📄 Ver liquidación final
+                  </button>
+                ) : <span style={{ fontSize: '11px', color: '#aaa' }}>Pendiente de Cobranza</span>)}
                 {p.campoPath && (form[p.campoPath] ? (
                   <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
                     style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
