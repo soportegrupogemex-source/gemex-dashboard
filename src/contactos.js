@@ -3,6 +3,7 @@ import { enviarPush } from './enviarPush';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import DetalleContacto from './DetalleContacto';
+import { InputDinero } from './dinero';
 
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
@@ -701,8 +702,8 @@ export default function Contactos() {
       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>
         {label}{required && <span style={{ color: '#e53e3e', marginLeft: '2px' }}>*</span>}
       </label>
-      <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
-        style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+      {React.createElement(type === 'dinero' ? InputDinero : 'input', { type, value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }),
+        style: { width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' } })}
     </div>
   );
 
@@ -1140,7 +1141,7 @@ export default function Contactos() {
                   style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#f9f9f9', color: '#888', boxSizing: 'border-box' }} />
               )}
             </div>
-            {inp('Presupuesto', 'presupuesto', 'number')}
+            {inp('Presupuesto', 'presupuesto', 'dinero')}
             {sel('Fuente de medio', 'fuente_medio', MEDIO_OPCIONES, true)}
           </div>
           <div style={{ padding: '1rem 1.5rem', borderTop: '0.5px solid #f0f0f0', flexShrink: 0, background: '#fff' }}>

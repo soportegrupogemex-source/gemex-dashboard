@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { InputDinero } from './dinero';
 
 // FIX: Titulación y Cobranza se agregan como tipos de movimiento
 // posteriores a la Venta — no cambian el estatus de Inventario (la
@@ -395,7 +396,7 @@ export default function Movimientos() {
           </div>
           <div>
             <label style={labelStyle}>Monto (MXN)</label>
-            <input type='number' value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })} style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }} placeholder='0' />
+            <InputDinero value={form.monto} onChange={e => setForm({ ...form, monto: e.target.value })} style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }} placeholder='0' />
           </div>
           <div>
             <label style={labelStyle}>Vendedor</label>
@@ -506,7 +507,7 @@ export default function Movimientos() {
             </div>
             <div>
               <label style={labelStyle}>Nuevo Monto (MXN)</label>
-              <input type='number' value={form.nuevo_monto} onChange={e => setForm({ ...form, nuevo_monto: e.target.value })} style={inputStyle} placeholder='0' />
+              <InputDinero value={form.nuevo_monto} onChange={e => setForm({ ...form, nuevo_monto: e.target.value })} style={inputStyle} placeholder='0' />
             </div>
           </div>
         )}

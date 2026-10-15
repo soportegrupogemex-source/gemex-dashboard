@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import Cotizador from './Cotizador';
+import { InputDinero } from './dinero';
 
 const ESTATUS_OPCIONES = ['Libre', 'Bloqueado', 'Apartado', 'Vendido'];
 const ORIENTACION_OPCIONES = ['', 'Norte', 'Sur', 'Este', 'Oeste', 'Noreste', 'Noroeste', 'Sureste', 'Suroeste'];
@@ -444,9 +445,9 @@ const { data } = await query.limit(5000);
   const inp = (label, key, type = 'text', readOnly = false) => (
     <div style={{ marginBottom: '12px' }}>
       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>{label}</label>
-      <input type={type} value={form[key]} onChange={e => setForm({ ...form, [key]: e.target.value })}
-        readOnly={readOnly}
-        style={{ width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', background: readOnly ? '#f9f9f9' : '#fff' }} />
+      {React.createElement(type === 'dinero' ? InputDinero : 'input', { type, value: form[key], onChange: e => setForm({ ...form, [key]: e.target.value }),
+        readOnly,
+        style: { width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', background: readOnly ? '#f9f9f9' : '#fff' } })}
     </div>
   );
 
@@ -466,12 +467,11 @@ const { data } = await query.limit(5000);
 
   // ---- MODAL CARGA MASIVA ----
   if (showMasiva) {
-    const inpCell = (idx, campo, type = 'text') => (
-      <input type={type}
-        value={filasMasivas[idx][campo]}
-        onChange={e => handleCampoFila(idx, campo, type === 'number' ? e.target.value : e.target.value)}
-        style={{ width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', boxSizing: 'border-box' }} />
-    );
+    const inpCell = (idx, campo, type = 'text') => React.createElement(type === 'dinero' ? InputDinero : 'input', {
+      type, value: filasMasivas[idx][campo],
+      onChange: e => handleCampoFila(idx, campo, e.target.value),
+      style: { width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', boxSizing: 'border-box' },
+    });
     const selCell = (idx, campo, opciones) => (
       <select value={filasMasivas[idx][campo]}
         onChange={e => handleCampoFila(idx, campo, e.target.value)}
@@ -558,9 +558,9 @@ const { data } = await query.limit(5000);
                     <input readOnly value={fila.m2_total}
                       style={{ width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', background: '#f0f0f8', boxSizing: 'border-box' }} />
                   </td>
-                  <td style={{ padding: '6px 8px', minWidth: '100px' }}>{puedeCambiarPrecio ? inpCell(idx, 'precio_lista', 'number') : <span style={{ fontSize: '12px', color: '#aaa' }}>solo Super Admin</span>}</td>
+                  <td style={{ padding: '6px 8px', minWidth: '100px' }}>{puedeCambiarPrecio ? inpCell(idx, 'precio_lista', 'dinero') : <span style={{ fontSize: '12px', color: '#aaa' }}>solo Super Admin</span>}</td>
                   <td style={{ padding: '6px 8px', minWidth: '80px', background: '#f0f0f8' }}>
-                    <input readOnly value={fila.precio_m2}
+                    <InputDinero readOnly value={fila.precio_m2}
                       style={{ width: '100%', padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '4px', fontSize: '12px', background: '#f0f0f8', boxSizing: 'border-box' }} />
                   </td>
                   <td style={{ padding: '6px 8px', minWidth: '140px' }}>
@@ -863,7 +863,7 @@ const { data } = await query.limit(5000);
                         <span style={{ color: '#ccc', fontSize: '12px' }}>—</span>
                       ) : puedeCambiarPrecio && editandoPrecio === u.id ? (
                         <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                          <input type='number' value={precioTemp} onChange={e => setPrecioTemp(e.target.value)}
+                          <InputDinero value={precioTemp} onChange={e => setPrecioTemp(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter') handleGuardarPrecio(u.id); if (e.key === 'Escape') { setEditandoPrecio(null); setPrecioTemp(''); } }}
                             style={{ width: '110px', padding: '4px 8px', border: '1px solid #C0203A', borderRadius: '4px', fontSize: '13px' }}
                             autoFocus />
@@ -1121,8 +1121,8 @@ const { data } = await query.limit(5000);
             {inp('m² Interior', 'm2_interior', 'number')}
             {inp('m² Terraza', 'm2_terraza', 'number')}
             {inp('m² Total (automático)', 'm2_total', 'number', true)}
-            {puedeCambiarPrecio && inp('Precio de lista', 'precio_lista', 'number')}
-            {inp('Precio por m² (automático)', 'precio_m2', 'number', true)}
+            {puedeCambiarPrecio && inp('Precio de lista', 'precio_lista', 'dinero')}
+            {inp('Precio por m² (automático)', 'precio_m2', 'dinero', true)}
             <div style={{ marginBottom: '12px' }}>
               <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Detalles</label>
               <textarea value={form.detalles} onChange={e => setForm({ ...form, detalles: e.target.value })} rows={3}

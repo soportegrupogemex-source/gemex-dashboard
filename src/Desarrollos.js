@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Inventario from './Inventario';
 import Planes from './Planes';
+import { fmtDinero, InputDinero } from './dinero';
 
 const OPCIONES_NUM = ['0','1','1.5','1 a 2','1 a 3','1 a 4','2 a 3','2 a 4','2','2.5','3 a 4','3 a 5','3','3.5','4 a 5','4','4.5','5'];
 const CIUDADES = ['Guadalajara','Zapopan','Tlaquepaque','Tonalá','Mazatlán','Ciudad de México','Monterrey','Cancún','Puerto Vallarta','Los Cabos'];
@@ -380,8 +381,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
   const inp = (label, key, type = 'text') => (
     <div style={{ marginBottom: '14px' }}>
       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>{label}</label>
-      <input type={type} value={form[key] || ''} onChange={e => setForm({ ...form, [key]: e.target.value })}
-        style={{ width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box' }} />
+      {React.createElement(type === 'dinero' ? InputDinero : 'input', { type, value: form[key] || '', onChange: e => setForm({ ...form, [key]: e.target.value }),
+        style: { width: '100%', padding: isMobile ? '10px' : '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box' } })}
     </div>
   );
 
@@ -489,9 +490,9 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
           {showFiltrosDesarrollos && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <input placeholder='Precio mín.' type='number' value={filtroPrecioMin} onChange={e => setFiltroPrecioMin(e.target.value)}
+                <InputDinero placeholder='Precio mín.' value={filtroPrecioMin} onChange={e => setFiltroPrecioMin(e.target.value)}
                   style={{ ...filtroStyle, flex: 1, padding: '10px' }} />
-                <input placeholder='Precio máx.' type='number' value={filtroPrecioMax} onChange={e => setFiltroPrecioMax(e.target.value)}
+                <InputDinero placeholder='Precio máx.' value={filtroPrecioMax} onChange={e => setFiltroPrecioMax(e.target.value)}
                   style={{ ...filtroStyle, flex: 1, padding: '10px' }} />
               </div>
               <select value={filtroRecamaras} onChange={e => setFiltroRecamaras(e.target.value)}
@@ -524,9 +525,9 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
         <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <input placeholder='Buscar...' value={buscar} onChange={e => setBuscar(e.target.value)}
             style={{ padding: '7px 12px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', width: '200px', boxSizing: 'border-box' }} />
-          <input placeholder='Precio mín.' type='number' value={filtroPrecioMin} onChange={e => setFiltroPrecioMin(e.target.value)}
+          <InputDinero placeholder='Precio mín.' value={filtroPrecioMin} onChange={e => setFiltroPrecioMin(e.target.value)}
             style={{ ...filtroStyle, width: '120px' }} />
-          <input placeholder='Precio máx.' type='number' value={filtroPrecioMax} onChange={e => setFiltroPrecioMax(e.target.value)}
+          <InputDinero placeholder='Precio máx.' value={filtroPrecioMax} onChange={e => setFiltroPrecioMax(e.target.value)}
             style={{ ...filtroStyle, width: '120px' }} />
           <select value={filtroRecamaras} onChange={e => setFiltroRecamaras(e.target.value)} style={filtroStyle}>
             <option value=''>Recámaras</option>
@@ -569,7 +570,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e', marginBottom: '4px' }}>{d.nombre}</div>
-                    {d.precio_desde > 0 && <div style={{ fontSize: '12px', color: '#666' }}>Desde: ${Number(d.precio_desde).toLocaleString()}</div>}
+                    {d.precio_desde > 0 && <div style={{ fontSize: '12px', color: '#666' }}>Desde: {fmtDinero(d.precio_desde)}</div>}
                     {d.fecha_entrega && <div style={{ fontSize: '12px', color: '#666' }}>Entrega: {d.fecha_entrega}</div>}
                     {d.ciudad && <div style={{ fontSize: '12px', color: '#666' }}>📍 {d.ciudad}</div>}
                     {d.mostrar_web && (
@@ -770,8 +771,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
                 {tabForm === 'precios' && (
                   <div>
-                    {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'number')}
-                    {inp('Apartado', 'apartado', 'number')}
+                    {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'dinero')}
+                    {inp('Apartado', 'apartado', 'dinero')}
                     {sel('Precio en', 'precio_en', MONEDAS)}
                     {inp('Fecha de entrega', 'fecha_entrega', 'date')}
                     {inp('Tiempo estimado de entrega', 'tiempo_entrega')}
@@ -942,8 +943,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </div>
                   </div>
                   {inp('Mensaje WhatsApp', 'mensaje_whatsapp')}
-                  {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'number')}
-                  {inp('Apartado', 'apartado', 'number')}
+                  {miRol === 'Super Admin' && inp('Precio desde', 'precio_desde', 'dinero')}
+                  {inp('Apartado', 'apartado', 'dinero')}
                   {sel('Precio en', 'precio_en', MONEDAS)}
                   {inp('Fecha de entrega', 'fecha_entrega', 'date')}
                   <div style={{ marginBottom: '16px' }}>

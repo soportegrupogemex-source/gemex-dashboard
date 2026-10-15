@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
+import { InputDinero } from './dinero';
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
@@ -168,7 +169,7 @@ export default function Objetivos({ miRol, miAgente }) {
                             onChange={e => setFormEdit({ ...formEdit, unidades: parseInt(e.target.value) || 0 })}
                             placeholder='Unidades'
                             style={{ width: '80px', padding: '4px 6px', border: '1px solid #C0203A', borderRadius: '4px', fontSize: '11px', textAlign: 'center' }} />
-                          <input type='number' value={formEdit.monto}
+                          <InputDinero value={formEdit.monto}
                             onChange={e => setFormEdit({ ...formEdit, monto: parseFloat(e.target.value) || 0 })}
                             placeholder='Monto'
                             style={{ width: '80px', padding: '4px 6px', border: '1px solid #C0203A', borderRadius: '4px', fontSize: '11px', textAlign: 'center' }} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
+import { InputDinero } from './dinero';
 
 const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 // FIX: al editar el tipo de un movimiento aquí (p. ej. de Apartado a
@@ -442,7 +443,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
         </div>
         <div style={{ marginBottom: '12px' }}>
           <label style={labelStyle}>Monto (MXN)</label>
-          <input type='number' value={form.monto || ''} onChange={e => setForm({ ...form, monto: e.target.value })} style={inputStyle} />
+          <InputDinero value={form.monto || ''} onChange={e => setForm({ ...form, monto: e.target.value })} style={inputStyle} />
         </div>
         <div style={{ marginBottom: '12px' }}>
           <label style={labelStyle}>Plan de Pago</label>

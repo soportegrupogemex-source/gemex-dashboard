@@ -160,6 +160,8 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
     // ven sus desarrollos y solo pueden solicitar) y Mesa de Control (solo
     // lectura, toda la empresa); los permisos finos se limitan dentro de la pantalla.
     if (s.id === 'ajustes_admin') return miRol === 'Super Admin';
+    // Mesa de Control entra a Cobranza solo para ver y descargar la liquidación (PDF).
+    if (s.id === 'cobranza' && miRol === 'Mesa de Control') return true;
     if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
     if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
     // FIX: Mesa de Control entra a revisar Movimientos, Historial

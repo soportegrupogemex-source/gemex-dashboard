@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+import { InputDinero } from './dinero';
 
 const ETAPAS = [
   { id: 'Leads', color: '#0EA5E9' },
@@ -582,7 +583,7 @@ export default function Negocios() {
             </div>
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Valor del negocio</label>
-              <input type='number' value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} style={inputStyle} placeholder='$0' />
+              <InputDinero value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} style={inputStyle} placeholder='$0' />
             </div>
             <div style={{ marginBottom: '12px' }}>
               <label style={labelStyle}>Etapa</label>

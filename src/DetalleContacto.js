@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+import { InputDinero } from './dinero';
 
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
@@ -282,7 +283,7 @@ function SeccionProducto({ isMobile, contacto, upd, campo, dropdownField, desarr
             {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
           </select>
         </div>
-        {campo('Presupuesto', 'presupuesto', 'number')}
+        {campo('Presupuesto', 'presupuesto', 'dinero')}
         <div>
           <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Asesor de ventas</div>
           <select value={contacto.asesor_ventas || ''} onChange={e => upd('asesor_ventas', e.target.value)}
@@ -533,9 +534,9 @@ export default function DetalleContacto({ contactoId, onBack, miAgente, miRol })
   const campo = (label, key, type = 'text', readOnly = false) => (
     <div key={key}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{label}</div>
-      <input type={type} value={contacto[key] || ''} onChange={e => upd(key, e.target.value)}
-        readOnly={readOnly}
-        style={{ width: '100%', padding: isMobile ? '10px' : '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', background: readOnly ? '#f9f9f9' : '#fff', color: readOnly ? '#888' : '#000' }} />
+      {React.createElement(type === 'dinero' ? InputDinero : 'input', { type, value: contacto[key] || '', onChange: e => upd(key, e.target.value),
+        readOnly,
+        style: { width: '100%', padding: isMobile ? '10px' : '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: isMobile ? '14px' : '13px', boxSizing: 'border-box', background: readOnly ? '#f9f9f9' : '#fff', color: readOnly ? '#888' : '#000' } })}
     </div>
   );
 

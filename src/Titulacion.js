@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import Expedientes from './Expedientes';
+import { InputDinero } from './dinero';
 
 // FIX: Titulación ahora solo trabaja el Paso 2 (Titulación -> Escritura)
 // — el Paso 1 (Avance de obra, DTU, Lista para avalúo) lo captura el
@@ -389,7 +390,7 @@ export default function Titulacion({ miRol, miAgente }) {
                 {p.campoMonto && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#555' }}>
                     Monto $
-                    <input type="number" step="0.01" min="0" disabled={soloLectura} value={form[p.campoMonto] === 0 ? '' : form[p.campoMonto]} placeholder="0.00"
+                    <InputDinero disabled={soloLectura} value={form[p.campoMonto] === 0 ? '' : form[p.campoMonto]} placeholder="0.00"
                       onChange={e => setForm(f => ({ ...f, [p.campoMonto]: e.target.value }))}
                       style={{ width: '120px', padding: '4px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px' }} />
                   </span>
