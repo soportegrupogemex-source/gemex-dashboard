@@ -15,13 +15,14 @@ import Expedientes from './Expedientes';
 import Titulacion from './Titulacion';
 import Cobranza from './Cobranza';
 import Comisiones from './Comisiones';
+import AjustesAdministracion from './AjustesAdministracion';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
-  TrendingUp, Landmark, Percent,
+  TrendingUp, Landmark, Percent, SlidersHorizontal,
 } from 'lucide-react';
 
 // Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
@@ -51,12 +52,13 @@ const MENU_MODULOS = [
     { id: 'cobranza', label: 'Cobranza', icon: 'cobranza' },
     { id: 'comisiones', label: 'Comisiones', icon: 'comisiones' },
     { id: 'agentes', label: 'Agentes', icon: 'agentes' },
+    { id: 'ajustes_admin', label: 'Ajustes de administración', icon: 'ajustes_admin' },
   ]},
 ];
 
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
+const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -128,6 +130,7 @@ const MENU_ICONS = {
   titulacion: <ClipboardCheck size={18} />,
   cobranza: <Banknote size={18} />,
   comisiones: <Percent size={18} />,
+  ajustes_admin: <SlidersHorizontal size={18} />,
   construccion: <HardHat size={18} />,
   objetivos: <Target size={18} />,
   tendencias_producto: <Flame size={18} />,
@@ -151,6 +154,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
     // Comisiones: Super Admin, Admin, Tesorería, los Gerentes (estos solo
     // ven sus desarrollos y solo pueden solicitar) y Mesa de Control (solo
     // lectura, toda la empresa); los permisos finos se limitan dentro de la pantalla.
+    if (s.id === 'ajustes_admin') return ['Super Admin', 'Admin', 'Tesorería'].includes(miRol);
     if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
     if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
     // FIX: Mesa de Control entra a revisar Movimientos, Historial
@@ -803,6 +807,7 @@ function App() {
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
       case 'comisiones': return <Comisiones miRol={miRol} miAgente={miAgente} />;
+      case 'ajustes_admin': return <AjustesAdministracion />;
       case 'construccion': return <Construccion />;
       case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':

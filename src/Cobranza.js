@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import { supabase } from './supabase';
+import { CLAVE_TITULADOR, CLAVE_TESORERO } from './AjustesAdministracion';
 
 // FIX: Cliente asignado, Valor venta y Tipo de compra ya NO se capturan
 // aquí — se leen en vivo del movimiento 'Vendida' de la unidad (fuente
@@ -82,9 +83,10 @@ export default function Cobranza({ miRol, miAgente }) {
   const cargarTodo = async () => {
     setCargando(true);
     const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
-    const { data: firm } = await supabase.from('agentes').select('nombre, apellidos, rol').in('rol', ['Titulación', 'Tesorería']).eq('activo', true);
-    const nombreDe = (rol) => { const a = (firm || []).find(x => x.rol === rol); return a ? `${a.nombre || ''} ${a.apellidos || ''}`.trim().toUpperCase() : ''; };
-    setFirmantes({ titulacion: nombreDe('Titulación'), tesorero: nombreDe('Tesorería') });
+    // Nombres de las firmas: se capturan en Administración → Ajustes de administración.
+    const { data: cfg } = await supabase.from('configuracion').select('clave, valor').in('clave', [CLAVE_TITULADOR, CLAVE_TESORERO]);
+    const valorDe = (clave) => ((cfg || []).find(c => c.clave === clave)?.valor || '').trim().toUpperCase();
+    setFirmantes({ titulacion: valorDe(CLAVE_TITULADOR), tesorero: valorDe(CLAVE_TESORERO) });
     setDesarrollos(des || []);
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
