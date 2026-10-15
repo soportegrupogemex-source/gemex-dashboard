@@ -154,7 +154,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
     // Comisiones: Super Admin, Admin, Tesorería, los Gerentes (estos solo
     // ven sus desarrollos y solo pueden solicitar) y Mesa de Control (solo
     // lectura, toda la empresa); los permisos finos se limitan dentro de la pantalla.
-    if (s.id === 'ajustes_admin') return ['Super Admin', 'Admin', 'Tesorería'].includes(miRol);
+    if (s.id === 'ajustes_admin') return miRol === 'Super Admin';
     if (s.id === 'comisiones') return ['Super Admin', 'Admin', 'Tesorería', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control'].includes(miRol);
     if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
     // FIX: Mesa de Control entra a revisar Movimientos, Historial
@@ -807,7 +807,7 @@ function App() {
       case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'cobranza': return <Cobranza miRol={miRol} miAgente={miAgente} />;
       case 'comisiones': return <Comisiones miRol={miRol} miAgente={miAgente} />;
-      case 'ajustes_admin': return <AjustesAdministracion />;
+      case 'ajustes_admin': return miRol === 'Super Admin' ? <AjustesAdministracion /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
       case 'tendencias_producto': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador') ? <TendenciasProducto miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
