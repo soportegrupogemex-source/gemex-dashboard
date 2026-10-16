@@ -55,6 +55,7 @@ export default function Comisiones({ miRol, miAgente }) {
   const [ventas, setVentas] = useState([]);
   const [docsPorMov, setDocsPorMov] = useState({});
   const [segPorMov, setSegPorMov] = useState({});
+  const [cotejadas, setCotejadas] = useState({}); // unidad_id -> true cuando Cobranza marcó "Unidad cotejada"
   const [negocios, setNegocios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [buscar, setBuscar] = useState('');
@@ -84,8 +85,15 @@ export default function Comisiones({ miRol, miAgente }) {
       (segs || []).forEach(s => { mapaSeg[s.movimiento_id] = s; });
       setSegPorMov(mapaSeg);
       setNegocios(negs || []);
+      const unidadIds = [...new Set(lista.map(m => m.unidad_id).filter(Boolean))];
+      const mapaCot = {};
+      if (unidadIds.length > 0) {
+        const { data: cob } = await supabase.from('cobranza_seguimiento').select('unidad_id, liquidacion_final_completada').in('unidad_id', unidadIds);
+        (cob || []).forEach(c => { if (c.liquidacion_final_completada) mapaCot[c.unidad_id] = true; });
+      }
+      setCotejadas(mapaCot);
     } else {
-      setDocsPorMov({}); setSegPorMov({}); setNegocios([]);
+      setDocsPorMov({}); setSegPorMov({}); setNegocios([]); setCotejadas({});
     }
     setCargando(false);
   };
@@ -213,6 +221,7 @@ export default function Comisiones({ miRol, miAgente }) {
                   {chip(!!s.enganche_pagado, 'Enganche')}
                   {chip(!!m.comisionable, 'Comisionable')}
                   {chip(!!s.comision_solicitada, 'Solicitada')}
+                  {chip(!!cotejadas[m.unidad_id], 'Unidad cotejada')}
                   {chip(!!s.comision_pagada, 'Pagada')}
                 </div>
               </div>
@@ -265,7 +274,8 @@ export default function Comisiones({ miRol, miAgente }) {
                 <span style={{ fontSize: '11px', color: '#aaa' }}>(se marca en Historial)</span>
               </div>
               {CAMPOS.map(c => (
-                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', fontSize: '13px', cursor: puedeCampo(c.key, s) ? 'pointer' : 'default', flexWrap: 'wrap' }}>
+                <React.Fragment key={c.key}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', fontSize: '13px', cursor: puedeCampo(c.key, s) ? 'pointer' : 'default', flexWrap: 'wrap' }}>
                   <input type="checkbox" checked={!!s[c.key]} disabled={!puedeCampo(c.key, s) || guardando}
                     onChange={e => cambiarCampo(m, c.key, e.target.checked)} style={{ width: '16px', height: '16px' }} />
                   <span style={{ color: '#333' }}>{c.label}</span>
@@ -274,6 +284,14 @@ export default function Comisiones({ miRol, miAgente }) {
                     <span style={{ fontSize: '11px', color: '#aaa' }}>{fmtFecha(s[`${c.key}_fecha`])}{s[`${c.key}_por`] ? ` · ${s[`${c.key}_por`]}` : ''}</span>
                   )}
                 </label>
+                {c.key === 'comision_solicitada' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', fontSize: '13px' }}>
+                  <input type="checkbox" checked={!!cotejadas[m.unidad_id]} disabled readOnly style={{ width: '16px', height: '16px' }} />
+                  <span style={{ color: '#333' }}>Unidad cotejada</span>
+                  <span style={{ fontSize: '11px', color: '#aaa' }}>(la marca Cobranza)</span>
+                </div>
+                )}
+                </React.Fragment>
               ))}
 
               <button onClick={() => setAbierta(null)}
