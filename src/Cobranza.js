@@ -43,6 +43,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const [pagosPorUnidad, setPagosPorUnidad] = useState({});
   const [ventaPorUnidad, setVentaPorUnidad] = useState({}); // unidad_id -> {contacto_nombre, monto, tipo_compra}
   const [desarrolloSel, setDesarrolloSel] = useState('');
+  const [buscar, setBuscar] = useState('');
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(SEG_VACIO);
@@ -113,6 +114,12 @@ export default function Cobranza({ miRol, miAgente }) {
   const unidadesVisibles = unidades.filter(u => {
     if (ROLES_GERENTE.includes(miRol) && !idsPermitidos.includes(u.desarrollo_id)) return false;
     if (desarrolloSel && u.desarrollo_nombre !== desarrolloSel) return false;
+    // Búsqueda por número de unidad o nombre del cliente (sin acentos ni mayúsculas).
+    if (buscar.trim()) {
+      const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const q = norm(buscar.trim());
+      if (!norm(u.numero).includes(q) && !norm(ventaPorUnidad[u.id]?.contacto_nombre).includes(q)) return false;
+    }
     return true;
   });
 
@@ -266,6 +273,8 @@ export default function Cobranza({ miRol, miAgente }) {
       <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Enganche, pagos y financieras por unidad vendida</div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por cliente o número de unidad..."
+          style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', width: isMobile ? '100%' : '300px', boxSizing: 'border-box' }} />
         <select value={desarrolloSel} onChange={e => setDesarrolloSel(e.target.value)}
           style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
           <option value=''>Todos los proyectos</option>
