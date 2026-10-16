@@ -44,6 +44,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const [ventaPorUnidad, setVentaPorUnidad] = useState({}); // unidad_id -> {contacto_nombre, monto, tipo_compra}
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [buscar, setBuscar] = useState('');
+  const [gruposAbiertos, setGruposAbiertos] = useState({});
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(SEG_VACIO);
@@ -287,26 +288,54 @@ export default function Cobranza({ miRol, miAgente }) {
       ) : unidadesVisibles.length === 0 ? (
         <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades que coincidan con el filtro.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {unidadesVisibles.map(u => {
-            const s = seguimientos[u.id] || SEG_VACIO;
-            const { pagado, saldoNeto } = calc(u.id, s);
-            return (
-              <div key={u.id} onClick={() => abrirUnidad(u)}
-                style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
-                  <div style={{ fontSize: '12px', color: '#888' }}>{ventaPorUnidad[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ fontSize: '12px', color: '#888' }}>Pagado: <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(pagado)}</span></div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: saldoNeto <= 0 ? '#10B981' : '#F59E0B', borderRadius: '20px', padding: '4px 12px' }}>
-                    Saldo neto: {fmt(saldoNeto)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {(() => {
+            // Agrupadas por desarrollo y plegadas de inicio; al buscar se
+            // despliegan solas los desarrollos con coincidencias.
+            const grupos = {};
+            unidadesVisibles.forEach(u => { (grupos[u.desarrollo_nombre || 'Sin desarrollo'] = grupos[u.desarrollo_nombre || 'Sin desarrollo'] || []).push(u); });
+            return Object.keys(grupos).sort((x, y) => x.localeCompare(y, 'es')).map(nombre => {
+              const lista = grupos[nombre];
+              const abierto = !!buscar.trim() || !!gruposAbiertos[nombre];
+              const saldoGrupo = r2(lista.reduce((t, u) => t + calc(u.id, seguimientos[u.id] || SEG_VACIO).saldoNeto, 0));
+              return (
+                <div key={nombre}>
+                  <div onClick={() => setGruposAbiertos(g => ({ ...g, [nombre]: !g[nombre] }))}
+                    style={{ background: '#1a1a2e', color: '#fff', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '12px', display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600' }}>{nombre}</span>
+                      <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}</span>
+                    </div>
+                    <div style={{ fontSize: '12px', opacity: 0.85 }}>Saldo neto del desarrollo: <b>{fmt(saldoGrupo)}</b></div>
                   </div>
+                  {abierto && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                      {lista.map(u => {
+                        const s = seguimientos[u.id] || SEG_VACIO;
+                        const { pagado, saldoNeto } = calc(u.id, s);
+                        return (
+                          <div key={u.id} onClick={() => abrirUnidad(u)}
+                            style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero}</div>
+                              <div style={{ fontSize: '12px', color: '#888' }}>{ventaPorUnidad[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#888' }}>Pagado: <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(pagado)}</span></div>
+                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: saldoNeto <= 0 ? '#10B981' : '#F59E0B', borderRadius: '20px', padding: '4px 12px' }}>
+                                Saldo neto: {fmt(saldoNeto)}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 
