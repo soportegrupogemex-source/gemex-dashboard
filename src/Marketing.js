@@ -16,8 +16,8 @@ const ROLES_GUARDIA = ['Agente', 'Asesor Premium', 'Gerente Editor', 'Gerente Op
 const TURNOS = [{ k: 'manana', l: 'Mañana' }, { k: 'tarde', l: 'Tarde' }, { k: 'completo', l: 'Día completo' }];
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const ESTATUS = { sin_asignar: { l: 'Sin asignar', bg: '#FDECEC', c: '#C0392B' }, asignado: { l: 'Asignado', bg: '#FFF3CD', c: '#856404' }, atendido: { l: 'Atendido', bg: '#EAF3DE', c: '#27500A' } };
-const CLAVES_CFG = ['leads_minutos_reasignacion', 'leads_manana_inicio', 'leads_manana_fin', 'leads_tarde_inicio', 'leads_tarde_fin'];
-const CFG_DEFAULT = { leads_minutos_reasignacion: '15', leads_manana_inicio: '09:00', leads_manana_fin: '14:00', leads_tarde_inicio: '14:00', leads_tarde_fin: '19:00' };
+const CLAVES_CFG = ['leads_reasignar_auto', 'leads_minutos_reasignacion', 'leads_manana_inicio', 'leads_manana_fin', 'leads_tarde_inicio', 'leads_tarde_fin'];
+const CFG_DEFAULT = { leads_reasignar_auto: 'si', leads_minutos_reasignacion: '15', leads_manana_inicio: '09:00', leads_manana_fin: '14:00', leads_tarde_inicio: '14:00', leads_tarde_fin: '19:00' };
 const ENDPOINT = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/recibir-lead`;
 
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -71,7 +71,8 @@ export default function Marketing({ miRol, miAgente }) {
   const puede = usePuede();
   const verApi = puede('marketing.gestionar_api');
   const verAjustes = puede('marketing.ajustes');
-  const tabs = [['leads', 'Leads'], ['guardias', 'Guardias'], ...(verApi ? [['api', 'API']] : []), ...(verAjustes ? [['ajustes', 'Ajustes']] : [])];
+  const verResultados = puede('marketing.ver_resultados');
+  const tabs = [['leads', 'Leads'], ['guardias', 'Guardias'], ...(verResultados ? [['resultados', 'Resultados']] : []), ...(verApi ? [['api', 'API']] : []), ...(verAjustes ? [['ajustes', 'Ajustes']] : [])];
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
@@ -87,6 +88,7 @@ export default function Marketing({ miRol, miAgente }) {
       </div>
       {tab === 'leads' && <LeadsTab {...{ miRol, miAgente, esAdmin, esGerente, misDesarrollos, desarrollos: desarrollosVisibles, agentes, nombreAg, isMobile }} />}
       {tab === 'guardias' && <GuardiasTab {...{ miAgente, esAdmin, esGerente, desarrollos: desarrollosVisibles, agentes, nombreAg, isMobile }} />}
+      {tab === 'resultados' && verResultados && <ResultadosTab {...{ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos: desarrollosVisibles, agentes, nombreAg, isMobile }} />}
       {tab === 'api' && verApi && <ApiTab miAgente={miAgente} />}
       {tab === 'ajustes' && verAjustes && <AjustesTab />}
     </div>
@@ -425,6 +427,161 @@ function ApiTab({ miAgente }) {
   );
 }
 
+// ----------------------------------------------------------- Resultados
+const ETAPAS_AVANZADAS = ['Cotización', 'Cita', 'Seguimiento', 'Apartado', 'Venta', 'Escritura', 'Cobranza'];
+const ETAPAS_VENTA = ['Apartado', 'Venta', 'Escritura', 'Cobranza'];
+const AGRUPAR = [['campana', 'Campaña'], ['formulario', 'Formulario'], ['asesor', 'Asesor'], ['desarrollo', 'Desarrollo']];
+
+function ResultadosTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, agentes, nombreAg, isMobile }) {
+  const hoy = new Date();
+  const [desde, setDesde] = useState(iso(sumaDias(hoy, -29)));
+  const [hasta, setHasta] = useState(iso(hoy));
+  const [desarrollo, setDesarrollo] = useState('');
+  const [agrupar, setAgrupar] = useState('campana');
+  const [leads, setLeads] = useState([]);
+  const [etapas, setEtapas] = useState({});
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => { cargar(); }, [desde, hasta]); // eslint-disable-line
+
+  const cargar = async () => {
+    setCargando(true);
+    const ini = new Date(`${desde}T00:00:00`).toISOString();
+    const fin = new Date(`${hasta}T23:59:59`).toISOString();
+    const { data } = await supabase.from('leads').select('*').gte('created_at', ini).lte('created_at', fin).order('created_at', { ascending: false }).limit(5000);
+    const lista = data || [];
+    setLeads(lista);
+    const ids = lista.map(l => l.negocio_id).filter(Boolean);
+    const mapa = {};
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data: negs } = await supabase.from('negocios').select('id, etapa').in('id', ids.slice(i, i + 150));
+      (negs || []).forEach(n => { mapa[n.id] = n.etapa; });
+    }
+    setEtapas(mapa);
+    setCargando(false);
+  };
+
+  const enAlcance = (l) => {
+    if (esAdmin) return true;
+    if (esGerente) return misDesarrollos.includes(l.desarrollo_nombre) || l.asesor_correo === miAgente?.correo;
+    return l.asesor_correo === miAgente?.correo;
+  };
+  const base = leads.filter(l => enAlcance(l) && (!desarrollo || l.desarrollo_nombre === desarrollo));
+  const nombreDe = (correo) => { const a = agentes.find(x => x.correo === correo); return a ? nombreAg(a) : correo; };
+
+  // Métricas de un conjunto de leads.
+  const metricas = (arr) => {
+    const atendidos = arr.filter(l => l.estatus === 'atendido');
+    const tiempos = atendidos.filter(l => l.atendido_en).map(l => (new Date(l.atendido_en) - new Date(l.created_at)) / 60000).filter(t => t >= 0);
+    return {
+      total: arr.length,
+      atendidos: atendidos.length,
+      pct: arr.length ? Math.round(atendidos.length / arr.length * 100) : 0,
+      minutos: tiempos.length ? Math.round(tiempos.reduce((a, b) => a + b, 0) / tiempos.length) : null,
+      sinAsignar: arr.filter(l => l.estatus === 'sin_asignar').length,
+      reasignados: arr.filter(l => (l.reasignaciones || 0) > 0).length,
+      avanzaron: arr.filter(l => ETAPAS_AVANZADAS.includes(etapas[l.negocio_id])).length,
+      ventas: arr.filter(l => ETAPAS_VENTA.includes(etapas[l.negocio_id])).length,
+    };
+  };
+  const fmtMin = (m) => m === null ? '—' : m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${Math.floor(m / 1440)} d`;
+
+  const grupos = {};
+  base.forEach(l => {
+    const clave = agrupar === 'campana' ? (l.campana || 'Sin campaña')
+      : agrupar === 'formulario' ? (l.formulario || 'Sin formulario')
+      : agrupar === 'desarrollo' ? (l.desarrollo_nombre || 'Sin desarrollo')
+      : (l.asesor_nombre || l.asesor_correo || 'Sin asesor');
+    (grupos[clave] = grupos[clave] || []).push(l);
+  });
+  // "Se le pasaron": leads que tuvo un asesor y terminaron con otro (no los atendió a tiempo).
+  const pasados = {};
+  if (agrupar === 'asesor') {
+    base.forEach(l => (l.asesores_previos || []).forEach(c => { const k = nombreDe(c); pasados[k] = (pasados[k] || 0) + 1; }));
+    Object.keys(pasados).forEach(k => { if (!grupos[k]) grupos[k] = []; });
+  }
+  const filas = Object.entries(grupos).map(([k, arr]) => ({ k, m: metricas(arr) })).sort((a, b) => b.m.total - a.m.total || a.k.localeCompare(b.k, 'es'));
+  const tot = metricas(base);
+  const autos = base.reduce((t, l) => t + (l.reasignaciones_auto || 0), 0);
+
+  const tarjeta = (titulo, valor, sub) => (
+    <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '12px 14px' }}>
+      <div style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a2e' }}>{valor}</div>
+      <div style={{ fontSize: '11px', color: '#888' }}>{titulo}</div>
+      {sub && <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>{sub}</div>}
+    </div>
+  );
+  const th = { textAlign: 'right', padding: '8px 10px', fontSize: '11px', color: '#888', fontWeight: '600', whiteSpace: 'nowrap', borderBottom: '1px solid #eee' };
+  const td = { textAlign: 'right', padding: '9px 10px', fontSize: '13px', color: '#1a1a2e', whiteSpace: 'nowrap', borderBottom: '0.5px solid #f2f2f2' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+        <span style={{ fontSize: '12px', color: '#888' }}>Del</span>
+        <input type="date" value={desde} onChange={e => e.target.value && setDesde(e.target.value)} style={inputStyle} />
+        <span style={{ fontSize: '12px', color: '#888' }}>al</span>
+        <input type="date" value={hasta} onChange={e => e.target.value && setHasta(e.target.value)} style={inputStyle} />
+        <select value={desarrollo} onChange={e => setDesarrollo(e.target.value)} style={inputStyle}>
+          <option value=''>Todos los desarrollos</option>
+          {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+        </select>
+        <button onClick={cargar} style={btnStyle}>↻ Actualizar</button>
+      </div>
+
+      {cargando ? <div style={{ color: '#888', fontSize: '13px' }}>Cargando...</div> : (<>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', marginBottom: '1.25rem' }}>
+          {tarjeta('Leads recibidos', tot.total)}
+          {tarjeta('Atendidos', `${tot.pct}%`, `${tot.atendidos} de ${tot.total}`)}
+          {tarjeta('Tiempo promedio de atención', fmtMin(tot.minutos), 'desde que llega el lead')}
+          {tarjeta('Sin asignar', tot.sinAsignar)}
+          {tarjeta('Reasignados', tot.reasignados, `${autos} automáticas`)}
+          {tarjeta('Avanzaron en el embudo', tot.avanzaron, 'cotización o más')}
+          {tarjeta('Apartados o ventas', tot.ventas)}
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          {AGRUPAR.map(([k, l]) => (
+            <button key={k} onClick={() => setAgrupar(k)}
+              style={{ padding: '6px 14px', borderRadius: '20px', border: '0.5px solid #ddd', background: agrupar === k ? '#1a1a2e' : '#fff', color: agrupar === k ? '#fff' : '#555', fontSize: '12px', cursor: 'pointer' }}>
+              Por {l.toLowerCase()}
+            </button>
+          ))}
+        </div>
+
+        {filas.length === 0 ? <div style={{ color: '#888', fontSize: '13px' }}>No hay leads en este periodo.</div> : (
+          <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ ...th, textAlign: 'left' }}>{AGRUPAR.find(a => a[0] === agrupar)[1]}</th>
+                  <th style={th}>Leads</th><th style={th}>Atendidos</th><th style={th}>% atendido</th><th style={th}>Tiempo prom.</th>
+                  <th style={th}>Reasignados</th>{agrupar === 'asesor' && <th style={th}>Se le pasaron</th>}
+                  <th style={th}>Avanzaron</th><th style={th}>Apart./ventas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filas.map(({ k, m }) => (
+                  <tr key={k}>
+                    <td style={{ ...td, textAlign: 'left', fontWeight: '600', whiteSpace: 'normal' }}>{k}</td>
+                    <td style={td}>{m.total}</td><td style={td}>{m.atendidos}</td>
+                    <td style={{ ...td, color: m.pct >= 80 ? '#27500A' : m.pct >= 50 ? '#856404' : '#C0392B', fontWeight: '600' }}>{m.total ? `${m.pct}%` : '—'}</td>
+                    <td style={td}>{fmtMin(m.minutos)}</td><td style={td}>{m.reasignados}</td>
+                    {agrupar === 'asesor' && <td style={{ ...td, color: pasados[k] ? '#C0392B' : '#1a1a2e' }}>{pasados[k] || 0}</td>}
+                    <td style={td}>{m.avanzaron}</td><td style={td}>{m.ventas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div style={{ fontSize: '11px', color: '#aaa', marginTop: '10px', lineHeight: 1.5 }}>
+          "Se le pasaron" cuenta los leads que tuvo ese asesor y terminaron con otro (por no atenderlos a tiempo o por reasignación manual). "Avanzaron" y "Apartados o ventas" salen de la etapa actual del negocio ligado al lead.
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 // -------------------------------------------------------------- Ajustes
 function AjustesTab() {
   const [cfg, setCfg] = useState(CFG_DEFAULT);
@@ -460,8 +617,15 @@ function AjustesTab() {
 
   return (
     <div style={{ maxWidth: '420px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '1.25rem' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '12px', cursor: 'pointer' }}>
+        <input type="checkbox" checked={cfg.leads_reasignar_auto !== 'no'} style={{ width: '16px', height: '16px' }}
+          onChange={e => { setCfg(c => ({ ...c, leads_reasignar_auto: e.target.checked ? 'si' : 'no' })); setMsg(''); }} />
+        Reasignación automática activada
+      </label>
       {campo('leads_minutos_reasignacion', 'Minutos para atender un lead antes de pasarlo al siguiente asesor', 'number')}
-      <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 14px' }}>La reasignación automática usa este tiempo.</div>
+      <div style={{ fontSize: '11px', color: '#aaa', margin: '-6px 0 14px', lineHeight: 1.5 }}>
+        Se revisa cada minuto y solo dentro del horario de los turnos. Un lead que llega fuera de horario empieza a contar al abrir el turno de la mañana. Pasa al siguiente asesor de guardia que aún no lo haya tenido; los leads de contactos que ya existían se quedan con su asesor.
+      </div>
       {campo('leads_manana_inicio', 'Turno mañana — inicio')}
       {campo('leads_manana_fin', 'Turno mañana — fin')}
       {campo('leads_tarde_inicio', 'Turno tarde — inicio')}

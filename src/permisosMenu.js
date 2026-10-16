@@ -226,7 +226,8 @@ export const ACCIONES = [
   { id: 'marketing.reasignar_leads', seccion: 'Marketing', label: 'Reasignar leads a otro asesor', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
   { id: 'marketing.editar_guardias', seccion: 'Marketing', label: 'Editar el calendario de guardias', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
   { id: 'marketing.gestionar_api', seccion: 'Marketing', label: 'Ver y administrar las llaves de API', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
-  { id: 'marketing.ajustes', seccion: 'Marketing', label: 'Cambiar tiempo de reasignación y horarios de los turnos', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+  { id: 'marketing.ajustes', seccion: 'Marketing', label: 'Cambiar tiempo de reasignación automática, interruptor y horarios de los turnos', defecto: roles('Super Admin', 'Admin', 'Sub Admin') },
+  { id: 'marketing.ver_resultados', seccion: 'Marketing', label: 'Ver el reporte de resultados (por campaña, formulario y asesor)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
 
   // Agentes (Gerente Operador da de alta a su equipo).
   { id: 'agentes.crear', seccion: 'Agentes', label: 'Agregar agentes', defecto: roles('Super Admin', 'Admin', 'Gerente Operador') },
