@@ -37,6 +37,7 @@ export default function Construccion() {
   const [seguimientos, setSeguimientos] = useState({});
   const [tipoCompraPorUnidad, setTipoCompraPorUnidad] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
+  const [abiertos, setAbiertos] = useState({});
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(VACIO);
@@ -80,6 +81,11 @@ export default function Construccion() {
   };
 
   const unidadesVisibles = unidades.filter(u => !desarrolloSel || u.desarrollo_nombre === desarrolloSel);
+
+  // La letra con que empieza el número de unidad es la torre/etapa (A102 -> A).
+  // Los desarrollos cuyas unidades no llevan letra se muestran sin nivel de torre.
+  const torreDe = (u) => (String(u.numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)/)?.[1] || '').toUpperCase();
+  const alternar = (clave, abierto) => setAbiertos(a => ({ ...a, [clave]: !abierto }));
 
   const dtuHabilitado = (avanceObra) => Number(avanceObra) >= 90;
 
@@ -129,23 +135,75 @@ export default function Construccion() {
       ) : unidadesVisibles.length === 0 ? (
         <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades que coincidan con el filtro.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {unidadesVisibles.map(u => {
-            const s = seguimientos[u.id] || VACIO;
-            return (
-              <div key={u.id} onClick={() => abrirUnidad(u)}
-                style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
-                  <div style={{ fontSize: '12px', color: '#888' }}>{u.estatus}{tipoCompraPorUnidad[u.id] ? ` · ${tipoCompraPorUnidad[u.id]}` : ''}</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {(() => {
+            const natural = (x, y) => String(x.numero).localeCompare(String(y.numero), 'es', { numeric: true });
+            const filaUnidad = (u) => {
+              const s = seguimientos[u.id] || VACIO;
+              return (
+                <div key={u.id} onClick={() => abrirUnidad(u)}
+                  style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero}</div>
+                    <div style={{ fontSize: '12px', color: '#888' }}>{u.estatus}{tipoCompraPorUnidad[u.id] ? ` · ${tipoCompraPorUnidad[u.id]}` : ''}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a2e' }}>{Number(s.avance_obra_pct || 0)}%</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: s.dtu ? '#10B981' : '#ccc' }}>DTU {s.dtu ? '✓' : '—'}</div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a2e' }}>{Number(s.avance_obra_pct || 0)}%</div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: s.dtu ? '#10B981' : '#ccc' }}>DTU {s.dtu ? '✓' : '—'}</div>
+              );
+            };
+            const porDesarrollo = {};
+            unidadesVisibles.forEach(u => { (porDesarrollo[u.desarrollo_nombre || 'Sin desarrollo'] = porDesarrollo[u.desarrollo_nombre || 'Sin desarrollo'] || []).push(u); });
+            return Object.keys(porDesarrollo).sort((x, y) => x.localeCompare(y, 'es')).map(nombre => {
+              const lista = porDesarrollo[nombre].slice().sort(natural);
+              const claveDes = nombre;
+              const abierto = !!abiertos[claveDes];
+              const hayTorres = lista.some(u => torreDe(u));
+              const torres = {};
+              if (hayTorres) lista.forEach(u => { const t = torreDe(u) || '—'; (torres[t] = torres[t] || []).push(u); });
+              const promedio = (arr) => arr.length ? Math.round(arr.reduce((t, u) => t + Number((seguimientos[u.id] || VACIO).avance_obra_pct || 0), 0) / arr.length) : 0;
+              return (
+                <div key={nombre}>
+                  <div onClick={() => alternar(claveDes, abierto)}
+                    style={{ background: '#1a1a2e', color: '#fff', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '12px', display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
+                      <span style={{ fontSize: '14px', fontWeight: '600' }}>{nombre}</span>
+                      <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>
+                        {hayTorres ? `${Object.keys(torres).length} ${Object.keys(torres).length === 1 ? 'torre' : 'torres'} · ` : ''}{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12px', opacity: 0.85 }}>Avance promedio: <b>{promedio(lista)}%</b></div>
+                  </div>
+                  {abierto && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                      {!hayTorres && lista.map(filaUnidad)}
+                      {hayTorres && Object.keys(torres).sort((x, y) => x.localeCompare(y, 'es')).map(t => {
+                        const claveTorre = `${nombre}||${t}`;
+                        const torreAbierta = !!abiertos[claveTorre];
+                        return (
+                          <div key={t} style={{ marginLeft: isMobile ? '8px' : '20px' }}>
+                            <div onClick={() => alternar(claveTorre, torreAbierta)}
+                              style={{ background: '#f0f0f5', color: '#1a1a2e', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <span style={{ fontSize: '11px', display: 'inline-block', transform: torreAbierta ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
+                                <span style={{ fontSize: '13px', fontWeight: '600' }}>{t === '—' ? 'Sin torre' : `Torre ${t}`}</span>
+                                <span style={{ fontSize: '11px', color: '#888' }}>{torres[t].length} {torres[t].length === 1 ? 'unidad' : 'unidades'}</span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: '#666' }}>Avance promedio: <b>{promedio(torres[t])}%</b></div>
+                            </div>
+                            {torreAbierta && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>{torres[t].map(filaUnidad)}</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 
