@@ -1,3 +1,4 @@
+import { EMPRESA } from './empresa';
 import React, { useState, useEffect, useRef } from 'react';
 import { enviarPush } from './enviarPush';
 import { supabase } from './supabase';
@@ -19,7 +20,7 @@ const DOCS_ASESOR = [
   { id: 'comprobante_apartado', label: 'Comprobante de apartado', aceptaImagen: true, multiple: true, maxArchivos: 10, nota: 'Puedes subir hasta 10 archivos si el apartado se hizo en varios movimientos', avisoRojo: 'ARCHIVO DESCARGADO EN PDF O FOTO LEGIBLE' },
   { id: 'kyc', label: 'KYC firmado', avisoRojo: 'ARCHIVO EN PDF O FOTO LEGIBLE' },
   { id: 'documentos_generales', label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
-  { id: 'liquidacion_gemex', label: 'Preliquidación Gemex', avisoRojo: 'ARCHIVO EN PDF' },
+  { id: 'liquidacion_gemex', label: `Preliquidación ${EMPRESA.nombreCorto}`, avisoRojo: 'ARCHIVO EN PDF' },
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
 const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Contrato firmado' };
@@ -49,7 +50,7 @@ const DOC_DEFS_FINANCIADO = {
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
   cotizacion: { label: 'Cotización del día del apartado (a nombre del cliente)', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
-  liquidacion_gemex: { label: 'Preliquidación Gemex' },
+  liquidacion_gemex: { label: `Preliquidación ${EMPRESA.nombreCorto}` },
   documentos_generales: { label: 'Documentos generales del cliente', avisoRojo: 'ARCHIVO EN PDF' },
 };
 

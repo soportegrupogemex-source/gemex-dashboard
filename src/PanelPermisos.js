@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { HOJAS_CONFIGURABLES, ROLES_CONFIGURABLES, MENU_MODULOS, ACCIONES, clavePermiso, claveAccion, reglaPorDefecto } from './permisosMenu';
+import { HOJAS_CONFIGURABLES, ROLES_CONFIGURABLES, MENU_MODULOS, ACCIONES_PANEL, clavePermiso, claveAccion, reglaPorDefecto } from './permisosMenu';
 
 // Panel de permisos (solo Super Admin). Un interruptor por rol para:
 //  1) cada sección del menú (¿la ve?) y
@@ -127,10 +127,10 @@ export default function PanelPermisos({ miAgente }) {
   })).filter(g => g.filas.length > 0);
 
   // Funciones dentro de cada sección
-  const seccionesAcciones = [...new Set(ACCIONES.map(a => a.seccion))];
+  const seccionesAcciones = [...new Set(ACCIONES_PANEL.map(a => a.seccion))];
   const gruposAcciones = seccionesAcciones.map(sec => ({
     titulo: sec,
-    filas: ACCIONES.filter(a => a.seccion === sec).map(a => ({ tipo: 'accion', label: a.label, permiso: claveAccion(a.id), defecto: a.defecto })),
+    filas: ACCIONES_PANEL.filter(a => a.seccion === sec).map(a => ({ tipo: 'accion', label: a.label, permiso: claveAccion(a.id), defecto: a.defecto })),
   }));
 
   const celda = { padding: '8px 6px', textAlign: 'center', borderBottom: '0.5px solid #f0f0f0' };

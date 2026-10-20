@@ -6,7 +6,9 @@
 // Sidebar en 4 módulos. Los ids de las pantallas (hojas) no cambian, solo
 // cómo se agrupan. Un módulo con una sola hoja visible para el rol se
 // muestra como botón directo.
-export const MENU_MODULOS = [
+import { EMPRESA } from './empresa';
+
+const TODOS_LOS_MODULOS = [
   { id: 'mod_ventas', label: 'Ventas', icon: 'mod_ventas', submenu: [
     { id: 'dashboard_dir', label: 'Dashboard', icon: 'dashboard_dir' },
     { id: 'dashboard', label: 'Ranking Gemex', icon: 'dashboard' },
@@ -35,6 +37,11 @@ export const MENU_MODULOS = [
   ]},
 ];
 
+// Cada empresa ve solo sus pantallas (ver empresa.js).
+export const MENU_MODULOS = TODOS_LOS_MODULOS
+  .map(m => ({ ...m, submenu: m.submenu.filter(h => !EMPRESA.hojas || EMPRESA.hojas.includes(h.id)) }))
+  .filter(m => m.submenu.length > 0);
+
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
 export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
@@ -61,7 +68,8 @@ export const MENU_POR_ROL = {
 };
 
 // Roles que se pueden configurar en el panel (Super Admin siempre tiene todo).
-export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación'];
+export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación']
+  .filter(r => !EMPRESA.rolesOcultos.includes(r));
 
 // Pantallas que se pueden encender/apagar por rol ("Ajustes de administración"
 // es solo del Super Admin y no se configura).
@@ -212,7 +220,7 @@ export const ACCIONES = [
 
   // Dashboard y Ranking
   { id: 'dashboard.descargar_reporte', seccion: 'Dashboard y Ranking', label: 'Descargar el reporte del Dashboard (PDF)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador') },
-  { id: 'ranking.alternar_visibilidad', seccion: 'Dashboard y Ranking', label: 'Mostrar u ocultar el Ranking Gemex para todos (interruptor del menú)', defecto: roles('Super Admin') },
+  { id: 'ranking.alternar_visibilidad', seccion: 'Dashboard y Ranking', label: 'Mostrar u ocultar el Ranking para todos (interruptor del menú)', defecto: roles('Super Admin') },
 
   // Objetivos, Tendencias, Construcción
   { id: 'objetivos.editar_metas', seccion: 'Objetivos', label: 'Capturar y editar las metas (unidades y monto)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor') },
@@ -240,6 +248,10 @@ export const ACCIONES = [
 
   { id: 'planes.editar', seccion: 'Planes de pago', label: 'Crear, editar y eliminar planes de pago', defecto: roles('Super Admin', 'Admin') },
 ];
+
+// Funciones que muestra el panel Permisos (las demás siguen existiendo para
+// que puedeAccion() las evalúe, pero esta empresa no las usa).
+export const ACCIONES_PANEL = ACCIONES.filter(a => !EMPRESA.seccionesAcciones || (EMPRESA.seccionesAcciones.includes(a.seccion) && !a.id.startsWith('ranking.')));
 
 export const claveAccion = (id) => `accion.${id}`;
 

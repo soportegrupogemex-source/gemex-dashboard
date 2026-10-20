@@ -1,9 +1,11 @@
+import { EMPRESA } from './empresa';
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
 
-const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación'];
+const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación']
+  .filter(r => !EMPRESA.rolesOcultos.includes(r));
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
 const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -600,7 +602,7 @@ export default function Agentes() {
       display: 'inline-block', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '500',
       background: equipoColor(equipo).bg, color: equipoColor(equipo).color, whiteSpace: 'nowrap', lineHeight: '1.4',
     }}>
-      {equipo || 'Gemex'}
+      {(equipo || 'Gemex') === 'Gemex' ? EMPRESA.nombreCorto : equipo}
     </span>
   );
 
@@ -853,7 +855,7 @@ export default function Agentes() {
         </button>
         <button onClick={() => { setFiltroEquipo('Gemex'); setFiltroInmobiliariaId(''); }}
           style={{ padding: '6px 16px', borderRadius: '20px', border: '0.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: filtroEquipo === 'Gemex' ? '600' : '400', background: filtroEquipo === 'Gemex' ? '#C0203A' : '#fff', color: filtroEquipo === 'Gemex' ? '#fff' : '#333', borderColor: filtroEquipo === 'Gemex' ? '#C0203A' : '#ddd' }}>
-          Gemex ({conteos['Gemex']})
+          {EMPRESA.nombreCorto} ({conteos['Gemex']})
         </button>
         <button onClick={() => { setFiltroEquipo('Inmobiliaria'); setFiltroInmobiliariaId(''); }}
           style={{ padding: '6px 16px', borderRadius: '20px', border: '0.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: filtroEquipo === 'Inmobiliaria' ? '600' : '400', background: filtroEquipo === 'Inmobiliaria' ? '#C0203A' : '#f0f0f0', color: filtroEquipo === 'Inmobiliaria' ? '#fff' : '#555', borderColor: filtroEquipo === 'Inmobiliaria' ? '#C0203A' : '#ddd' }}>

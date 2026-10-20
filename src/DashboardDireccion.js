@@ -1,3 +1,4 @@
+import { EMPRESA } from './empresa';
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import jsPDF from 'jspdf';
@@ -427,7 +428,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(150, 150, 150);
-      doc.text(`Gemex CRM — ${titulo} — ${anioSel}`, 10, pageH - 5);
+      doc.text(`${EMPRESA.nombreCorto} CRM — ${titulo} — ${anioSel}`, 10, pageH - 5);
 
       doc.save(`Reporte_${titulo.replace(/\s/g,'_')}_${anioSel}.pdf`);
     } catch (err) {
@@ -586,7 +587,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
                 <select value={filtroEquipoVendedor} onChange={e => setFiltroEquipoVendedor(e.target.value)}
                   style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', minWidth: '160px' }}>
                   <option value=''>Todos los equipos</option>
-                  <option value='Gemex'>Solo Gemex</option>
+                  <option value='Gemex'>Solo {EMPRESA.nombreCorto}</option>
                   <option value='Externos'>Solo externos</option>
                 </select>
               )}
@@ -616,7 +617,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
               <select value={filtroEquipoVendedor} onChange={e => setFiltroEquipoVendedor(e.target.value)}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px', background: '#fff' }}>
                 <option value=''>Todos los equipos</option>
-                <option value='Gemex'>Solo Gemex</option>
+                <option value='Gemex'>Solo {EMPRESA.nombreCorto}</option>
                 <option value='Externos'>Solo externos</option>
               </select>
             )}

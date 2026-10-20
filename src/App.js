@@ -19,6 +19,7 @@ import AjustesAdministracion from './AjustesAdministracion';
 import Marketing from './Marketing';
 import PanelPermisos from './PanelPermisos';
 import { PermisosContext } from './PermisosContext';
+import { EMPRESA } from './empresa';
 import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe, puedeAccion } from './permisosMenu';
 import Construccion from './Construccion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
@@ -43,15 +44,22 @@ function useIsMobile() {
   return { isMobile, isTablet, isSmall: isMobile || isTablet };
 }
 
-// Logo de Grupo Gemex (public/logo-gemex.jpg — fondo rojo #C0203A, texto blanco).
-function LogoGemex({ small = false }) {
-  return (
+// Logo de la empresa (ver empresa.js). El de Gemex trae su propio fondo rojo;
+// el de GMF es blanco y transparente, así que sobre fondo claro (pantalla de
+// carga) se le pone una caja del color del menú.
+function LogoGemex({ small = false, sobreClaro = false }) {
+  const compacto = small && EMPRESA.logoCompacto;
+  const img = (
     <img
-      src={process.env.PUBLIC_URL + '/logo-gemex.jpg'}
-      alt="Grupo Gemex"
-      style={{ height: small ? '32px' : '38px', width: 'auto', verticalAlign: 'middle', borderRadius: '4px' }}
+      src={process.env.PUBLIC_URL + '/' + (compacto ? EMPRESA.logoCompacto : EMPRESA.logo)}
+      alt={EMPRESA.nombre}
+      style={{ height: small ? '32px' : (EMPRESA.logoSobreOscuro ? '84px' : '38px'), width: 'auto', verticalAlign: 'middle', borderRadius: '4px' }}
     />
   );
+  if (EMPRESA.logoSobreOscuro && sobreClaro) {
+    return <span style={{ display: 'inline-block', background: EMPRESA.colorMenu, padding: '8px 12px', borderRadius: '8px' }}>{img}</span>;
+  }
+  return img;
 }
 
 // Iconos de línea (lucide-react) reemplazando emojis. size=18 y color
@@ -727,6 +735,10 @@ function App() {
     if (HOJAS_CONFIGURABLES.some(h => h.id === activePage) && !puedeVer(activePage) && activePage !== 'desarrollos') {
       return <Desarrollos miRol={miRol} miAgente={miAgente} />;
     }
+    // Pantallas que esta empresa no usa (ej. Ranking, Titulación en GMF) no se abren.
+    if (EMPRESA.hojas && !['permisos', 'micuenta', 'desarrollos'].includes(activePage) && !HOJAS_CONFIGURABLES.some(h => h.id === activePage)) {
+      return <Desarrollos miRol={miRol} miAgente={miAgente} />;
+    }
     switch (activePage) {
       case 'permisos': return miRol === 'Super Admin' ? <PanelPermisos miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'dashboard':
@@ -755,7 +767,7 @@ function App() {
 
   if (loading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f5f5f5' }}>
-      <div style={{ textAlign: 'center' }}><LogoGemex small /><div style={{ marginTop: '12px', fontSize: '13px', color: '#888' }}>Cargando...</div></div>
+      <div style={{ textAlign: 'center' }}><LogoGemex small sobreClaro /><div style={{ marginTop: '12px', fontSize: '13px', color: '#888' }}>Cargando...</div></div>
     </div>
   );
   if (!session) return <Login />;
