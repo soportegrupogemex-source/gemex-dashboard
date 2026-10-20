@@ -1,14 +1,13 @@
 import { EMPRESA } from './empresa';
 import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
-import { supabase } from './supabase';
+import { supabase, tokenSesion } from './supabase';
 import { usePuede } from './PermisosContext';
 
 const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación']
   .filter(r => !EMPRESA.rolesOcultos.includes(r));
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
-const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const LS_KEY_PROCESADOS = 'gemex_import_agentes_procesados';
 
 function useIsMobile() {
@@ -209,7 +208,7 @@ export default function Agentes() {
         try {
           const res = await fetch(EDGE_CREAR_USUARIO, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
             body: JSON.stringify({ action: 'cambiar_correo', email: correoOriginal, nuevoEmail: correoLimpio })
           });
           const result = await res.json();
@@ -218,7 +217,7 @@ export default function Agentes() {
               // No existía cuenta con el correo viejo — se crea una nueva con el correo nuevo
               const resCrear = await fetch(EDGE_CREAR_USUARIO, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
                 body: JSON.stringify({ action: 'crear', email: correoLimpio, password: '123456' })
               });
               const resultCrear = await resCrear.json();
@@ -250,7 +249,7 @@ export default function Agentes() {
       try {
         const res = await fetch(EDGE_CREAR_USUARIO, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
           body: JSON.stringify({ action: 'crear', email: correoLimpio, password: passProvisional })
         });
         const result = await res.json();
@@ -285,7 +284,7 @@ export default function Agentes() {
       try {
         await fetch(EDGE_CREAR_USUARIO, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
           body: JSON.stringify({ action: 'eliminar', email: agente.correo })
         });
       } catch (err) {
@@ -362,7 +361,7 @@ export default function Agentes() {
     try {
       const res = await fetch(EDGE_CREAR_USUARIO, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
         body: JSON.stringify({ action: 'cambiar_password', email: showDetalle.correo, password: nuevaPass })
       });
       const result = await res.json();
@@ -454,7 +453,7 @@ export default function Agentes() {
       try {
         const res = await fetch(EDGE_CREAR_USUARIO, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
           body: JSON.stringify({ action: 'crear', email: fila.correo, password: '123456' })
         });
         const result = await res.json();

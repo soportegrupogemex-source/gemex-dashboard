@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './supabase';
+import { supabase, tokenSesion } from './supabase';
 import Contactos from './contactos';
 import Desarrollos from './Desarrollos';
 import Agentes from './Agentes';
@@ -381,7 +381,6 @@ function Dashboard() {
 // (con paginación completa) en vez de solo el método de sesión propia,
 // que puede quedar en un estado raro si la cuenta activa no es "la buena".
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
-const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
 function MiCuenta({ user, miRol }) {
   const [agente, setAgente] = useState(null);
@@ -433,7 +432,7 @@ function MiCuenta({ user, miRol }) {
       try {
         const res = await fetch(EDGE_CREAR_USUARIO, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await tokenSesion()}` },
           body: JSON.stringify({ action: 'cambiar_password', email: user.email, password: passNueva })
         });
         const result = await res.json();
