@@ -1,3 +1,4 @@
+import { EMPRESA } from './empresa';
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { InputDinero } from './dinero';
@@ -8,7 +9,8 @@ import { usePuede } from './PermisosContext';
 // unidad ya está Vendido) y no requieren columnas nuevas: reutilizan
 // monto y fecha_firma (que fechaEfectiva() ya prioriza) para que el
 // Dashboard pueda sumar el "real" por mes contra la meta de Objetivos.
-const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad', 'Titulación', 'Cobranza'];
+// Titulación y Cobranza son módulos que no todas las empresas usan (ver empresa.js).
+const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad', ...(EMPRESA.hojas ? [] : ['Titulación', 'Cobranza'])];
 const TIPOS_POST_VENTA = ['Titulación', 'Cobranza'];
 // FIX: se agrega "Especial" — para negociaciones que no entran en las
 // políticas de los demás planes (caso a caso).

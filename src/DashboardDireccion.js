@@ -665,6 +665,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
 
       {/* FIX: Titulación y Cobranza — real (movimientos de esos tipos)
           vs meta (Objetivos), mismo patrón que las tarjetas de Ventas. */}
+      {!EMPRESA.hojas && (
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
         <Tarjeta label="Unidades Tituladas" valor={totalTituladasP}
           meta={metaTitulacionP.unidades > 0 ? `Meta: ${metaTitulacionP.unidades}` : null}
@@ -679,6 +680,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
           meta={metaCobranzaP.monto > 0 ? `Meta: ${fmt(metaCobranzaP.monto)}` : null}
           pctLabel="Progreso" pct={pctCobMP} color="#14B8A6" />
       </div>
+      )}
 
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e', marginBottom: '10px' }}>
