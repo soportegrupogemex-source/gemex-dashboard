@@ -14,7 +14,9 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const fmt = (n) => fmtDinero(n, { centavos: true });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0, cuotas_condominales: 0 };
+const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, financiera_1_recibido: null, financiera_2_recibido: null, liberacion_monto: 0, cuotas_condominales: 0 };
+// Lo recibido en bancos: vacío = aún no capturado (distinto de 0, que es "no cayó nada").
+const recibidoNum = (v) => (v === null || v === undefined || v === '') ? null : r2(v);
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -34,6 +36,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const puedeEliminarPagos = puede('cobranza.eliminar_pagos');
   const puedeEditarMontos = puede('cobranza.editar_montos');
   const puedeMarcarLiquidacion = puede('cobranza.marcar_liquidacion');
+  const puedeCapturarRecibido = puede('cobranza.capturar_recibido');
   const puedeDescargarLiquidacion = puede('cobranza.descargar_liquidacion');
   const [desarrollos, setDesarrollos] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -126,15 +129,25 @@ export default function Cobranza({ miRol, miAgente }) {
 
   const totalPagos = (unidadId) => r2((pagosPorUnidad[unidadId] || []).reduce((s, p) => s + Number(p.monto || 0), 0));
 
+  // Las financieras (lo que autorizó Titulación) NO se restan del saldo hasta que la
+  // unidad esté cotejada; entonces se resta lo que Tesorería registró como recibido en
+  // bancos. Las unidades cotejadas antes de este control (sin "recibido") conservan lo
+  // autorizado.
   const calc = (unidadId, s) => {
     const valorVenta = Number(ventaPorUnidad[unidadId]?.monto || 0);
     const pagado = totalPagos(unidadId);
     const diferenciaPorCubrir = r2(valorVenta - pagado);
-    const f1 = Number(montosTit[unidadId]?.f1 || 0);
-    const f2 = Number(montosTit[unidadId]?.f2 || 0);
-    const saldoNeto = r2(diferenciaPorCubrir - f1 - f2);
-    const remanente = r2(f1 + f2 - Number(s.liberacion_monto || 0));
-    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente };
+    const aut1 = Number(montosTit[unidadId]?.f1 || 0);
+    const aut2 = Number(montosTit[unidadId]?.f2 || 0);
+    const rec1 = recibidoNum(s.financiera_1_recibido);
+    const rec2 = recibidoNum(s.financiera_2_recibido);
+    const cotejada = !!s.liquidacion_final_completada;
+    const aplicada1 = cotejada ? (rec1 ?? aut1) : 0;
+    const aplicada2 = cotejada ? (rec2 ?? aut2) : 0;
+    const saldoNeto = r2(diferenciaPorCubrir - aplicada1 - aplicada2);
+    const enBancos = r2((rec1 ?? (cotejada ? aut1 : 0)) + (rec2 ?? (cotejada ? aut2 : 0)));
+    const remanente = r2(enBancos - Number(s.liberacion_monto || 0));
+    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente, aut1, aut2, rec1, rec2, aplicada1, aplicada2, cotejada };
   };
 
   const abrirUnidad = (u) => {
@@ -144,17 +157,25 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   const guardarSeguimiento = async () => {
-    if (!puedeEditarMontos) return null;
+    if (!puedeEditarMontos && !puedeCapturarRecibido) return null;
     setGuardando(true);
     const { data: { user } } = await supabase.auth.getUser();
     const payload = {
       unidad_id: unidadAbierta.id,
       desarrollo_id: unidadAbierta.desarrollo_id,
-      liberacion_monto: r2(form.liberacion_monto),
-      cuotas_condominales: r2(form.cuotas_condominales),
       actualizado_por: user?.email || null,
       updated_at: new Date().toISOString(),
     };
+    if (puedeEditarMontos) {
+      payload.liberacion_monto = r2(form.liberacion_monto);
+      payload.cuotas_condominales = r2(form.cuotas_condominales);
+    }
+    if (puedeCapturarRecibido) {
+      payload.financiera_1_recibido = recibidoNum(form.financiera_1_recibido);
+      payload.financiera_2_recibido = recibidoNum(form.financiera_2_recibido);
+      payload.financieras_recibido_por = user?.email || null;
+      payload.financieras_recibido_fecha = new Date().toISOString();
+    }
     const { data, error } = await supabase.from('cobranza_seguimiento')
       .upsert(payload, { onConflict: 'unidad_id' })
       .select().single();
@@ -208,14 +229,19 @@ export default function Cobranza({ miRol, miAgente }) {
   };
 
   // Liquidación final: mismo formato que el que usa Tesorería.
-  const construirLiquidacion = async () => {
-    const { valorVenta, pagado } = calc(unidadAbierta.id, form);
+  // `cotejada` se pasa explícito porque al marcar la casilla el estado aún no se actualiza.
+  const construirLiquidacion = async (cotejada = !!form.liquidacion_final_completada) => {
+    const c = calc(unidadAbierta.id, { ...form, liquidacion_final_completada: cotejada });
     const venta = ventaPorUnidad[unidadAbierta.id] || {};
     return construirLiquidacionPdf({
       cliente: venta.contacto_nombre, tipoCompra: venta.tipo_compra,
       unidadNumero: unidadAbierta.numero, desarrolloNombre: unidadAbierta.desarrollo_nombre,
-      valorVenta, pagado, f1: form.financiera_1_monto, f2: form.financiera_2_monto, cuotas: form.cuotas_condominales,
-      firmantes,
+      valorVenta: c.valorVenta, pagado: c.pagado,
+      // Lo que se descuenta es lo recibido en bancos (cotejada); sin cotejar solo lo que ya se capturó como recibido.
+      f1: c.rec1 ?? (cotejada ? c.aut1 : 0), f2: c.rec2 ?? (cotejada ? c.aut2 : 0),
+      f1Autorizado: c.aut1, f2Autorizado: c.aut2,
+      cuotas: form.cuotas_condominales,
+      firmantes, preliminar: !cotejada,
     });
   };
 
@@ -247,9 +273,18 @@ export default function Cobranza({ miRol, miAgente }) {
         setForm(f => ({ ...f, liquidacion_final_completada: false, liquidacion_final_path: null }));
         return;
       }
+      // Cuadre con bancos: cada financiera con monto autorizado necesita su "recibido" (puede ser 0).
+      const cp = calc(unidadAbierta.id, form);
+      const faltan = [[cp.aut1, cp.rec1, 'Financiera 1'], [cp.aut2, cp.rec2, 'Financiera 2']].filter(([aut, rec]) => aut > 0 && rec === null).map(x => x[2]);
+      if (faltan.length > 0) {
+        alert(`Antes de cotejar captura lo recibido en bancos de: ${faltan.join(' y ')} (si no cayó nada, escribe 0).`);
+        return;
+      }
+      const difTotal = r2((cp.aut1 + cp.aut2) - ((cp.rec1 ?? 0) + (cp.rec2 ?? 0)));
+      if (difTotal !== 0 && !window.confirm(`Lo recibido en bancos no cuadra con lo autorizado por las financieras.\n\nAutorizado: ${fmt(cp.aut1 + cp.aut2)}\nRecibido: ${fmt((cp.rec1 ?? 0) + (cp.rec2 ?? 0))}\nDiferencia: ${fmt(difTotal)}\n\n¿Cotejar de todos modos? La diferencia queda pendiente en el saldo.`)) return;
       const guardado = await guardarSeguimiento();
       if (!guardado) return;
-      const { doc } = await construirLiquidacion();
+      const { doc } = await construirLiquidacion(true);
       const blob = doc.output('blob');
       const path = `${unidadAbierta.id}/liquidacion_final_${Date.now()}.pdf`;
       const { error: errUpload } = await supabase.storage.from('cobranza').upload(path, blob, { contentType: 'application/pdf' });
@@ -340,7 +375,8 @@ export default function Cobranza({ miRol, miAgente }) {
       )}
 
       {unidadAbierta && (() => {
-        const { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente } = calc(unidadAbierta.id, form);
+        const calcAbierta = calc(unidadAbierta.id, form);
+        const { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente } = calcAbierta;
         const venta = ventaPorUnidad[unidadAbierta.id] || {};
         const pagos = pagosPorUnidad[unidadAbierta.id] || [];
         return (
@@ -399,15 +435,35 @@ export default function Cobranza({ miRol, miAgente }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '4px' }}>
-                {[['Financiera 1', etiquetasCredito(venta.tipo_compra).f1, form.financiera_1_monto], ['Financiera 2', etiquetasCredito(venta.tipo_compra).f2, form.financiera_2_monto]].map(([t, e, monto]) => (
-                  <div key={t} style={{ flex: 1 }}>
-                    <div style={{ fontSize: '12px', color: '#555', marginBottom: '4px' }}>{t} — {e}</div>
-                    <div style={{ padding: '8px 10px', background: '#f3f3f3', border: '0.5px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#1a1a2e' }}>{fmt(monto)}</div>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                {[
+                  { t: 'Financiera 1', e: etiquetasCredito(venta.tipo_compra).f1, aut: calcAbierta.aut1, campo: 'financiera_1_recibido', rec: calcAbierta.rec1 },
+                  { t: 'Financiera 2', e: etiquetasCredito(venta.tipo_compra).f2, aut: calcAbierta.aut2, campo: 'financiera_2_recibido', rec: calcAbierta.rec2 },
+                ].map(({ t, e, aut, campo, rec }) => {
+                  const dif = rec === null ? null : r2(aut - rec);
+                  const legado = calcAbierta.cotejada && rec === null && aut > 0;
+                  return (
+                    <div key={t} style={{ flex: '1 1 220px', border: '0.5px solid #e5e5e5', borderRadius: '10px', padding: '10px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>{t} — {e}</div>
+                      <div style={{ fontSize: '11px', color: '#888' }}>Autorizado (Titulación)</div>
+                      <div style={{ padding: '7px 10px', background: '#f3f3f3', border: '0.5px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#1a1a2e', marginBottom: '8px' }}>{fmt(aut)}</div>
+                      <div style={{ fontSize: '11px', color: '#888' }}>Recibido en bancos</div>
+                      <InputDinero disabled={!puedeCapturarRecibido} value={form[campo] ?? ''} placeholder="Lo que cayó en bancos"
+                        onChange={ev => setForm(f => ({ ...f, [campo]: ev.target.value }))}
+                        style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+                      <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: '600', color: legado ? '#888' : dif === null ? '#aaa' : dif === 0 ? '#27500A' : '#C0392B' }}>
+                        {legado ? 'Cotejada antes de este control: se toma lo autorizado'
+                          : dif === null ? (aut > 0 ? 'Pendiente de capturar' : '')
+                          : dif === 0 ? '✓ Cuadra con lo autorizado'
+                          : `Diferencia: ${fmt(dif)}`}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>Estos montos se capturan en Titulación (Autorización financiera 1 y 2).</div>
+              <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>
+                El autorizado lo captura Titulación. Las financieras se restan del saldo hasta que la unidad esté cotejada, y se resta lo recibido en bancos.
+              </div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
                 <InputDinero disabled={!puedeEditarMontos} value={form.liberacion_monto}
@@ -446,7 +502,7 @@ export default function Cobranza({ miRol, miAgente }) {
                   style={{ flex: 1, padding: '10px', background: '#fff', color: '#666', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   Cerrar
                 </button>
-                {puedeEditarMontos && <button onClick={guardarSeguimiento} disabled={guardando}
+                {(puedeEditarMontos || puedeCapturarRecibido) && <button onClick={guardarSeguimiento} disabled={guardando}
                   style={{ flex: 1, padding: '10px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   {guardando ? 'Guardando...' : 'Guardar'}
                 </button>}

@@ -286,7 +286,7 @@ export default function Titulacion({ miRol, miAgente }) {
         supabase.from('movimientos').select('tipo, contacto_nombre, monto, tipo_compra, created_at')
           .eq('unidad_id', unidad.id).in('tipo', ['Vendida', 'Apartado']).order('created_at', { ascending: false }),
         supabase.from('cobranza_pagos').select('monto').eq('unidad_id', unidad.id),
-        supabase.from('cobranza_seguimiento').select('cuotas_condominales').eq('unidad_id', unidad.id).maybeSingle(),
+        supabase.from('cobranza_seguimiento').select('cuotas_condominales, financiera_1_recibido, financiera_2_recibido').eq('unidad_id', unidad.id).maybeSingle(),
         supabase.from('titulacion_seguimiento').select('autorizacion_financiera_1_monto, autorizacion_financiera_2_monto').eq('unidad_id', unidad.id).maybeSingle(),
         cargarFirmantes(supabase),
       ]);
@@ -296,7 +296,9 @@ export default function Titulacion({ miRol, miAgente }) {
         unidadNumero: unidad.numero, desarrolloNombre: unidad.desarrollo_nombre,
         valorVenta: Number(venta.monto || 0),
         pagado: (pagos || []).reduce((t, p) => t + Number(p.monto || 0), 0),
-        f1: tit?.autorizacion_financiera_1_monto, f2: tit?.autorizacion_financiera_2_monto,
+        // Antes del cotejo la financiera no se resta: solo cuenta lo que Tesorería ya registró como recibido en bancos.
+        f1: cob?.financiera_1_recibido ?? 0, f2: cob?.financiera_2_recibido ?? 0,
+        f1Autorizado: tit?.autorizacion_financiera_1_monto, f2Autorizado: tit?.autorizacion_financiera_2_monto,
         cuotas: cob?.cuotas_condominales, firmantes, preliminar: true,
       });
       if (accion === 'ver') {

@@ -112,8 +112,23 @@ export const construirLiquidacionPdf = async (d) => {
 
   y += 11;
   fila(y, 'ENGANCHE (+)', fmtN(pagado)); y += 6;
-  fila(y, et.f1.toUpperCase(), fmtN(f1)); y += 6;
-  fila(y, et.f2.toUpperCase(), fmtN(f2)); y += 3;
+  // Debajo de cada crédito: lo autorizado vs. lo recibido en bancos (solo si hay algo que aclarar).
+  const notaFinanciera = (autorizado, recibido) => {
+    const a = r2(autorizado);
+    if (!(a > 0)) return;
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'italic');
+    if (d.preliminar && r2(recibido) === 0) {
+      doc.setTextColor(120, 120, 120);
+      doc.text(`Autorizado ${fmtN(a)} — por recibir (aún no se resta)`, L + 4, y + 4);
+    } else if (r2(a - recibido) !== 0) {
+      doc.setTextColor(192, 32, 58);
+      doc.text(`Autorizado ${fmtN(a)} · recibido ${fmtN(recibido)} · diferencia ${fmtN(r2(a - recibido))}`, L + 4, y + 4);
+    } else { doc.setFontSize(10); doc.setFont('helvetica', 'normal'); return; }
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+    y += 4;
+  };
+  fila(y, et.f1.toUpperCase(), fmtN(f1)); notaFinanciera(d.f1Autorizado, f1); y += 6;
+  fila(y, et.f2.toUpperCase(), fmtN(f2)); notaFinanciera(d.f2Autorizado, f2); y += 3;
   linea(y, L, R, 0.5); y += 5;
   fila(y, 'TOTAL PAGOS', fmtN(totalPagos), true); y += 2;
   linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);

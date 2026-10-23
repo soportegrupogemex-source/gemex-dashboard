@@ -170,6 +170,7 @@ export const ACCIONES = [
   { id: 'cobranza.agregar_pagos', seccion: 'Cobranza', label: 'Registrar pagos (enganche y abonos)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.eliminar_pagos', seccion: 'Cobranza', label: 'Eliminar pagos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.editar_montos', seccion: 'Cobranza', label: 'Editar liberación y cuotas condominales', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
+  { id: 'cobranza.capturar_recibido', seccion: 'Cobranza', label: 'Capturar lo recibido en bancos de las financieras (cuadre)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Tesorería') },
   { id: 'cobranza.marcar_liquidacion', seccion: 'Cobranza', label: 'Marcar "Unidad cotejada"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería') },
   { id: 'cobranza.descargar_liquidacion', seccion: 'Cobranza', label: 'Descargar la liquidación en PDF', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Tesorería', 'Mesa de Control') },
 
