@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
+import { fmtDinero, InputDinero } from './dinero';
 
 // Obra por torre — catálogo de partidas de mano de obra, programa semanal y avance real (%).
 //  - Cada torre (Los Arrayanes, Torre L…) tiene una fecha de arranque (lunes de la semana 1);
@@ -21,6 +22,7 @@ const sumaDias = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); ret
 const fechaDe = (arranque, semana, dia) => sumaDias(arranque, (semana - 1) * 7 + (dia - 1));
 const fechaCorta = (s) => { const d = parse(s); return `${d.getDate()} ${MESES[d.getMonth()]}`; };
 const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
+const $ = (n) => fmtDinero(n, { centavos: true });
 const fmtN = (n, dec = 2) => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: dec });
 const pct1 = (n) => `${Math.round((Number(n) || 0) * 10) / 10}%`;
 
@@ -93,6 +95,7 @@ function ListaObra() {
   const puede = usePuede();
   const puedeCapturar = puede('construccion.capturar_avance_obra');
   const puedeEditar = puede('construccion.editar_obra');
+  const permisosCostos = { costos: puede('construccion.editar_costos_obra'), pagos: puede('construccion.registrar_pagos_obra'), tope: puede('construccion.fijar_tope_obra') };
   const isMobile = useIsMobile();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -118,7 +121,7 @@ function ListaObra() {
 
   if (abierta) {
     const torre = torres.find(t => t.id === abierta);
-    if (torre) return <DetalleTorre torre={torre} puedeCapturar={puedeCapturar} puedeEditar={puedeEditar} isMobile={isMobile}
+    if (torre) return <DetalleTorre torre={torre} puedeCapturar={puedeCapturar} puedeEditar={puedeEditar} permisosCostos={permisosCostos} isMobile={isMobile}
       onCerrar={() => { setAbierta(null); cargar(); }} onTorreActualizada={(t) => setTorres(prev => prev.map(x => x.id === t.id ? { ...x, ...t } : x))} />;
   }
 
@@ -209,7 +212,7 @@ function AgregarTorre({ desarrollos, existentes, onCerrar, onCreada }) {
   );
 }
 
-function DetalleTorre({ torre, puedeCapturar, puedeEditar, isMobile, onCerrar, onTorreActualizada }) {
+function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMobile, onCerrar, onTorreActualizada }) {
   const [tab, setTab] = useState('hoy');
   const [partidas, setPartidas] = useState([]);
   const [programa, setPrograma] = useState([]); // [{partida_id, semana, dia}]
@@ -217,6 +220,25 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, isMobile, onCerrar, o
   const [error, setError] = useState('');
   const [arranque, setArranque] = useState(torre.fecha_arranque || '');
   const [filtroEtapa, setFiltroEtapa] = useState('');
+  const [contratistas, setContratistas] = useState([]);
+  const [contratos, setContratos] = useState([]);
+  const [pagos, setPagos] = useState([]);
+  const [tope, setTope] = useState(torre.presupuesto_tope ?? null);
+
+  const cargarCostos = useCallback(async () => {
+    try {
+      const [ct, cs, t] = await Promise.all([
+        traerTodo(() => supabase.from('obra_contratistas').select('*').order('nombre')),
+        traerTodo(() => supabase.from('obra_contratos').select('*').eq('torre_id', torre.id).order('created_at')),
+        supabase.from('obra_torres').select('presupuesto_tope').eq('id', torre.id).single(),
+      ]);
+      setContratistas(ct); setContratos(cs); setTope(t.data?.presupuesto_tope ?? null);
+      const ids = cs.map(c => c.id);
+      let pg = [];
+      for (let i = 0; i < ids.length; i += 120) pg = pg.concat(await traerTodo(() => supabase.from('obra_pagos').select('*').in('contrato_id', ids.slice(i, i + 120)).order('fecha')));
+      setPagos(pg);
+    } catch (e) { setError(e.message || String(e)); }
+  }, [torre.id]);
 
   const cargar = useCallback(async () => {
     setCargando(true); setError('');
@@ -230,7 +252,8 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, isMobile, onCerrar, o
       setPartidas(p); setPrograma(prog);
     } catch (e) { setError(e.message || String(e)); }
     setCargando(false);
-  }, [torre.id]);
+    cargarCostos();
+  }, [torre.id, cargarCostos]);
   useEffect(() => { cargar(); }, [cargar]);
 
   const progMap = useMemo(() => {
@@ -266,7 +289,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, isMobile, onCerrar, o
     return true;
   };
 
-  const tabs = [['hoy', 'Hoy'], ['avance', 'Avance'], ['programa', 'Programa'], ['catalogo', 'Catálogo']];
+  const tabs = [['hoy', 'Hoy'], ['avance', 'Avance'], ['programa', 'Programa'], ['catalogo', 'Catálogo'], ['costos', 'Costos']];
 
   return (
     <div>
@@ -306,7 +329,8 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, isMobile, onCerrar, o
         {tab === 'avance' && <TabAvance etapas={etapas} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} isMobile={isMobile} />}
         {tab === 'programa' && <TabPrograma etapas={etapas} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           onCambio={(partidaId, semana, dia, activo) => setPrograma(prev => activo ? [...prev, { partida_id: partidaId, semana, dia }] : prev.filter(x => !(x.partida_id === partidaId && x.semana === semana && x.dia === dia)))} />}
-        {tab === 'catalogo' && <TabCatalogo torre={torre} etapas={etapas} puedeEditar={puedeEditar} onCambio={cargar} />}
+        {tab === 'catalogo' && <TabCatalogo torre={torre} etapas={etapas} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
+        {tab === 'costos' && <TabCostos torre={torre} partidas={partidas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
       </>)}
     </div>
   );
@@ -532,17 +556,18 @@ function TabPrograma({ etapas, progMap, arr, hoy, puedeEditar, filtroEtapa, setF
   );
 }
 
-function TabCatalogo({ torre, etapas, puedeEditar, onCambio }) {
+function TabCatalogo({ torre, etapas, puedeEditar, puedeCostos, contratos, contratistas, onCambio }) {
   const [nueva, setNueva] = useState({ etapa: '', descripcion: '', unidad: '', cantidad: '' });
   const [etapaNueva, setEtapaNueva] = useState('');
 
+  const nombreContrato = (id) => { const c = contratos.find(x => x.id === id); if (!c) return ''; return (contratistas.find(x => x.id === c.contratista_id)?.nombre || 'Contratista') + (c.concepto ? ` · ${c.concepto}` : ''); };
   const guardarCampo = async (p, campo, valor) => {
-    if (!puedeEditar) return;
-    const v = campo === 'cantidad' ? num(valor) : (String(valor).trim() || null);
+    if (campo === 'precio_unitario' ? !puedeCostos : !puedeEditar) return;
+    const v = (campo === 'cantidad' || campo === 'precio_unitario') ? num(valor) : (String(valor).trim() || null);
     if (campo === 'descripcion' && !v) return;
     if (v === p[campo] || (v === null && p[campo] === null)) return;
     const { error } = await supabase.from('obra_partidas').update({ [campo]: v }).eq('id', p.id);
-    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    if (error) alert('No se pudo guardar: ' + error.message);
     onCambio();
   };
   const eliminar = async (p) => {
@@ -595,6 +620,9 @@ function TabCatalogo({ torre, etapas, puedeEditar, onCambio }) {
               <input defaultValue={p.descripcion} disabled={!puedeEditar} onBlur={e => guardarCampo(p, 'descripcion', e.target.value)} style={{ ...inp, flex: '1 1 240px', border: puedeEditar ? inp.border : 'none' }} />
               <input defaultValue={p.unidad || ''} disabled={!puedeEditar} onBlur={e => guardarCampo(p, 'unidad', e.target.value.toUpperCase())} style={{ ...inp, width: 70 }} />
               <input type="number" defaultValue={p.cantidad ?? ''} disabled={!puedeEditar} onBlur={e => guardarCampo(p, 'cantidad', e.target.value)} style={{ ...inp, width: 100, textAlign: 'right' }} />
+              <PrecioCelda p={p} disabled={!puedeCostos} onGuardar={guardarCampo} />
+              <span style={{ width: 110, fontSize: 11, color: '#555', textAlign: 'right' }} title="Presupuesto = cantidad × precio unitario">{p.cantidad > 0 && p.precio_unitario > 0 ? $(p.cantidad * p.precio_unitario) : ''}</span>
+              {p.contrato_id && <span style={{ fontSize: 10, color: '#3B82F6', background: '#EFF6FF', padding: '2px 8px', borderRadius: 20 }} title="Contrato">{nombreContrato(p.contrato_id)}</span>}
               {p.solo_programa && <span style={{ fontSize: 10, color: '#856404', background: '#FFF8E1', padding: '2px 8px', borderRadius: 20 }} title="Está en el programa del Excel pero no en el catálogo de cantidades">sin cantidad en catálogo</span>}
               {puedeEditar && <button onClick={() => eliminar(p)} style={{ ...btn, color: '#C0392B', padding: '4px 8px' }}>Eliminar</button>}
             </div>
@@ -614,5 +642,332 @@ export default function ObraTorres() {
       <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Catálogo de partidas, programa semanal y avance real de la mano de obra</div>
       <ListaObra />
     </div>
+  );
+}
+
+function PrecioCelda({ p, disabled, onGuardar }) {
+  const [v, setV] = useState(p.precio_unitario ?? '');
+  useEffect(() => { setV(p.precio_unitario ?? ''); }, [p.precio_unitario]);
+  return <InputDinero disabled={disabled} value={v} placeholder="Precio unit." onChange={e => setV(e.target.value)}
+    onBlur={() => onGuardar(p, 'precio_unitario', v)} style={{ ...inp, width: 110, textAlign: 'right' }} />;
+}
+
+function Modal({ titulo, onCerrar, children, ancho = 460 }) {
+  return (
+    <div onClick={onCerrar} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: '1.25rem', width: '100%', maxWidth: ancho, maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>{titulo}</div>
+        {children}
+      </div>
+    </div>
+  );
+}
+const lbl = { fontSize: 12, color: '#555', display: 'block', marginBottom: 3 };
+
+// ------------------------------------------------------------------ Costos
+function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, tope, permisos, isMobile, onCambio }) {
+  const [modalContrato, setModalContrato] = useState(false);
+  const [asignando, setAsignando] = useState(null);
+  const [pagando, setPagando] = useState(null);
+  const [abiertos, setAbiertos] = useState({});
+  const [topeTxt, setTopeTxt] = useState(tope === null ? '' : String(tope));
+  useEffect(() => { setTopeTxt(tope === null ? '' : String(tope)); }, [tope]);
+
+  const presPartida = (p) => (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0);
+  const contratoDe = (id) => contratos.find(c => c.id === id);
+  const nombreContratista = (c) => contratistas.find(x => x.id === c.contratista_id)?.nombre || 'Contratista';
+  const esFijo = (c) => c?.tipo === 'monto_fijo';
+
+  const datos = useMemo(() => {
+    const porContrato = contratos.map(c => {
+      const ps = partidas.filter(p => p.contrato_id === c.id);
+      const total = esFijo(c) ? Number(c.monto_fijo || 0) : ps.reduce((t, p) => t + presPartida(p), 0);
+      const avance = ps.length ? resumen(ps, progMap, null).real : 0;
+      const devengado = esFijo(c) ? total * avance / 100 : ps.reduce((t, p) => t + presPartida(p) * Number(p.avance_pct || 0) / 100, 0);
+      const pgs = pagos.filter(x => x.contrato_id === c.id);
+      const pagado = pgs.reduce((t, x) => t + Number(x.monto || 0), 0);
+      return { c, ps, total, avance, devengado, pagado, pagos: pgs };
+    });
+    const libres = partidas.filter(p => !p.contrato_id);
+    const presLibres = libres.reduce((t, p) => t + presPartida(p), 0);
+    const devLibres = libres.reduce((t, p) => t + presPartida(p) * Number(p.avance_pct || 0) / 100, 0);
+    const presupuesto = porContrato.reduce((t, x) => t + x.total, 0) + presLibres;
+    const devengado = porContrato.reduce((t, x) => t + x.devengado, 0) + devLibres;
+    const pagado = porContrato.reduce((t, x) => t + x.pagado, 0);
+    return { porContrato, libres, presLibres, presupuesto, devengado, pagado };
+  }, [partidas, contratos, pagos, progMap]); // eslint-disable-line
+
+  const fijarTope = async (valor) => {
+    const v = valor === '' || valor === null ? null : Number(valor);
+    const { error } = await supabase.from('obra_torres').update({ presupuesto_tope: v }).eq('id', torre.id);
+    if (error) { alert('No se pudo fijar el tope: ' + error.message); setTopeTxt(tope === null ? '' : String(tope)); return; }
+    onCambio();
+  };
+  const verComprobante = async (path) => {
+    const { data } = await supabase.storage.from('obra').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+  const eliminarPago = async (pg) => {
+    if (!window.confirm(`¿Eliminar el pago de ${$(pg.monto)} del ${fechaCorta(pg.fecha)}?`)) return;
+    const { error } = await supabase.from('obra_pagos').delete().eq('id', pg.id);
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    if (pg.comprobante_path) await supabase.storage.from('obra').remove([pg.comprobante_path]);
+    onCambio();
+  };
+  const eliminarContrato = async (c) => {
+    if (!window.confirm('¿Eliminar este contrato? Sus partidas quedan sin contratista y se borran sus pagos registrados.')) return;
+    const { error } = await supabase.from('obra_contratos').delete().eq('id', c.id);
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    onCambio();
+  };
+
+  const disponible = tope === null ? null : tope - datos.presupuesto;
+  const tarjetas = [
+    ['Presupuesto cargado', $(datos.presupuesto), tope === null ? 'sin tope fijado' : `tope ${$(tope)}`, '#1a1a2e'],
+    ['Disponible del tope', disponible === null ? '—' : $(disponible), disponible === null ? 'fija un tope para controlarlo' : 'lo que aún se puede cargar', disponible !== null && disponible < 0 ? '#C0392B' : '#1a1a2e'],
+    ['Devengado (por avance)', $(datos.devengado), 'avance real × presupuesto', '#1a1a2e'],
+    ['Pagado', $(datos.pagado), `${pagos.length} pagos`, '#1a1a2e'],
+    ['Por pagar del devengado', $(datos.devengado - datos.pagado), datos.pagado > datos.devengado ? 'pagado por encima del avance (anticipo)' : 'avance sin pagar', datos.pagado > datos.devengado ? '#B45309' : '#1a1a2e'],
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
+        {tarjetas.map(([t, v, sub, color]) => <Tarjeta key={t} titulo={t} valor={v} sub={sub} color={color} />)}
+      </div>
+
+      <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, padding: 12, marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Tope de presupuesto autorizado</div>
+        <InputDinero disabled={!permisos.tope} value={topeTxt} placeholder="Sin tope" onChange={e => setTopeTxt(e.target.value)} style={{ ...inp, width: 150, textAlign: 'right' }} />
+        {permisos.tope && <button onClick={() => fijarTope(topeTxt)} style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none' }}>Fijar tope</button>}
+        {permisos.tope && tope !== null && <button onClick={() => fijarTope(null)} style={btn}>Quitar tope</button>}
+        <div style={{ fontSize: 11, color: '#888', flex: '1 1 260px' }}>
+          Construcción no puede cargar precios ni contratos que hagan que el presupuesto de la torre rebase este tope.{!permisos.tope ? ' Solo quien tenga permiso lo fija.' : ''}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontSize: 14, fontWeight: 700 }}>Contratos por contratista</div>
+        {permisos.costos && <button onClick={() => setModalContrato(true)} style={{ ...btn, background: '#C0203A', color: '#fff', border: 'none' }}>+ Contrato</button>}
+      </div>
+      {datos.porContrato.length === 0 && <div style={{ color: '#888', fontSize: 13, marginBottom: 12 }}>Aún no hay contratos. Las partidas se presupuestan con su precio unitario (pestaña Catálogo); un contrato las agrupa con un contratista para controlar lo que se le paga.</div>}
+      {datos.porContrato.map(({ c, ps, total, avance, devengado, pagado, pagos: pgs }) => {
+        const abierto = !!abiertos[c.id];
+        return (
+          <div key={c.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, marginBottom: 10, overflow: 'hidden' }}>
+            <div onClick={() => setAbiertos(a => ({ ...a, [c.id]: !a[c.id] }))} style={{ padding: '12px 14px', cursor: 'pointer', display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>▶</span>
+              <div style={{ minWidth: 180, flex: '1 1 200px' }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>{nombreContratista(c)}</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{c.concepto || 'Sin concepto'} · {esFijo(c) ? 'monto fijo' : 'precios unitarios'} · {ps.length} partidas{c.estatus === 'cerrado' ? ' · cerrado' : ''}</div>
+              </div>
+              <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Contrato</div><b>{$(total)}</b></div>
+              <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Avance</div><b>{pct1(avance)}</b></div>
+              <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Devengado</div><b>{$(devengado)}</b></div>
+              <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Pagado</div><b>{$(pagado)}</b></div>
+              <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Saldo del contrato</div><b style={{ color: total - pagado > 0 ? '#1a1a2e' : '#10B981' }}>{$(total - pagado)}</b></div>
+            </div>
+            {abierto && (
+              <div style={{ padding: '0 14px 14px', borderTop: '0.5px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', gap: 8, margin: '10px 0', flexWrap: 'wrap' }}>
+                  {permisos.pagos && <button onClick={() => setPagando(c)} style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none' }}>+ Registrar pago</button>}
+                  {permisos.costos && <button onClick={() => setAsignando(c)} style={btn}>Asignar partidas</button>}
+                  {permisos.costos && <button onClick={() => eliminarContrato(c)} style={{ ...btn, color: '#C0392B' }}>Eliminar contrato</button>}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Pagos</div>
+                {pgs.length === 0 ? <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Sin pagos registrados.</div> : pgs.map(pg => (
+                  <div key={pg.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '4px 0', borderBottom: '0.5px solid #f5f5f5', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ width: 70 }}>{fechaCorta(pg.fecha)}</span><b style={{ width: 110 }}>{$(pg.monto)}</b><span style={{ flex: 1, color: '#555' }}>{pg.concepto || ''}</span>
+                    <span style={{ color: '#aaa' }}>{pg.registrado_por || ''}</span>
+                    {pg.comprobante_path && <button onClick={() => verComprobante(pg.comprobante_path)} style={{ ...btn, padding: '2px 8px', color: '#3B82F6' }}>📎 Comprobante</button>}
+                    {permisos.pagos && <button onClick={() => eliminarPago(pg)} style={{ ...btn, padding: '2px 8px', color: '#C0392B' }}>Eliminar</button>}
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, fontWeight: 700, margin: '10px 0 4px' }}>Partidas del contrato</div>
+                {ps.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Sin partidas asignadas.</div> : ps.map(p => (
+                  <div key={p.id} style={{ display: 'flex', gap: 10, fontSize: 12, padding: '3px 0', color: '#555' }}>
+                    <span style={{ flex: 1 }}>{p.descripcion} <span style={{ color: '#aaa' }}>· {p.etapa}</span></span>
+                    <span style={{ width: 60, textAlign: 'right' }}>{pct1(p.avance_pct)}</span>
+                    {!esFijo(c) && <span style={{ width: 110, textAlign: 'right' }}>{$(presPartida(p))}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div style={{ background: '#fff', border: '0.5px dashed #ccc', borderRadius: 12, padding: '10px 14px', fontSize: 12, color: '#555' }}>
+        <b>Sin contratista:</b> {datos.libres.length} partidas · presupuesto {$(datos.presLibres)} (por precio unitario).
+      </div>
+
+      {modalContrato && <ModalContrato torre={torre} contratistas={contratistas} onCerrar={() => setModalContrato(false)} onCreado={() => { setModalContrato(false); onCambio(); }} />}
+      {asignando && <ModalAsignar contrato={asignando} partidas={partidas} onCerrar={() => setAsignando(null)} onGuardado={() => { setAsignando(null); onCambio(); }} />}
+      {pagando && <ModalPago contrato={pagando} total={datos.porContrato.find(x => x.c.id === pagando.id)?.total || 0} pagado={datos.porContrato.find(x => x.c.id === pagando.id)?.pagado || 0}
+        onCerrar={() => setPagando(null)} onGuardado={() => { setPagando(null); onCambio(); }} />}
+    </div>
+  );
+}
+
+function ModalContrato({ torre, contratistas, onCerrar, onCreado }) {
+  const [contratistaId, setContratistaId] = useState('');
+  const [nuevoNombre, setNuevoNombre] = useState('');
+  const [telefono, setTelefono] = useState('');
+  const [concepto, setConcepto] = useState('');
+  const [tipo, setTipo] = useState('precio_unitario');
+  const [monto, setMonto] = useState('');
+  const [guardando, setGuardando] = useState(false);
+
+  const guardar = async () => {
+    if (!contratistaId || (contratistaId === '__nuevo' && !nuevoNombre.trim())) { alert('Elige un contratista o escribe el nombre del nuevo.'); return; }
+    if (tipo === 'monto_fijo' && !(Number(monto) > 0)) { alert('Captura el monto del contrato.'); return; }
+    setGuardando(true);
+    try {
+      let cid = contratistaId;
+      if (contratistaId === '__nuevo') {
+        const { data, error } = await supabase.from('obra_contratistas').insert({ nombre: nuevoNombre.trim(), telefono: telefono.trim() || null }).select().single();
+        if (error) throw error;
+        cid = data.id;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase.from('obra_contratos').insert({
+        torre_id: torre.id, contratista_id: cid, concepto: concepto.trim() || null, tipo,
+        monto_fijo: tipo === 'monto_fijo' ? Number(monto) : null, creado_por: user?.email || null,
+      });
+      if (error) throw error;
+      onCreado();
+    } catch (e) { alert('No se pudo crear el contrato: ' + (e.message || e)); }
+    setGuardando(false);
+  };
+
+  return (
+    <Modal titulo="Nuevo contrato" onCerrar={onCerrar}>
+      <label style={lbl}>Contratista</label>
+      <select value={contratistaId} onChange={e => setContratistaId(e.target.value)} style={{ ...inp, width: '100%', marginBottom: 8 }}>
+        <option value="">Selecciona...</option>
+        {contratistas.filter(c => c.activo).map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        <option value="__nuevo">+ Contratista nuevo</option>
+      </select>
+      {contratistaId === '__nuevo' && (<>
+        <input placeholder="Nombre del contratista" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} style={{ ...inp, width: '100%', marginBottom: 6 }} />
+        <input placeholder="Teléfono (opcional)" value={telefono} onChange={e => setTelefono(e.target.value)} style={{ ...inp, width: '100%', marginBottom: 8 }} />
+      </>)}
+      <label style={lbl}>Concepto (qué hace en la obra)</label>
+      <input value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Ej. Albañilería de niveles 1 y 2" style={{ ...inp, width: '100%', marginBottom: 8 }} />
+      <label style={lbl}>Forma de pago</label>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 13 }}>
+        <label><input type="radio" checked={tipo === 'precio_unitario'} onChange={() => setTipo('precio_unitario')} /> Por precios unitarios</label>
+        <label><input type="radio" checked={tipo === 'monto_fijo'} onChange={() => setTipo('monto_fijo')} /> Monto fijo</label>
+      </div>
+      {tipo === 'monto_fijo' && (<>
+        <label style={lbl}>Monto del contrato</label>
+        <InputDinero value={monto} onChange={e => setMonto(e.target.value)} placeholder="0.00" style={{ ...inp, width: '100%', marginBottom: 8, textAlign: 'right' }} />
+      </>)}
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>
+        {tipo === 'precio_unitario' ? 'El monto del contrato es la suma de cantidad × precio unitario de las partidas que le asignes.' : 'El monto fijo reemplaza el presupuesto de las partidas que le asignes.'} Después asigna las partidas.
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={guardar} disabled={guardando} style={{ ...btn, flex: 1, background: '#C0203A', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Crear contrato'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ModalAsignar({ contrato, partidas, onCerrar, onGuardado }) {
+  const [sel, setSel] = useState(() => new Set(partidas.filter(p => p.contrato_id === contrato.id).map(p => p.id)));
+  const [filtro, setFiltro] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const disponibles = partidas.filter(p => (!p.contrato_id || p.contrato_id === contrato.id) && (!filtro || p.etapa === filtro));
+  const etapas = [...new Set(partidas.map(p => p.etapa))];
+  const alternar = (id) => setSel(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  const guardar = async () => {
+    setGuardando(true);
+    const antes = new Set(partidas.filter(p => p.contrato_id === contrato.id).map(p => p.id));
+    const agregar = [...sel].filter(id => !antes.has(id));
+    const quitar = [...antes].filter(id => !sel.has(id));
+    try {
+      for (let i = 0; i < agregar.length; i += 50) {
+        const { error } = await supabase.from('obra_partidas').update({ contrato_id: contrato.id }).in('id', agregar.slice(i, i + 50));
+        if (error) throw error;
+      }
+      for (let i = 0; i < quitar.length; i += 50) {
+        const { error } = await supabase.from('obra_partidas').update({ contrato_id: null }).in('id', quitar.slice(i, i + 50));
+        if (error) throw error;
+      }
+      onGuardado();
+    } catch (e) { alert('No se pudo guardar: ' + (e.message || e)); setGuardando(false); }
+  };
+
+  return (
+    <Modal titulo="Asignar partidas al contrato" onCerrar={onCerrar} ancho={620}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <select value={filtro} onChange={e => setFiltro(e.target.value)} style={inp}>
+          <option value="">Todas las etapas</option>
+          {etapas.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <span style={{ fontSize: 11, color: '#888' }}>{sel.size} seleccionadas · solo se muestran partidas libres o de este contrato</span>
+      </div>
+      <div style={{ maxHeight: '50vh', overflowY: 'auto', border: '0.5px solid #eee', borderRadius: 8 }}>
+        {disponibles.map(p => (
+          <label key={p.id} style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '0.5px solid #f5f5f5', fontSize: 12, alignItems: 'center', cursor: 'pointer' }}>
+            <input type="checkbox" checked={sel.has(p.id)} onChange={() => alternar(p.id)} />
+            <span style={{ flex: 1 }}>{p.descripcion} <span style={{ color: '#aaa' }}>· {p.etapa}</span></span>
+            <span style={{ color: '#888' }}>{p.cantidad > 0 ? `${fmtN(p.cantidad)} ${p.unidad || ''}` : ''}</span>
+            {p.cantidad > 0 && p.precio_unitario > 0 && <span style={{ width: 100, textAlign: 'right' }}>{$(p.cantidad * p.precio_unitario)}</span>}
+          </label>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={guardar} disabled={guardando} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Guardar asignación'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ModalPago({ contrato, total, pagado, onCerrar, onGuardado }) {
+  const [fecha, setFecha] = useState(hoyISO());
+  const [monto, setMonto] = useState('');
+  const [concepto, setConcepto] = useState('');
+  const [archivo, setArchivo] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const disponible = total - pagado;
+
+  const guardar = async () => {
+    const m = Number(monto);
+    if (!(m > 0)) { alert('Captura el monto del pago.'); return; }
+    if (m > disponible + 0.001) { alert(`El pago (${$(m)}) excede lo que falta por pagar del contrato (${$(disponible)}).`); return; }
+    setGuardando(true);
+    let path = null;
+    try {
+      if (archivo) {
+        const limpio = archivo.name.replace(/[^\w.\-]+/g, '_');
+        path = `${contrato.id}/${Date.now()}_${limpio}`;
+        const { error: eu } = await supabase.storage.from('obra').upload(path, archivo);
+        if (eu) throw eu;
+      }
+      const { error } = await supabase.from('obra_pagos').insert({ contrato_id: contrato.id, fecha, monto: m, concepto: concepto.trim() || null, comprobante_path: path });
+      if (error) { if (path) await supabase.storage.from('obra').remove([path]); throw error; }
+      onGuardado();
+    } catch (e) { alert('No se pudo registrar el pago: ' + (e.message || e)); setGuardando(false); }
+  };
+
+  return (
+    <Modal titulo="Registrar pago" onCerrar={onCerrar}>
+      <div style={{ fontSize: 12, color: '#555', marginBottom: 10 }}>Contrato {$(total)} · pagado {$(pagado)} · <b>por pagar {$(disponible)}</b></div>
+      <label style={lbl}>Fecha</label>
+      <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...inp, width: '100%', marginBottom: 8 }} />
+      <label style={lbl}>Monto</label>
+      <InputDinero value={monto} onChange={e => setMonto(e.target.value)} placeholder="0.00" style={{ ...inp, width: '100%', marginBottom: 8, textAlign: 'right' }} />
+      <label style={lbl}>Concepto</label>
+      <input value={concepto} onChange={e => setConcepto(e.target.value)} placeholder="Ej. Estimación 3" style={{ ...inp, width: '100%', marginBottom: 8 }} />
+      <label style={lbl}>Comprobante (opcional)</label>
+      <input type="file" onChange={e => setArchivo(e.target.files?.[0] || null)} style={{ fontSize: 12, marginBottom: 12 }} />
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={guardar} disabled={guardando} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Registrar pago'}</button>
+      </div>
+    </Modal>
   );
 }

@@ -100,7 +100,7 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
   if (miRol === 'Construcción') return id === 'construccion' || id === 'obra_torres';
-  if (miRol === 'Tesorería') return id === 'cobranza';
+  if (miRol === 'Tesorería') return id === 'cobranza' || id === 'obra_torres';
   if (miRol === 'Titulación') return id === 'titulacion';
   // Gerente Operador — Dashboard (de sus desarrollos), Movimientos, Historial,
   // Titulación (solo ver) y Tendencias.
@@ -232,6 +232,9 @@ export const ACCIONES = [
   { id: 'construccion.marcar_lista_avaluo', seccion: 'Construcción', label: 'Marcar "Lista para avalúo"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
   { id: 'construccion.capturar_avance_obra', seccion: 'Construcción', label: 'Obra por torre: capturar el avance (%) de las partidas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
   { id: 'construccion.editar_obra', seccion: 'Construcción', label: 'Obra por torre: editar catálogo, programa y fecha de arranque', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.editar_costos_obra', seccion: 'Construcción', label: 'Obra por torre: capturar precios, contratistas y contratos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.registrar_pagos_obra', seccion: 'Construcción', label: 'Obra por torre: registrar pagos a contratistas', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
+  { id: 'construccion.fijar_tope_obra', seccion: 'Construcción', label: 'Obra por torre: fijar el tope de presupuesto', defecto: roles('Super Admin', 'Admin') },
 
   // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
   { id: 'marketing.marcar_atendido', seccion: 'Marketing', label: 'Marcar un lead como atendido', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
