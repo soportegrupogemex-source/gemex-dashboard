@@ -3,12 +3,14 @@ import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
 import {
   resumen, progPct, Barra, Tarjeta, traerTodo, useIsMobile, parse, hoyISO, fechaCorta, pct1, $,
-  indexar, hojasDe, etapasDe, rutaDe, TIPOS_FRENTE, nombreFrente, TOLERANCIA, fechaDe,
+  indexar, hojasDe, etapasDe, rutaDe, TIPOS_FRENTE, nombreFrente, TOLERANCIA, fechaDe, curvaS,
 } from './ObraTorres';
 
 // Dashboard de obra — una sola hoja con el avance real contra el programado de cada proyecto.
 // Solo aparecen los proyectos que tienen al menos un frente con programa capturado
 // (un desarrollo de pura comercialización no trae obra y no aparece).
+const SERIE_REAL = '#2a78d6';
+const SERIE_PROG = '#eb6834';
 const VERDE = '#10B981';
 const ROJO = '#C0392B';
 const sel = { padding: '6px 8px', border: '0.5px solid #ddd', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' };
@@ -25,6 +27,90 @@ function EstadoChip({ f }) {
   if (f.r.atrasadas > 0 && f.desv < -TOLERANCIA) return <Chip color={ROJO} fondo="#FDECEC">Atrasado</Chip>;
   if (f.r.real >= 100) return <Chip color="#27500A" fondo="#EAF3DE">Terminado</Chip>;
   return <Chip color="#27500A" fondo="#EAF3DE">En tiempo</Chip>;
+}
+
+
+// Curva S: avance real contra programado semana a semana. Dos series en un solo eje (0-100%),
+// leyenda siempre, etiquetas directas al final de cada línea, tooltip al pasar y vista de tabla.
+function CurvaS({ curva }) {
+  const [hover, setHover] = useState(null);
+  const [tabla, setTabla] = useState(false);
+  const W = 680, H = 230, ML = 38, MR = 74, MT = 14, MB = 26;
+  const xMax = Math.max(curva.maxSem, curva.proy ? Math.min(curva.proy.semFin, curva.maxSem * 1.6) : 0);
+  const X = (w) => ML + (w / xMax) * (W - ML - MR);
+  const Y = (v) => MT + (1 - v / 100) * (H - MT - MB);
+  const pts = (arr) => arr.map(([w, v]) => `${X(w).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
+  const prog = curva.filas.map(f => [f.w, f.prog]);
+  const real = curva.filas.filter(f => f.real !== null && f.w <= curva.xHoy).map(f => [f.w, f.real]);
+  if (curva.realHoy !== null && curva.xHoy >= 0) real.push([Math.min(curva.xHoy, curva.maxSem), curva.realHoy]);
+  const ultimo = real[real.length - 1];
+  const paso = Math.max(1, Math.ceil(curva.maxSem / 8));
+  const ticks = []; for (let w = 0; w <= xMax; w += paso) ticks.push(w);
+  const sobre = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * W;
+    setHover(Math.max(0, Math.min(curva.maxSem, Math.round(((x - ML) / (W - ML - MR)) * xMax))));
+  };
+  const hf = hover !== null ? curva.filas[hover] : null;
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>Curva S · avance acumulado</div>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}><span style={{ width: 16, height: 2, background: SERIE_REAL, display: 'inline-block' }} />Avance real</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}><span style={{ width: 16, borderTop: `2px dashed ${SERIE_PROG}`, display: 'inline-block' }} />Programado</span>
+        <button onClick={() => setTabla(t => !t)} style={{ ...sel, padding: '2px 8px', background: '#fff', cursor: 'pointer', color: '#555', marginLeft: 'auto' }}>{tabla ? 'Ver gráfica' : 'Ver tabla'}</button>
+      </div>
+      {curva.proy ? (
+        <div style={{ fontSize: 11, color: '#555', marginBottom: 6 }}>
+          Al ritmo actual terminaría el <b>{fechaCorta(curva.proy.fecha)} {parse(curva.proy.fecha).getFullYear()}</b>
+          {Math.abs(curva.proy.difSem) < 0.5 ? ', en la fecha programada' : curva.proy.difSem > 0 ? `, unas ${Math.round(curva.proy.difSem)} semanas después de lo programado` : `, unas ${Math.round(-curva.proy.difSem)} semanas antes de lo programado`}.
+        </div>
+      ) : <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>{curva.realHoy > 0 ? '' : 'Sin avance registrado todavía: la proyección aparece en cuanto haya avance.'}</div>}
+      {tabla ? (
+        <div style={{ maxHeight: 240, overflow: 'auto', border: '0.5px solid #eee', borderRadius: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+            <thead><tr style={{ background: '#f7f7f9', textAlign: 'right' }}><th style={{ textAlign: 'left', padding: '4px 8px' }}>Semana</th><th style={{ padding: '4px 8px' }}>Fin de semana</th><th style={{ padding: '4px 8px' }}>Programado</th><th style={{ padding: '4px 8px' }}>Real</th></tr></thead>
+            <tbody>{curva.filas.map(f => (
+              <tr key={f.w} style={{ borderTop: '0.5px solid #f3f3f3', textAlign: 'right' }}>
+                <td style={{ textAlign: 'left', padding: '3px 8px' }}>{f.w === 0 ? 'Arranque' : `S${f.w}`}</td><td style={{ padding: '3px 8px' }}>{f.fecha ? fechaCorta(f.fecha) : '—'}</td>
+                <td style={{ padding: '3px 8px' }}>{pct1(f.prog)}</td><td style={{ padding: '3px 8px' }}>{f.real === null ? '—' : pct1(f.real)}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Curva S de avance real contra programado">
+            {[0, 25, 50, 75, 100].map(v => (
+              <g key={v}><line x1={ML} x2={W - MR} y1={Y(v)} y2={Y(v)} stroke="#ececef" strokeWidth="1" />
+                <text x={ML - 6} y={Y(v) + 3} textAnchor="end" fontSize="10" fill="#888">{v}%</text></g>
+            ))}
+            {ticks.map(w => <text key={w} x={X(w)} y={H - 8} textAnchor="middle" fontSize="10" fill="#888">{w === 0 ? '0' : `S${w}`}</text>)}
+            {curva.xHoy >= 0 && curva.xHoy <= curva.maxSem && (
+              <g><line x1={X(curva.xHoy)} x2={X(curva.xHoy)} y1={MT} y2={H - MB} stroke="#c9c9cf" strokeWidth="1" />
+                <text x={X(curva.xHoy)} y={MT - 3} textAnchor="middle" fontSize="9" fill="#888">hoy</text></g>
+            )}
+            <polyline points={pts(prog)} fill="none" stroke={SERIE_PROG} strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" />
+            {curva.proy && ultimo && <polyline points={pts([ultimo, [Math.min(curva.proy.semFin, xMax), 100]])} fill="none" stroke={SERIE_REAL} strokeOpacity="0.45" strokeWidth="2" strokeDasharray="2 4" strokeLinecap="round" />}
+            {real.length > 1 && <polyline points={pts(real)} fill="none" stroke={SERIE_REAL} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
+            {ultimo && <circle cx={X(ultimo[0])} cy={Y(ultimo[1])} r="4.5" fill={SERIE_REAL} stroke="#fff" strokeWidth="2" />}
+            <text x={W - MR + 6} y={Y(prog[prog.length - 1][1]) + 3} fontSize="10" fill="#555">Programado</text>
+            {ultimo && <text x={Math.min(X(ultimo[0]) + 8, W - 40)} y={Y(ultimo[1]) - 8} fontSize="10" fill="#555">{pct1(ultimo[1])}</text>}
+            {hf && <g><line x1={X(hf.w)} x2={X(hf.w)} y1={MT} y2={H - MB} stroke="#9a9aa2" strokeWidth="1" />
+              <circle cx={X(hf.w)} cy={Y(hf.prog)} r="4" fill={SERIE_PROG} stroke="#fff" strokeWidth="2" />
+              {hf.real !== null && <circle cx={X(hf.w)} cy={Y(hf.real)} r="4" fill={SERIE_REAL} stroke="#fff" strokeWidth="2" />}</g>}
+            <rect x={ML} y={MT} width={W - ML - MR} height={H - MT - MB} fill="transparent" onMouseMove={sobre} onMouseLeave={() => setHover(null)} />
+          </svg>
+          {hf && (
+            <div style={{ position: 'absolute', top: 6, left: `${Math.min(80, (X(hf.w) / W) * 100 + 2)}%`, background: '#fff', border: '0.5px solid #ddd', borderRadius: 8, padding: '6px 10px', fontSize: 11, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>{hf.w === 0 ? 'Arranque' : `Semana ${hf.w} · ${fechaCorta(hf.fecha)}`}</div>
+              <div style={{ color: '#555' }}>Programado: <b>{pct1(hf.prog)}</b></div>
+              <div style={{ color: '#555' }}>Real: <b>{hf.real === null ? '—' : pct1(hf.real)}</b></div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
@@ -67,7 +153,9 @@ function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
         )}
       </div>
       {abierto && (
-        <div style={{ padding: '4px 14px 16px 40px', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+        <div style={{ padding: '4px 14px 16px 40px' }}>
+          {f.curva && <CurvaS curva={f.curva} />}
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 320px', minWidth: 280 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Avance por etapa</div>
             {f.etapas.map(e => (
@@ -94,6 +182,7 @@ function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
               </div>
             ))}
           </div>
+          </div>
         </div>
       )}
     </div>
@@ -106,21 +195,22 @@ export default function ObraDashboard() {
   const isMobile = useIsMobile();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [datos, setDatos] = useState({ torres: [], partidas: [], programa: [], contratos: [], pagos: [] });
+  const [datos, setDatos] = useState({ torres: [], partidas: [], programa: [], contratos: [], pagos: [], avances: [] });
   const [filtro, setFiltro] = useState('');
   const [abiertos, setAbiertos] = useState({});
 
   const cargar = useCallback(async () => {
     setCargando(true); setError('');
     try {
-      const [torres, partidas, programa, contratos, pagos] = await Promise.all([
+      const [torres, partidas, programa, contratos, pagos, avances] = await Promise.all([
         traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(id, nombre)').eq('es_plantilla', false).order('created_at')),
         traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, etapa, etapa_orden, orden, descripcion, avance_pct, cantidad, precio_unitario, terminada_en, contrato_id').order('id')),
         traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').order('partida_id').order('semana').order('dia')),
         verCostos ? traerTodo(() => supabase.from('obra_contratos').select('id, torre_id, tipo, monto_fijo').order('id')) : Promise.resolve([]),
         verCostos ? traerTodo(() => supabase.from('obra_pagos').select('contrato_id, monto').order('id')) : Promise.resolve([]),
+        traerTodo(() => supabase.from('obra_avance').select('partida_id, fecha, pct, created_at').order('partida_id').order('fecha').order('created_at')),
       ]);
-      setDatos({ torres, partidas, programa, contratos, pagos });
+      setDatos({ torres, partidas, programa, contratos, pagos, avances });
     } catch (e) { setError(e.message || String(e)); }
     setCargando(false);
   }, [verCostos]);
@@ -128,7 +218,9 @@ export default function ObraDashboard() {
 
   const hoy = hoyISO();
   const { proyectos, sinPrograma, global } = useMemo(() => {
-    const { torres, partidas, programa, contratos, pagos } = datos;
+    const { torres, partidas, programa, contratos, pagos, avances } = datos;
+    const hist = new Map();
+    avances.forEach(a => { if (!hist.has(a.partida_id)) hist.set(a.partida_id, []); hist.get(a.partida_id).push({ fecha: a.fecha, pct: a.pct }); });
     const progMap = new Map();
     programa.forEach(x => { if (!progMap.has(x.partida_id)) progMap.set(x.partida_id, []); progMap.get(x.partida_id).push({ semana: x.semana, dia: x.dia }); });
     const porTorre = new Map();
@@ -166,7 +258,8 @@ export default function ObraDashboard() {
       const presupuesto = fijos.reduce((s, c) => s + Number(c.monto_fijo || 0), 0) +
         hojas.filter(p => contratoTorre.get(p.contrato_id)?.tipo !== 'monto_fijo').reduce((s, p) => s + (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0), 0);
       const pagado = susContratos.reduce((s, c) => s + (pagadoPorContrato.get(c.id) || 0), 0);
-      frentes.push({ t, hojas, r, desv, etapas, atrasadas, semanaTxt, terminaTxt, presupuesto, pagado, arr });
+      const curva = arr ? curvaS(hojas, progMap, hist, arr, hoy) : null;
+      frentes.push({ t, hojas, r, desv, etapas, atrasadas, semanaTxt, terminaTxt, presupuesto, pagado, arr, curva });
     });
 
     const grupos = new Map();

@@ -19,7 +19,7 @@ const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0
 export const parse = (s) => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
 export const hoyISO = () => iso(new Date());
 const lunesDe = (s) => { const d = parse(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
-const sumaDias = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
+export const sumaDias = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
 export const fechaDe = (arranque, semana, dia) => sumaDias(arranque, (semana - 1) * 7 + (dia - 1));
 export const fechaCorta = (s) => { const d = parse(s); return `${d.getDate()} ${MESES[d.getMonth()]}`; };
 const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
@@ -101,6 +101,41 @@ export function Tarjeta({ titulo, valor, sub, color = '#1a1a2e' }) {
       {sub && <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>{sub}</div>}
     </div>
   );
+}
+
+// Curva S de un frente: avance programado y real semana a semana (en % ponderado como en resumen()),
+// más la proyección de término al ritmo actual. hist = Map(partida_id -> [{fecha, pct}] ordenado).
+export function curvaS(hojas, prog, hist, arr, hoy) {
+  const usa = hojas.some(p => Number(p.precio_unitario) > 0) && hojas.every(p => !(Number(p.cantidad) > 0) || Number(p.precio_unitario) > 0);
+  const peso = (p) => (usa ? (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0) : Math.max((prog.get(p.id) || []).length, 1));
+  let maxSem = 0;
+  hojas.forEach(p => (prog.get(p.id) || []).forEach(x => { if (x.semana > maxSem) maxSem = x.semana; }));
+  const wTot = hojas.reduce((t, p) => t + peso(p), 0);
+  if (!arr || maxSem === 0 || wTot === 0) return null;
+  const xHoy = (parse(hoy) - parse(arr)) / 86400000 / 7;
+  const pctEn = (p, fecha) => {
+    let v = 0;
+    for (const h of (hist.get(p.id) || [])) { if (h.fecha <= fecha) v = Number(h.pct); else break; }
+    return v;
+  };
+  const filas = [];
+  for (let w = 0; w <= maxSem; w++) {
+    let pg = 0, rl = 0;
+    const fin = w >= 1 ? fechaDe(arr, w, 7) : null;
+    hojas.forEach(p => {
+      const dias = prog.get(p.id) || [];
+      if (dias.length) pg += peso(p) * (dias.filter(x => x.semana <= w).length / dias.length) * 100;
+      if (fin) rl += peso(p) * pctEn(p, fin);
+    });
+    filas.push({ w, fecha: fin, prog: pg / wTot, real: xHoy >= w ? rl / wTot : null });
+  }
+  const realHoy = xHoy >= 0 ? hojas.reduce((t, p) => t + peso(p) * Number(p.avance_pct || 0), 0) / wTot : null;
+  let proy = null;
+  if (xHoy > 0 && realHoy > 0 && realHoy < 100) {
+    const semFin = (xHoy * 100) / realHoy;
+    proy = { semFin, fecha: sumaDias(hoy, Math.round((semFin - xHoy) * 7)), difSem: semFin - maxSem };
+  }
+  return { filas, maxSem, xHoy, realHoy, proy };
 }
 
 // % programado de una partida a hoy (null si no tiene programa o falta fecha de arranque)
