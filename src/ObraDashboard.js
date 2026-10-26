@@ -5,6 +5,7 @@ import {
   resumen, progPct, Barra, Tarjeta, traerTodo, useIsMobile, parse, hoyISO, fechaCorta, pct1, $,
   indexar, hojasDe, etapasDe, rutaDe, TIPOS_FRENTE, nombreFrente, TOLERANCIA, fechaDe, curvaS,
 } from './ObraTorres';
+import { exportarExcel, exportarPdf } from './obraReportes';
 
 // Dashboard de obra — una sola hoja con el avance real contra el programado de cada proyecto.
 // Solo aparecen los proyectos que tienen al menos un frente con programa capturado
@@ -249,17 +250,18 @@ export default function ObraDashboard() {
         terminaTxt = `Termina prog. ${fechaCorta(fechaDe(arr, maxSem, maxDia))}`;
       }
       const etapas = etapasDe(ps).map(e => ({ nombre: e.nombre, r: resumen(e.raices.flatMap(x => hojasDe(x, hijos)), progMap, arr) }));
-      const atrasadas = hojas.map(p => ({ p, pp: progPct(p.id, progMap, arr, hoy) }))
+      const todasAtrasadas = hojas.map(p => ({ p, pp: progPct(p.id, progMap, arr, hoy) }))
         .filter(x => x.pp !== null && Number(x.p.avance_pct) < x.pp - TOLERANCIA)
-        .sort((a, b) => (b.pp - Number(b.p.avance_pct)) - (a.pp - Number(a.p.avance_pct))).slice(0, 8)
+        .sort((a, b) => (b.pp - Number(b.p.avance_pct)) - (a.pp - Number(a.p.avance_pct)))
         .map(x => ({ ...x, ruta: rutaDe(x.p, porId) }));
+      const atrasadas = todasAtrasadas.slice(0, 8);
       const susContratos = contratos.filter(c => c.torre_id === t.id);
       const fijos = susContratos.filter(c => c.tipo === 'monto_fijo');
       const presupuesto = fijos.reduce((s, c) => s + Number(c.monto_fijo || 0), 0) +
         hojas.filter(p => contratoTorre.get(p.contrato_id)?.tipo !== 'monto_fijo').reduce((s, p) => s + (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0), 0);
       const pagado = susContratos.reduce((s, c) => s + (pagadoPorContrato.get(c.id) || 0), 0);
       const curva = arr ? curvaS(hojas, progMap, hist, arr, hoy) : null;
-      frentes.push({ t, hojas, r, desv, etapas, atrasadas, semanaTxt, terminaTxt, presupuesto, pagado, arr, curva });
+      frentes.push({ t, hojas, r, desv, etapas, atrasadas, todasAtrasadas, semanaTxt, terminaTxt, presupuesto, pagado, arr, curva });
     });
 
     const grupos = new Map();
@@ -300,6 +302,10 @@ export default function ObraDashboard() {
             {proyectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
           </select>
           <button onClick={cargar} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>Actualizar</button>
+          {visibles.length > 0 && (<>
+            <button onClick={() => exportarExcel(visibles, verCostos)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>Excel</button>
+            <button onClick={() => exportarPdf(visibles, rg, verCostos)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>PDF</button>
+          </>)}
         </div>
       </div>
 
