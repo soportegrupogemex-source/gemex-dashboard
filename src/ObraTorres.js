@@ -1111,7 +1111,7 @@ function ModalRango({ p, arr, onCerrar, onGuardado }) {
 
 // Agrega una partida (sin padre: elige etapa) o una subpartida (con padre).
 function ModalPartida({ torre, partidas, hijos, etapas, padre, etapaInicial, progMap, onCerrar, onCreada }) {
-  const [etapa, setEtapa] = useState(padre ? padre.etapa : (etapaInicial || (etapas[0]?.nombre || '')));
+  const [etapa, setEtapa] = useState(padre ? padre.etapa : (etapaInicial || (etapas[0]?.nombre || '__nueva')));
   const [etapaNueva, setEtapaNueva] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [unidad, setUnidad] = useState('');
