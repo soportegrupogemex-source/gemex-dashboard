@@ -25,7 +25,7 @@ const partirUnidad = (numero) => {
   return m ? { edificio: m[1].toUpperCase(), departamento: m[2] } : { edificio: '', departamento: String(numero || '') };
 };
 
-const cargarLogo = () => new Promise(resolve => {
+export const cargarLogo = () => new Promise(resolve => {
   const img = new Image();
   img.onload = () => {
     const c = document.createElement('canvas');

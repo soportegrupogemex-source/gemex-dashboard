@@ -236,6 +236,7 @@ export const ACCIONES = [
   { id: 'construccion.editar_costos_obra', seccion: 'Construcción', label: 'Programa: capturar precios, contratistas y contratos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
   { id: 'construccion.registrar_pagos_obra', seccion: 'Construcción', label: 'Programa: registrar pagos a contratistas', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
   { id: 'construccion.fijar_tope_obra', seccion: 'Construcción', label: 'Programa: fijar el tope de presupuesto', defecto: roles('Super Admin', 'Admin') },
+  { id: 'construccion.autorizar_estimaciones_obra', seccion: 'Construcción', label: 'Programa: autorizar estimaciones a contratistas', defecto: roles('Super Admin', 'Admin') },
 
   // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
   { id: 'marketing.marcar_atendido', seccion: 'Marketing', label: 'Marcar un lead como atendido', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },

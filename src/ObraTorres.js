@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
 import { fmtDinero, InputDinero } from './dinero';
+import { descargarEstimacionPdf } from './estimacionPdf';
 
 // Programa de obra — frentes (torres, trenes de viviendas…), partidas y subpartidas, catálogo de partidas de mano de obra, programa semanal y avance real (%).
 //  - Cada torre (Los Arrayanes, Torre L…) tiene una fecha de arranque (lunes de la semana 1);
@@ -194,7 +195,7 @@ function Modal({ titulo, onCerrar, children, ancho = 460 }) {
 const lbl = { fontSize: 12, color: '#555', display: 'block', marginBottom: 3 };
 
 // ------------------------------------------------------------------ Costos
-function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, tope, permisos, isMobile, onCambio }) {
+function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, estimaciones = [], tope, permisos, isMobile, onCambio }) {
   const [modalContrato, setModalContrato] = useState(false);
   const [asignando, setAsignando] = useState(null);
   const [pagando, setPagando] = useState(null);
@@ -250,6 +251,31 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, t
     onCambio();
   };
 
+  const [estimando, setEstimando] = useState(null);
+  const estimacionesDe = (c) => estimaciones.filter(e => e.contrato_id === c.id).sort((a, b) => a.numero - b.numero);
+  const generarEstimacion = async (c) => {
+    const nota = window.prompt('Nota de la estimación (opcional):', '');
+    if (nota === null) return;
+    setEstimando(c.id);
+    const { error } = await supabase.rpc('obra_generar_estimacion', { p_contrato: c.id, p_nota: nota || null });
+    setEstimando(null);
+    if (error) { alert('No se pudo generar la estimación: ' + error.message); return; }
+    onCambio();
+  };
+  const autorizarEstimacion = async (e) => {
+    if (!window.confirm(`¿Autorizar la estimación ${e.numero} por ${$(e.importe)}?`)) return;
+    const { error } = await supabase.rpc('obra_autorizar_estimacion', { p_id: e.id });
+    if (error) { alert('No se pudo autorizar: ' + error.message); return; }
+    onCambio();
+  };
+  const eliminarEstimacion = async (e) => {
+    if (!window.confirm(`¿Eliminar la estimación ${e.numero}?`)) return;
+    const { error } = await supabase.rpc('obra_eliminar_estimacion', { p_id: e.id });
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    onCambio();
+  };
+  const pdfEstimacion = (e, c, pagado) => descargarEstimacionPdf({ est: e, contrato: c, contratista: nombreContratista(c), frente: nombreFrente(torre), desarrollo: torre.desarrollos?.nombre, pagado });
+
   const disponible = tope === null ? null : tope - datos.presupuesto;
   const tarjetas = [
     ['Presupuesto cargado', $(datos.presupuesto), tope === null ? 'sin tope fijado' : `tope ${$(tope)}`, '#1a1a2e'],
@@ -294,6 +320,17 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, t
               <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Avance</div><b>{pct1(avance)}</b></div>
               <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Devengado</div><b>{$(devengado)}</b></div>
               <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Pagado</div><b>{$(pagado)}</b></div>
+              {(() => {
+                const aut = estimacionesDe(c).filter(e => e.estatus === 'autorizada').reduce((t, e) => t + Number(e.importe), 0);
+                const pend = estimacionesDe(c).some(e => e.estatus === 'pendiente');
+                return (
+                  <div style={{ fontSize: 12, textAlign: 'right' }}>
+                    <div style={{ color: '#888' }}>Autorizado por pagar</div>
+                    <b style={{ color: aut - pagado < 0 ? '#B45309' : '#1a1a2e' }}>{$(aut - pagado)}</b>
+                    {pend && <div style={{ fontSize: 10, color: '#B45309' }}>estimación pendiente</div>}
+                  </div>
+                );
+              })()}
               <div style={{ fontSize: 12, textAlign: 'right' }}><div style={{ color: '#888' }}>Saldo del contrato</div><b style={{ color: total - pagado > 0 ? '#1a1a2e' : '#10B981' }}>{$(total - pagado)}</b></div>
             </div>
             {abierto && (
@@ -303,7 +340,24 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, t
                   {permisos.costos && <button onClick={() => setAsignando(c)} style={btn}>Asignar partidas</button>}
                   {permisos.costos && <button onClick={() => eliminarContrato(c)} style={{ ...btn, color: '#C0392B' }}>Eliminar contrato</button>}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>Pagos</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>Estimaciones</div>
+                  {permisos.costos && <button onClick={() => generarEstimacion(c)} disabled={estimando === c.id} style={{ ...btn, padding: '3px 10px' }}>{estimando === c.id ? 'Generando...' : '+ Generar estimación'}</button>}
+                </div>
+                {estimacionesDe(c).length === 0 ? <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Sin estimaciones. Una estimación congela el avance acumulado del contrato y calcula lo que toca pagar desde la anterior.</div> : estimacionesDe(c).map(e => (
+                  <div key={e.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '4px 0', borderBottom: '0.5px solid #f5f5f5', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <b style={{ width: 24 }}>#{e.numero}</b><span style={{ width: 70 }}>{fechaCorta(e.fecha)}</span>
+                    <span style={{ width: 60, color: '#555' }}>{pct1(e.avance_pct)}</span>
+                    <b style={{ width: 110 }}>{$(e.importe)}</b>
+                    <span style={{ flex: 1, color: '#888' }}>{e.nota || ''}</span>
+                    <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: e.estatus === 'autorizada' ? '#EAF3DE' : '#FFF4E5', color: e.estatus === 'autorizada' ? '#27500A' : '#B45309' }}>{e.estatus === 'autorizada' ? `Autorizada${e.autorizada_por ? ' · ' + e.autorizada_por : ''}` : 'Pendiente'}</span>
+                    <button onClick={() => pdfEstimacion(e, c, pagado)} style={{ ...btn, padding: '2px 8px' }}>PDF</button>
+                    {permisos.autorizar && e.estatus === 'pendiente' && <button onClick={() => autorizarEstimacion(e)} style={{ ...btn, padding: '2px 8px', background: '#1a1a2e', color: '#fff', border: 'none' }}>Autorizar</button>}
+                    {((e.estatus === 'pendiente' && permisos.costos) || (e.estatus === 'autorizada' && permisos.autorizar)) && e.numero === Math.max(...estimacionesDe(c).map(x => x.numero)) &&
+                      <button onClick={() => eliminarEstimacion(e)} style={{ ...btn, padding: '2px 8px', color: '#C0392B' }}>Eliminar</button>}
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, fontWeight: 700, margin: '10px 0 4px' }}>Pagos</div>
                 {pgs.length === 0 ? <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Sin pagos registrados.</div> : pgs.map(pg => (
                   <div key={pg.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '4px 0', borderBottom: '0.5px solid #f5f5f5', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ width: 70 }}>{fechaCorta(pg.fecha)}</span><b style={{ width: 110 }}>{$(pg.monto)}</b><span style={{ flex: 1, color: '#555' }}>{pg.concepto || ''}</span>
@@ -541,7 +595,7 @@ function ListaObra() {
   const puede = usePuede();
   const puedeCapturar = puede('construccion.capturar_avance_obra');
   const puedeEditar = puede('construccion.editar_obra');
-  const permisosCostos = { costos: puede('construccion.editar_costos_obra'), pagos: puede('construccion.registrar_pagos_obra'), tope: puede('construccion.fijar_tope_obra') };
+  const permisosCostos = { costos: puede('construccion.editar_costos_obra'), pagos: puede('construccion.registrar_pagos_obra'), tope: puede('construccion.fijar_tope_obra'), autorizar: puede('construccion.autorizar_estimaciones_obra') };
   const isMobile = useIsMobile();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
@@ -787,6 +841,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const [contratistas, setContratistas] = useState([]);
   const [contratos, setContratos] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [estimaciones, setEstimaciones] = useState([]);
   const [tope, setTope] = useState(torre.presupuesto_tope ?? null);
   const [viviendas, setViviendas] = useState([]);
 
@@ -803,6 +858,9 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
       let pg = [];
       for (let i = 0; i < ids.length; i += 120) pg = pg.concat(await traerTodo(() => supabase.from('obra_pagos').select('*').in('contrato_id', ids.slice(i, i + 120)).order('fecha')));
       setPagos(pg);
+      let es = [];
+      for (let i = 0; i < ids.length; i += 120) es = es.concat(await traerTodo(() => supabase.from('obra_estimaciones').select('*').in('contrato_id', ids.slice(i, i + 120)).order('numero')));
+      setEstimaciones(es);
     } catch (e) { setError(e.message || String(e)); }
   }, [torre.id, torre.es_plantilla]);
 
@@ -919,7 +977,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
         {tab === 'programa' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           partidas={partidas} onCambio={cargar} />}
         {tab === 'catalogo' && <TabCatalogo torre={torre} partidas={partidas} etapas={etapas} hijos={hijos} progMap={progMap} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
-        {tab === 'costos' && <TabCostos torre={torre} partidas={hojas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
+        {tab === 'costos' && <TabCostos torre={torre} partidas={hojas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} estimaciones={estimaciones} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
       </>)}
     </div>
   );
