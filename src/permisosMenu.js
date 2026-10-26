@@ -24,6 +24,7 @@ const TODOS_LOS_MODULOS = [
     { id: 'marketing', label: 'Marketing', icon: 'marketing' },
   ]},
   { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
+    { id: 'obra_dashboard', label: 'Dashboard de obra', icon: 'obra_dashboard' },
     { id: 'construccion', label: 'Avance por unidad', icon: 'construccion' },
     { id: 'obra_torres', label: 'Programa', icon: 'obra_torres' },
   ]},
@@ -45,7 +46,7 @@ export const MENU_MODULOS = TODOS_LOS_MODULOS
 
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'obra_torres', 'objetivos', 'tendencias_producto', 'buyer_persona'];
+export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'obra_torres', 'obra_dashboard', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 export const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -99,8 +100,8 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   // Mesa de Control revisa Movimientos, Historial y Titulación.
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
-  if (miRol === 'Construcción') return id === 'construccion' || id === 'obra_torres';
-  if (miRol === 'Tesorería') return id === 'cobranza' || id === 'obra_torres';
+  if (miRol === 'Construcción') return id === 'construccion' || id === 'obra_torres' || id === 'obra_dashboard';
+  if (miRol === 'Tesorería') return id === 'cobranza' || id === 'obra_torres' || id === 'obra_dashboard';
   if (miRol === 'Titulación') return id === 'titulacion';
   // Gerente Operador — Dashboard (de sus desarrollos), Movimientos, Historial,
   // Titulación (solo ver) y Tendencias.

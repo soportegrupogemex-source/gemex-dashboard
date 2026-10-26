@@ -11,23 +11,23 @@ import { fmtDinero, InputDinero } from './dinero';
 //  - Avance de la torre / etapa: ponderado por presupuesto si todas las partidas con cantidad
 //    ya tienen precio; si no, por días programados.
 const DIAS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-const TOLERANCIA = 5; // puntos de % para considerar una partida atrasada
+export const TOLERANCIA = 5; // puntos de % para considerar una partida atrasada
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-const parse = (s) => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
-const hoyISO = () => iso(new Date());
+export const parse = (s) => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
+export const hoyISO = () => iso(new Date());
 const lunesDe = (s) => { const d = parse(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return iso(d); };
 const sumaDias = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return iso(d); };
-const fechaDe = (arranque, semana, dia) => sumaDias(arranque, (semana - 1) * 7 + (dia - 1));
-const fechaCorta = (s) => { const d = parse(s); return `${d.getDate()} ${MESES[d.getMonth()]}`; };
+export const fechaDe = (arranque, semana, dia) => sumaDias(arranque, (semana - 1) * 7 + (dia - 1));
+export const fechaCorta = (s) => { const d = parse(s); return `${d.getDate()} ${MESES[d.getMonth()]}`; };
 const num = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
-const $ = (n) => fmtDinero(n, { centavos: true });
+export const $ = (n) => fmtDinero(n, { centavos: true });
 const fmtN = (n, dec = 2) => Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: dec });
-const pct1 = (n) => `${Math.round((Number(n) || 0) * 10) / 10}%`;
+export const pct1 = (n) => `${Math.round((Number(n) || 0) * 10) / 10}%`;
 
 // Pagina las consultas (PostgREST devuelve máximo 1000 filas por llamada).
-async function traerTodo(construir) {
+export async function traerTodo(construir) {
   const todo = [];
   for (let desde = 0; ; desde += 1000) {
     const { data, error } = await construir().range(desde, desde + 999);
@@ -39,7 +39,7 @@ async function traerTodo(construir) {
 }
 
 
-function useIsMobile() {
+export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
   React.useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -53,8 +53,9 @@ const btn = { padding: '6px 12px', border: '0.5px solid #ddd', borderRadius: '6p
 const inp = { padding: '6px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' };
 
 // Métricas de un conjunto de partidas. prog = Map(partida_id -> [{semana, dia}])
-function resumen(partidas, prog, arranque) {
+export function resumen(partidas, prog, arranque) {
   const hoy = hoyISO();
+  const arrDe = (p) => (typeof arranque === 'function' ? arranque(p) : arranque);
   const usaPresupuesto = partidas.some(p => Number(p.precio_unitario) > 0) &&
     partidas.every(p => !(Number(p.cantidad) > 0) || Number(p.precio_unitario) > 0);
   const peso = (p) => {
@@ -67,8 +68,9 @@ function resumen(partidas, prog, arranque) {
     wTot += w; wReal += w * Number(p.avance_pct || 0);
     if (p.terminada_en || Number(p.avance_pct) >= 100) terminadas++;
     const dias = prog.get(p.id) || [];
-    if (arranque && dias.length > 0) {
-      const transcurridos = dias.filter(x => fechaDe(arranque, x.semana, x.dia) <= hoy).length;
+    const arr = arrDe(p);
+    if (arr && dias.length > 0) {
+      const transcurridos = dias.filter(x => fechaDe(arr, x.semana, x.dia) <= hoy).length;
       const pp = (transcurridos / dias.length) * 100;
       wConProg += w; wProg += w * pp; wRealProg += w * Number(p.avance_pct || 0);
       if (Number(p.avance_pct) < pp - TOLERANCIA) atrasadas++;
@@ -77,12 +79,12 @@ function resumen(partidas, prog, arranque) {
   return {
     total: partidas.length, terminadas, atrasadas,
     real: wTot ? wReal / wTot : 0,
-    programado: arranque && wConProg ? wProg / wConProg : null,
+    programado: wConProg ? wProg / wConProg : null,
     realProgramadas: wConProg ? wRealProg / wConProg : null,
     usaPresupuesto,
   };
 }
-function Barra({ real, prog, alto = 8 }) {
+export function Barra({ real, prog, alto = 8 }) {
   return (
     <div style={{ position: 'relative', height: alto, background: '#eee', borderRadius: alto, overflow: 'hidden' }}>
       <div style={{ width: `${Math.min(100, real || 0)}%`, height: '100%', background: (real || 0) >= 100 ? '#10B981' : '#3B82F6' }} />
@@ -90,7 +92,7 @@ function Barra({ real, prog, alto = 8 }) {
     </div>
   );
 }
-function Tarjeta({ titulo, valor, sub, color = '#1a1a2e' }) {
+export function Tarjeta({ titulo, valor, sub, color = '#1a1a2e' }) {
   return (
     <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, padding: '12px 14px' }}>
       <div style={{ fontSize: 11, color: '#888' }}>{titulo}</div>
@@ -101,7 +103,7 @@ function Tarjeta({ titulo, valor, sub, color = '#1a1a2e' }) {
 }
 
 // % programado de una partida a hoy (null si no tiene programa o falta fecha de arranque)
-const progPct = (partidaId, progMap, arr, hoy) => {
+export const progPct = (partidaId, progMap, arr, hoy) => {
   const dias = progMap.get(partidaId) || [];
   if (!arr || dias.length === 0) return null;
   return (dias.filter(x => fechaDe(arr, x.semana, x.dia) <= hoy).length / dias.length) * 100;
@@ -500,14 +502,14 @@ function ModalPago({ contrato, total, pagado, onCerrar, onGuardado }) {
 // ------------------------------------------------------------ Árbol de partidas
 // Una partida puede tener subpartidas (a cualquier profundidad). Solo las hojas llevan
 // cantidad, precio, avance y programa; las padres suman a sus hijas.
-const indexar = (partidas) => {
+export const indexar = (partidas) => {
   const hijos = new Map();
   partidas.forEach(p => { if (p.parent_id) { if (!hijos.has(p.parent_id)) hijos.set(p.parent_id, []); hijos.get(p.parent_id).push(p); } });
   hijos.forEach(l => l.sort((a, b) => a.orden - b.orden));
   return hijos;
 };
-const hojasDe = (p, hijos) => { const h = hijos.get(p.id); return h ? h.flatMap(x => hojasDe(x, hijos)) : [p]; };
-const etapasDe = (partidas) => {
+export const hojasDe = (p, hijos) => { const h = hijos.get(p.id); return h ? h.flatMap(x => hojasDe(x, hijos)) : [p]; };
+export const etapasDe = (partidas) => {
   const m = new Map();
   partidas.filter(p => !p.parent_id).forEach(p => {
     if (!m.has(p.etapa)) m.set(p.etapa, { nombre: p.etapa, orden: p.etapa_orden, raices: [] });
@@ -525,14 +527,14 @@ const aplanar = (nodos, hijos, cerrados, depth = 0, out = []) => {
   });
   return out;
 };
-const rutaDe = (p, porId) => {
+export const rutaDe = (p, porId) => {
   const partes = [p.etapa];
   const cadena = [];
   for (let x = p.parent_id ? porId.get(p.parent_id) : null; x; x = x.parent_id ? porId.get(x.parent_id) : null) cadena.unshift(x.descripcion);
   return [...partes, ...cadena].join(' › ');
 };
-const TIPOS_FRENTE = { torre: 'Torre', tren: 'Tren de viviendas', otro: 'Otro frente' };
-const nombreFrente = (t) => t.nombre || `Torre ${t.torre}`;
+export const TIPOS_FRENTE = { torre: 'Torre', tren: 'Tren de viviendas', otro: 'Otro frente' };
+export const nombreFrente = (t) => t.nombre || `Torre ${t.torre}`;
 
 // ------------------------------------------------------------------ Lista
 function ListaObra() {
