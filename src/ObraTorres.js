@@ -149,7 +149,95 @@ const rangoFechas = (dias, arr) => {
   const fs = dias.map(x => fechaDe(arr, x.semana, x.dia)).sort();
   return fs[0] === fs[fs.length - 1] ? fechaCorta(fs[0]) : `${fechaCorta(fs[0])} – ${fechaCorta(fs[fs.length - 1])}`;
 };
-function FilaAvance({ p, progMap, arr, hoy, puedeCapturar, onRegistrar, ruta = '' }) {
+// Reduce la foto antes de subirla (las del celular pesan varios MB): lado mayor 1600 px, JPEG.
+const comprimirImagen = (archivo) => new Promise((resolve) => {
+  const url = URL.createObjectURL(archivo);
+  const img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    URL.revokeObjectURL(url);
+    c.toBlob(b => resolve(b || archivo), 'image/jpeg', 0.82);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(archivo); };
+  img.src = url;
+});
+
+// Evidencia fotográfica de una partida: fotos en el bucket privado "obra", con fecha y quién las subió.
+function PanelFotos({ partida, puedeSubir, onCambio, onCerrar }) {
+  const [fotos, setFotos] = useState(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [nota, setNota] = useState('');
+  const cargar = useCallback(async () => {
+    const { data } = await supabase.from('obra_evidencias').select('*').eq('partida_id', partida.id).order('created_at', { ascending: false });
+    const filas = data || [];
+    const { data: urls } = filas.length ? await supabase.storage.from('obra').createSignedUrls(filas.map(f => f.path), 3600) : { data: [] };
+    const porPath = new Map((urls || []).map(u => [u.path, u.signedUrl]));
+    setFotos(filas.map(f => ({ ...f, url: porPath.get(f.path) })));
+  }, [partida.id]);
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const subir = async (e) => {
+    const archivos = [...(e.target.files || [])];
+    e.target.value = '';
+    if (archivos.length === 0) return;
+    setSubiendo(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    for (const [i, archivo] of archivos.entries()) {
+      const blob = await comprimirImagen(archivo);
+      const path = `evidencias/${partida.id}/${Date.now()}-${i}.jpg`;
+      const { error: eu } = await supabase.storage.from('obra').upload(path, blob, { contentType: 'image/jpeg' });
+      if (eu) { alert('No se pudo subir la foto: ' + eu.message); continue; }
+      const { error } = await supabase.from('obra_evidencias').insert({ partida_id: partida.id, path, nota: nota.trim() || null, subido_por: user?.email || null });
+      if (error) { await supabase.storage.from('obra').remove([path]); alert('No se pudo registrar la foto: ' + error.message); }
+    }
+    setNota(''); setSubiendo(false);
+    await cargar(); onCambio();
+  };
+  const borrar = async (f) => {
+    if (!window.confirm('¿Eliminar esta foto?')) return;
+    const { error } = await supabase.from('obra_evidencias').delete().eq('id', f.id);
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    await supabase.storage.from('obra').remove([f.path]);
+    await cargar(); onCambio();
+  };
+
+  return (
+    <div style={{ marginTop: 8, background: '#f9f9f9', borderRadius: 8, padding: 10, fontSize: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <b>Evidencia fotográfica</b>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {puedeSubir && (<>
+            <input value={nota} onChange={e => setNota(e.target.value)} placeholder="Nota (opcional)" style={{ ...inp, width: 160 }} />
+            <label style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none', opacity: subiendo ? 0.6 : 1 }}>
+              {subiendo ? 'Subiendo...' : '+ Subir fotos'}
+              <input type="file" accept="image/*" multiple disabled={subiendo} onChange={subir} style={{ display: 'none' }} />
+            </label>
+          </>)}
+          <button onClick={onCerrar} style={{ ...btn, padding: '2px 8px' }}>Cerrar</button>
+        </div>
+      </div>
+      {fotos === null ? <div style={{ color: '#888' }}>Cargando...</div> : fotos.length === 0 ? <div style={{ color: '#888' }}>Sin fotos todavía.</div> : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {fotos.map(f => (
+            <div key={f.id} style={{ width: 130 }}>
+              <a href={f.url} target="_blank" rel="noreferrer" style={{ display: 'block', height: 96, borderRadius: 6, overflow: 'hidden', background: '#e8e8ec' }}>
+                {f.url && <img src={f.url} alt={f.nota || 'Evidencia'} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+              </a>
+              <div style={{ fontSize: 10, color: '#555', marginTop: 3 }}>{fechaCorta(String(f.created_at).slice(0, 10))} · {(f.subido_por || '').split('@')[0]}</div>
+              {f.nota && <div style={{ fontSize: 10, color: '#888' }}>{f.nota}</div>}
+              {puedeSubir && <button onClick={() => borrar(f)} style={{ ...btn, padding: '0 6px', fontSize: 10, color: '#C0392B', marginTop: 2 }}>Eliminar</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+function FilaAvance({ p, progMap, arr, hoy, puedeCapturar, onRegistrar, ruta = '', numFotos = 0, onFotos }) {
+  const [fotosAbiertas, setFotosAbiertas] = useState(false);
   const [valor, setValor] = useState(String(Number(p.avance_pct || 0)));
   const [guardando, setGuardando] = useState(false);
   const [historial, setHistorial] = useState(null);
@@ -196,8 +284,10 @@ function FilaAvance({ p, progMap, arr, hoy, puedeCapturar, onRegistrar, ruta = '
             {!p.terminada_en && <button onClick={() => guardar('100')} disabled={guardando} style={{ ...btn, color: '#27500A', borderColor: '#27500A' }} title="Marcar al 100%">100%</button>}
           </>) : <b style={{ fontSize: 13, width: 50, textAlign: 'right' }}>{pct1(p.avance_pct)}</b>}
           <button onClick={verHistorial} style={{ ...btn, padding: '6px 8px' }} title="Historial de avances">⏱</button>
+          <button onClick={() => setFotosAbiertas(v => !v)} style={{ ...btn, padding: '6px 8px', color: numFotos > 0 ? '#2a78d6' : '#888' }} title="Evidencia fotográfica">📷{numFotos > 0 ? ` ${numFotos}` : ''}</button>
         </div>
       </div>
+      {fotosAbiertas && <PanelFotos partida={p} puedeSubir={puedeCapturar} onCambio={() => onFotos && onFotos()} onCerrar={() => setFotosAbiertas(false)} />}
       {historial && (
         <div style={{ marginTop: 8, background: '#f9f9f9', borderRadius: 8, padding: 10, fontSize: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}><b>Historial de avance</b><button onClick={() => setHistorial(null)} style={{ ...btn, padding: '2px 8px' }}>Cerrar</button></div>
@@ -879,6 +969,21 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const [estimaciones, setEstimaciones] = useState([]);
   const [tope, setTope] = useState(torre.presupuesto_tope ?? null);
   const [viviendas, setViviendas] = useState([]);
+  const [evCount, setEvCount] = useState(new Map());
+  const cargarFotos = useCallback(async () => {
+    if (torre.es_plantilla) return;
+    try {
+      const { data: ps } = await supabase.from('obra_partidas').select('id').eq('torre_id', torre.id);
+      const ids = (ps || []).map(x => x.id);
+      const m = new Map();
+      for (let i = 0; i < ids.length; i += 120) {
+        const filas = await traerTodo(() => supabase.from('obra_evidencias').select('id, partida_id').in('partida_id', ids.slice(i, i + 120)).order('id'));
+        filas.forEach(f => m.set(f.partida_id, (m.get(f.partida_id) || 0) + 1));
+      }
+      setEvCount(m);
+    } catch (e) { /* las fotos son accesorias: si falla el conteo, la pantalla sigue */ }
+  }, [torre.id, torre.es_plantilla]);
+  useEffect(() => { cargarFotos(); }, [cargarFotos]);
 
   const cargarCostos = useCallback(async () => {
     if (torre.es_plantilla) return;
@@ -1007,8 +1112,8 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
       </div>
 
       {cargando ? <div style={{ color: '#888', fontSize: 13 }}>Cargando...</div> : (<>
-        {tab === 'hoy' && <TabHoy hojas={hojas} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} />}
-        {tab === 'avance' && <TabAvance etapas={etapas} hijos={hijos} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} />}
+        {tab === 'hoy' && <TabHoy hojas={hojas} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} evCount={evCount} onFotos={cargarFotos} />}
+        {tab === 'avance' && <TabAvance etapas={etapas} hijos={hijos} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} evCount={evCount} onFotos={cargarFotos} />}
         {tab === 'programa' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           partidas={partidas} onCambio={cargar} />}
         {tab === 'catalogo' && <TabCatalogo torre={torre} partidas={partidas} etapas={etapas} hijos={hijos} progMap={progMap} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
@@ -1019,7 +1124,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
 }
 
 // ------------------------------------------------------------------- Hoy
-function TabHoy({ hojas, porId, progMap, arr, hoy, puedeCapturar, onRegistrar }) {
+function TabHoy({ hojas, porId, progMap, arr, hoy, puedeCapturar, onRegistrar, evCount, onFotos }) {
   if (!arr) return <div style={{ color: '#888', fontSize: 13 }}>Captura la fecha de arranque para ver las partidas del día.</div>;
   const abiertas = hojas.filter(p => !p.terminada_en && Number(p.avance_pct) < 100);
   const conInfo = abiertas.map(p => {
@@ -1032,7 +1137,7 @@ function TabHoy({ hojas, porId, progMap, arr, hoy, puedeCapturar, onRegistrar })
   const grupo = (titulo, lista, color) => lista.length > 0 && (
     <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
       <div style={{ padding: '10px 12px', background: '#f7f7f9', fontSize: 13, fontWeight: 700, color }}>{titulo} ({lista.length})</div>
-      {lista.map(x => <FilaAvance key={x.p.id} p={x.p} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={onRegistrar} ruta={rutaDe(x.p, porId)} />)}
+      {lista.map(x => <FilaAvance key={x.p.id} p={x.p} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={onRegistrar} ruta={rutaDe(x.p, porId)} numFotos={evCount.get(x.p.id) || 0} onFotos={onFotos} />)}
     </div>
   );
   return (
@@ -1046,7 +1151,7 @@ function TabHoy({ hojas, porId, progMap, arr, hoy, puedeCapturar, onRegistrar })
 }
 
 // ---------------------------------------------------------------- Avance
-function TabAvance({ etapas, hijos, porId, progMap, arr, hoy, puedeCapturar, onRegistrar }) {
+function TabAvance({ etapas, hijos, porId, progMap, arr, hoy, puedeCapturar, onRegistrar, evCount, onFotos }) {
   const [abiertos, setAbiertos] = useState({});
   const alternar = (k) => setAbiertos(a => ({ ...a, [k]: !a[k] }));
   const cabecera = (clave, titulo, hs, depth, grande) => {
@@ -1064,7 +1169,7 @@ function TabAvance({ etapas, hijos, porId, progMap, arr, hoy, puedeCapturar, onR
   };
   const nodo = (p, depth) => {
     const h = hijos.get(p.id);
-    if (!h) return <div key={p.id} style={{ paddingLeft: depth * 18 }}><FilaAvance p={p} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={onRegistrar} /></div>;
+    if (!h) return <div key={p.id} style={{ paddingLeft: depth * 18 }}><FilaAvance p={p} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={onRegistrar} numFotos={evCount.get(p.id) || 0} onFotos={onFotos} /></div>;
     return (
       <div key={p.id}>
         {cabecera(p.id, p.descripcion, hojasDe(p, hijos), depth, false)}
