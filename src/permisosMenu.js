@@ -25,7 +25,7 @@ const TODOS_LOS_MODULOS = [
   ]},
   { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
     { id: 'construccion', label: 'Avance por unidad', icon: 'construccion' },
-    { id: 'obra_torres', label: 'Obra por torre', icon: 'obra_torres' },
+    { id: 'obra_torres', label: 'Programa', icon: 'obra_torres' },
   ]},
   { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
     { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
@@ -230,11 +230,11 @@ export const ACCIONES = [
   { id: 'construccion.editar_avance', seccion: 'Construcción', label: 'Capturar el avance de obra (%)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
   { id: 'construccion.marcar_dtu', seccion: 'Construcción', label: 'Marcar DTU', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
   { id: 'construccion.marcar_lista_avaluo', seccion: 'Construcción', label: 'Marcar "Lista para avalúo"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
-  { id: 'construccion.capturar_avance_obra', seccion: 'Construcción', label: 'Obra por torre: capturar el avance (%) de las partidas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
-  { id: 'construccion.editar_obra', seccion: 'Construcción', label: 'Obra por torre: editar catálogo, programa y fecha de arranque', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
-  { id: 'construccion.editar_costos_obra', seccion: 'Construcción', label: 'Obra por torre: capturar precios, contratistas y contratos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
-  { id: 'construccion.registrar_pagos_obra', seccion: 'Construcción', label: 'Obra por torre: registrar pagos a contratistas', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
-  { id: 'construccion.fijar_tope_obra', seccion: 'Construcción', label: 'Obra por torre: fijar el tope de presupuesto', defecto: roles('Super Admin', 'Admin') },
+  { id: 'construccion.capturar_avance_obra', seccion: 'Construcción', label: 'Programa: capturar el avance (%) de las partidas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.editar_obra', seccion: 'Construcción', label: 'Programa: editar catálogo, programa y fecha de arranque', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.editar_costos_obra', seccion: 'Construcción', label: 'Programa: capturar precios, contratistas y contratos', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.registrar_pagos_obra', seccion: 'Construcción', label: 'Programa: registrar pagos a contratistas', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
+  { id: 'construccion.fijar_tope_obra', seccion: 'Construcción', label: 'Programa: fijar el tope de presupuesto', defecto: roles('Super Admin', 'Admin') },
 
   // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
   { id: 'marketing.marcar_atendido', seccion: 'Marketing', label: 'Marcar un lead como atendido', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
