@@ -24,7 +24,8 @@ const TODOS_LOS_MODULOS = [
     { id: 'marketing', label: 'Marketing', icon: 'marketing' },
   ]},
   { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
-    { id: 'construccion', label: 'Construcción', icon: 'construccion' },
+    { id: 'construccion', label: 'Avance por unidad', icon: 'construccion' },
+    { id: 'obra_torres', label: 'Obra por torre', icon: 'obra_torres' },
   ]},
   { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
     { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
@@ -44,7 +45,7 @@ export const MENU_MODULOS = TODOS_LOS_MODULOS
 
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'objetivos', 'tendencias_producto', 'buyer_persona'];
+export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'obra_torres', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 export const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -98,7 +99,7 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   // Mesa de Control revisa Movimientos, Historial y Titulación.
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
-  if (miRol === 'Construcción') return id === 'construccion';
+  if (miRol === 'Construcción') return id === 'construccion' || id === 'obra_torres';
   if (miRol === 'Tesorería') return id === 'cobranza';
   if (miRol === 'Titulación') return id === 'titulacion';
   // Gerente Operador — Dashboard (de sus desarrollos), Movimientos, Historial,
@@ -229,6 +230,8 @@ export const ACCIONES = [
   { id: 'construccion.editar_avance', seccion: 'Construcción', label: 'Capturar el avance de obra (%)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
   { id: 'construccion.marcar_dtu', seccion: 'Construcción', label: 'Marcar DTU', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
   { id: 'construccion.marcar_lista_avaluo', seccion: 'Construcción', label: 'Marcar "Lista para avalúo"', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Construcción') },
+  { id: 'construccion.capturar_avance_obra', seccion: 'Construcción', label: 'Obra por torre: capturar el avance (%) de las partidas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.editar_obra', seccion: 'Construcción', label: 'Obra por torre: editar catálogo, programa y fecha de arranque', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
 
   // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
   { id: 'marketing.marcar_atendido', seccion: 'Marketing', label: 'Marcar un lead como atendido', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Agente', 'Asesor Premium') },
