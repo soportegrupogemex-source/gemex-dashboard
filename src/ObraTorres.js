@@ -628,6 +628,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
   const [ocupadas, setOcupadas] = useState(new Set());
   const [sel, setSel] = useState(new Set());
   const [sugeridas, setSugeridas] = useState([]);
+  const [letras, setLetras] = useState(new Set());
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -638,7 +639,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
         traerTodo(() => supabase.from('obra_torre_unidades').select('unidad_id').order('unidad_id')),
       ]);
       const lista = inv || [];
-      setUnidades(lista); setOcupadas(new Set(ocu.map(x => x.unidad_id))); setSel(new Set());
+      setUnidades(lista); setOcupadas(new Set(ocu.map(x => x.unidad_id))); setSel(new Set()); setLetras(new Set());
       setSugeridas([...new Set(lista.map(u => (String(u.numero || '').match(/^([A-Za-z]+)/)?.[1] || '').toUpperCase()).filter(Boolean))].sort());
     })();
   }, [desarrolloId]);
@@ -647,7 +648,24 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
   const alternar = (id) => setSel(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const plantillasDelTipo = plantillas.filter(p => p.tipo === tipo);
 
+  const letrasLibres = sugeridas.filter(l => !existentes.some(t => !t.es_plantilla && t.desarrollo_id === desarrolloId && (t.nombre || t.torre) === `Torre ${l}`));
+  const variasDesdePlantilla = tipo === 'torre' && !esPlantilla && !!plantillaId && letras.size > 0;
+
   const crear = async () => {
+    if (variasDesdePlantilla) {
+      setGuardando(true);
+      const hechas = [];
+      for (const l of [...letras].sort()) {
+        const { error } = await supabase.rpc('obra_crear_desde_plantilla', {
+          p_plantilla: plantillaId, p_desarrollo: desarrolloId, p_nombre: `Torre ${l}`, p_tipo: 'torre',
+          p_unidades: [], p_arranque: arranque ? lunesDe(arranque) : null,
+        });
+        if (error) { alert(`Se crearon ${hechas.length} torres (${hechas.join(', ')}) y falló la Torre ${l}: ${error.message}`); setGuardando(false); onCreado(); return; }
+        hechas.push(l);
+      }
+      onCreado();
+      return;
+    }
     const nom = nombre.trim();
     if (!nom) { alert('Escribe el nombre del frente.'); return; }
     if (!esPlantilla && !desarrolloId) { alert('Elige el desarrollo.'); return; }
@@ -715,6 +733,21 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
           </select>
         </>
       )}
+      {tipo === 'torre' && !esPlantilla && plantillaId && letrasLibres.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+            <label style={{ ...lbl, marginBottom: 0 }}>Crear varias torres a la vez con esta plantilla ({letras.size} elegidas)</label>
+            <button onClick={() => setLetras(letras.size === letrasLibres.length ? new Set() : new Set(letrasLibres))} style={{ ...btn, padding: '2px 8px' }}>{letras.size === letrasLibres.length ? 'Ninguna' : 'Todas las libres'}</button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+            {letrasLibres.map(l => (
+              <button key={l} onClick={() => setLetras(prev => { const n = new Set(prev); if (n.has(l)) n.delete(l); else n.add(l); return n; })}
+                style={{ ...btn, padding: '3px 10px', background: letras.has(l) ? '#1a1a2e' : '#fff', color: letras.has(l) ? '#fff' : '#555' }}>Torre {l}</button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Si eliges torres aquí, se crea una por cada una y el campo Nombre se ignora. Cada torre recibe una copia de las partidas, subpartidas y programa (sin avance).</div>
+        </div>
+      )}
       {tipo === 'tren' && !esPlantilla && desarrolloId && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
@@ -736,7 +769,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
       {plantillaId && tipo === 'tren' && <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>Las cantidades de la plantilla (por vivienda) se multiplican por {sel.size || 'el número de'} viviendas; ajústalas después si cambian los m² o materiales.</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
-        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#C0203A', color: '#fff', border: 'none' }}>{guardando ? 'Creando...' : 'Crear'}</button>
+        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#C0203A', color: '#fff', border: 'none' }}>{guardando ? 'Creando...' : variasDesdePlantilla ? `Crear ${letras.size} ${letras.size === 1 ? 'torre' : 'torres'}` : 'Crear'}</button>
       </div>
     </Modal>
   );

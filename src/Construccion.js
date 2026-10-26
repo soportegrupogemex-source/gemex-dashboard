@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
+import { resumen, traerTodo, indexar, nombreFrente } from './ObraTorres';
 
 // FIX: módulo de Construcción — reporta el Paso 1 del proceso de
 // Titulación (Avance de obra, DTU, Lista para avalúo) para TODAS las
@@ -13,6 +14,10 @@ import { usePuede } from './PermisosContext';
 // (Antes también exigía tipo de compra Infonavit/Fovissste, pero eso
 // dejaba a las unidades sin movimiento de venta —o vendidas sin
 // Infonavit/Fovissste— con DTU bloqueado para siempre.)
+
+// La letra con que empieza el número de unidad es la torre/etapa (A102 -> A).
+// Los desarrollos cuyas unidades no llevan letra se muestran sin nivel de torre.
+const torreDe = (u) => (String(u.numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)/)?.[1] || '').toUpperCase();
 
 const VACIO = { avance_obra_pct: 0, dtu: false, lista_avaluo: false };
 
@@ -42,6 +47,8 @@ export default function Construccion() {
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(VACIO);
   const [guardando, setGuardando] = useState(false);
+  // Avance que marca el programa de obra: unidad_id -> { pct, frente }. Es una sugerencia; nunca se aplica solo.
+  const [deObra, setDeObra] = useState({});
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -78,13 +85,43 @@ export default function Construccion() {
       setTipoCompraPorUnidad({});
     }
     setCargando(false);
+    cargarObra(invConNombre);
+  };
+
+  // Avance real de cada frente de obra con programa (torre o tren) -> unidades que le corresponden.
+  // Torre: las unidades del mismo desarrollo cuya letra es la de la torre (A102 -> Torre A).
+  // Tren u otro frente: las viviendas ligadas a él.
+  const cargarObra = async (inv) => {
+    try {
+      const [torres, partidas, programa, ligas] = await Promise.all([
+        traerTodo(() => supabase.from('obra_torres').select('id, desarrollo_id, torre, nombre, tipo, fecha_arranque').eq('es_plantilla', false).order('created_at')),
+        traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, avance_pct, cantidad, precio_unitario, terminada_en').order('id')),
+        traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').order('partida_id').order('semana').order('dia')),
+        traerTodo(() => supabase.from('obra_torre_unidades').select('torre_id, unidad_id').order('unidad_id')),
+      ]);
+      const progMap = new Map();
+      programa.forEach(x => { if (!progMap.has(x.partida_id)) progMap.set(x.partida_id, []); progMap.get(x.partida_id).push(1); });
+      const mapa = {};
+      torres.forEach(t => {
+        const ps = partidas.filter(p => p.torre_id === t.id);
+        const hijos = indexar(ps);
+        const hojas = ps.filter(p => !hijos.has(p.id));
+        if (!hojas.some(p => progMap.has(p.id))) return; // sin programa no hay obra que reportar
+        const pct = Math.round(resumen(hojas, progMap, null).real * 10) / 10;
+        const ligadas = ligas.filter(l => l.torre_id === t.id).map(l => l.unidad_id);
+        let unidades = ligadas;
+        if (t.tipo === 'torre' && ligadas.length === 0) {
+          const letra = String(t.nombre || t.torre || '').trim().replace(/^torre\s+/i, '').toUpperCase();
+          unidades = inv.filter(u => u.desarrollo_id === t.desarrollo_id && torreDe(u) === letra).map(u => u.id);
+        }
+        unidades.forEach(id => { mapa[id] = { pct, frente: nombreFrente(t) }; });
+      });
+      setDeObra(mapa);
+    } catch (e) { setDeObra({}); }
   };
 
   const unidadesVisibles = unidades.filter(u => !desarrolloSel || u.desarrollo_nombre === desarrolloSel);
 
-  // La letra con que empieza el número de unidad es la torre/etapa (A102 -> A).
-  // Los desarrollos cuyas unidades no llevan letra se muestran sin nivel de torre.
-  const torreDe = (u) => (String(u.numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)/)?.[1] || '').toUpperCase();
   const alternar = (clave, abierto) => setAbiertos(a => ({ ...a, [clave]: !abierto }));
 
   const dtuHabilitado = (avanceObra) => Number(avanceObra) >= 90;
@@ -92,6 +129,39 @@ export default function Construccion() {
   const abrirUnidad = (u) => {
     setUnidadAbierta(u);
     setForm({ ...VACIO, ...(seguimientos[u.id] || {}) });
+  };
+
+  // Pasa a las unidades el avance que marca el programa de obra. Siempre es una acción explícita:
+  // el avance habilita el DTU (90%) y alimenta Titulación, así que no se escribe solo.
+  const aplicarObra = async (lista, etiqueta) => {
+    const cambios = lista.filter(u => deObra[u.id] && Number((seguimientos[u.id] || VACIO).avance_obra_pct || 0) !== deObra[u.id].pct);
+    if (cambios.length === 0) { alert('Esas unidades ya tienen el avance que marca la obra.'); return; }
+    if (!window.confirm(`Se actualizará el avance de obra de ${cambios.length} ${cambios.length === 1 ? 'unidad' : 'unidades'} a lo que marca el programa (${etiqueta}). Reemplaza lo capturado a mano y, si queda abajo de 90%, quita el DTU. ¿Continuar?`)) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    const filas = cambios.map(u => {
+      const previo = seguimientos[u.id] || VACIO;
+      const pct = deObra[u.id].pct;
+      return {
+        unidad_id: u.id, desarrollo_id: u.desarrollo_id, avance_obra_pct: pct,
+        dtu: dtuHabilitado(pct) ? !!previo.dtu : false, lista_avaluo: !!previo.lista_avaluo,
+        actualizado_por: user?.email || null, updated_at: new Date().toISOString(),
+      };
+    });
+    const { data, error } = await supabase.from('titulacion_seguimiento').upsert(filas, { onConflict: 'unidad_id' }).select();
+    if (error) { alert('No se pudo actualizar: ' + error.message); return; }
+    setSeguimientos(prev => { const n = { ...prev }; (data || []).forEach(x => { n[x.unidad_id] = x; }); return n; });
+  };
+  const botonAplicar = (lista, etiqueta) => {
+    const mapeadas = lista.filter(u => deObra[u.id]);
+    if (!puedeAvance || mapeadas.length === 0) return null;
+    const dif = mapeadas.filter(u => Number((seguimientos[u.id] || VACIO).avance_obra_pct || 0) !== deObra[u.id].pct).length;
+    return (
+      <button onClick={(e) => { e.stopPropagation(); aplicarObra(mapeadas, etiqueta); }} disabled={dif === 0}
+        title="Pasa a las unidades el avance que marca el programa de obra"
+        style={{ padding: '4px 10px', border: '0.5px solid currentColor', borderRadius: '6px', background: 'transparent', color: 'inherit', fontSize: '11px', cursor: dif === 0 ? 'default' : 'pointer', opacity: dif === 0 ? 0.5 : 1 }}>
+        {dif === 0 ? 'Obra y unidades coinciden' : `Aplicar avance de obra (${dif})`}
+      </button>
+    );
   };
 
   const guardar = async () => {
@@ -148,6 +218,12 @@ export default function Construccion() {
                     <div style={{ fontSize: '12px', color: '#888' }}>{u.estatus}{tipoCompraPorUnidad[u.id] ? ` · ${tipoCompraPorUnidad[u.id]}` : ''}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {deObra[u.id] && (
+                      <div title={`Avance que marca el programa de obra (${deObra[u.id].frente})`}
+                        style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: deObra[u.id].pct === Number(s.avance_obra_pct || 0) ? '#f3f3f5' : '#FFF4E5', color: deObra[u.id].pct === Number(s.avance_obra_pct || 0) ? '#888' : '#B45309' }}>
+                        Obra {deObra[u.id].pct}%
+                      </div>
+                    )}
                     <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a2e' }}>{Number(s.avance_obra_pct || 0)}%</div>
                     <div style={{ fontSize: '11px', fontWeight: '700', color: s.dtu ? '#10B981' : '#ccc' }}>DTU {s.dtu ? '✓' : '—'}</div>
                   </div>
@@ -175,7 +251,10 @@ export default function Construccion() {
                         {hayTorres ? `${Object.keys(torres).length} ${Object.keys(torres).length === 1 ? 'torre' : 'torres'} · ` : ''}{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}
                       </span>
                     </div>
-                    <div style={{ fontSize: '12px', opacity: 0.85 }}>Avance promedio: <b>{promedio(lista)}%</b></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px' }}>
+                      {botonAplicar(lista, nombre)}
+                      <span style={{ opacity: 0.85 }}>Avance promedio: <b>{promedio(lista)}%</b></span>
+                    </div>
                   </div>
                   {abierto && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
@@ -192,7 +271,11 @@ export default function Construccion() {
                                 <span style={{ fontSize: '13px', fontWeight: '600' }}>{t === '—' ? 'Sin torre' : `Torre ${t}`}</span>
                                 <span style={{ fontSize: '11px', color: '#888' }}>{torres[t].length} {torres[t].length === 1 ? 'unidad' : 'unidades'}</span>
                               </div>
-                              <div style={{ fontSize: '12px', color: '#666' }}>Avance promedio: <b>{promedio(torres[t])}%</b></div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#666' }}>
+                                {deObra[torres[t][0]?.id] && <span>Obra marca <b>{deObra[torres[t][0].id].pct}%</b></span>}
+                                {botonAplicar(torres[t], `Torre ${t}`)}
+                                <span>Avance promedio: <b>{promedio(torres[t])}%</b></span>
+                              </div>
                             </div>
                             {torreAbierta && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>{torres[t].map(filaUnidad)}</div>}
                           </div>
@@ -219,6 +302,15 @@ export default function Construccion() {
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>Avance de obra</label>
+              {deObra[unidadAbierta.id] && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', fontSize: '12px', background: '#f7f7f9', borderRadius: '8px', padding: '8px 10px', marginBottom: '8px' }}>
+                  <span style={{ color: '#555' }}>El programa de obra ({deObra[unidadAbierta.id].frente}) marca <b>{deObra[unidadAbierta.id].pct}%</b></span>
+                  {puedeAvance && Number(form.avance_obra_pct) !== deObra[unidadAbierta.id].pct && (
+                    <button type="button" onClick={() => setForm(f => ({ ...f, avance_obra_pct: deObra[unidadAbierta.id].pct }))}
+                      style={{ padding: '3px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', fontSize: '11px', cursor: 'pointer' }}>Usar este avance</button>
+                  )}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <input type="number" min="0" max="100" disabled={!puedeAvance} value={form.avance_obra_pct}
                   onChange={e => setForm(f => ({ ...f, avance_obra_pct: e.target.value }))}
