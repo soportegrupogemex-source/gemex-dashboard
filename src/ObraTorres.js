@@ -126,7 +126,7 @@ function ListaObra() {
     <div>
       {error && <div style={{ padding: '10px 14px', background: '#FDECEC', color: '#C0392B', borderRadius: 8, fontSize: 13, marginBottom: 12 }}>No se pudo cargar la obra: {error}</div>}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 12, color: '#888' }}>Catálogo de partidas, programa semanal y avance real por torre.</div>
+        <div />
         {puedeEditar && <button onClick={() => setAgregando(true)} style={{ ...btn, background: '#C0203A', color: '#fff', border: 'none' }}>+ Agregar torre</button>}
       </div>
       {cargando ? <div style={{ color: '#888', fontSize: 13 }}>Cargando...</div> : torres.length === 0 ? (
