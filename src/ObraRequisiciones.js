@@ -4,6 +4,7 @@ import { usePuede } from './PermisosContext';
 import { InputDinero } from './dinero';
 import { enviarPush } from './enviarPush';
 import { descargarRequisicionPdf } from './requisicionPdf';
+import { EMPRESA } from './empresa';
 import { traerTodo, useIsMobile, fechaCorta, hoyISO, $, Modal, btn, inp, lbl, nombreFrente } from './ObraTorres';
 
 // Requisiciones de pago de obra (formato de la hoja oficial): Construcción solicita, Dirección Administrativa
@@ -23,6 +24,19 @@ const letrasTorres = (cargos) => {
   const nombres = [...new Set(cargos.map(c => c.obra_torres).filter(Boolean).map(t => nombreFrente(t)))];
   return nombres.map(n => (/^torre\s+([A-Za-zÁÉÍÓÚÑ]+)$/i.exec(n)?.[1] || n).toUpperCase()).join(nombres.every(n => /^torre\s+\S+$/i.test(n)) ? '' : ', ');
 };
+
+// Encabezado con el logo de la empresa, como en el formato impreso.
+function EncabezadoLogo({ folio }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 10, marginBottom: 12, borderBottom: '0.5px solid #eee' }}>
+      <img src={`${process.env.PUBLIC_URL}/${EMPRESA.logo}`} alt={EMPRESA.nombre} style={{ height: 36, width: 'auto' }} />
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', letterSpacing: 0.5 }}>REQUISICIÓN DE PAGO</div>
+        {folio && <div style={{ fontSize: 11, color: '#888' }}>Folio {folio}</div>}
+      </div>
+    </div>
+  );
+}
 
 function Chip({ e }) {
   const s = ESTATUS[e];
@@ -92,6 +106,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
   const celda = { ...inp, width: '100%' };
   return (
     <Modal titulo="Nueva requisición de pago" onCerrar={onCerrar} ancho={860}>
+      <EncabezadoLogo />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 8, marginBottom: 10 }}>
         <div><label style={lbl}>Proyecto</label>
           <select value={f.desarrollo_id} onChange={e => { setF({ ...f, desarrollo_id: e.target.value }); setCargos(cs => cs.map(c => ({ ...c, torre_id: '', destino: '' }))); }} style={celda}>
@@ -261,6 +276,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
   const dato = (k, v) => v ? <div style={{ minWidth: 150 }}><div style={{ fontSize: 10, color: '#888' }}>{k}</div><div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div></div> : null;
   return (
     <Modal titulo={`Requisición #${req.folio}`} onCerrar={onCerrar} ancho={780}>
+      <EncabezadoLogo folio={req.folio} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <Chip e={req.estatus} /><span style={{ fontSize: 12, color: '#888' }}>{fechaCorta(req.fecha)} · solicita {(req.solicitante || '').split('@')[0]}</span>
         <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto' }}>PDF</button>
