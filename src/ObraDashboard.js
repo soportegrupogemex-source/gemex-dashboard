@@ -240,15 +240,16 @@ export default function ObraDashboard() {
       const ps = porTorre.get(t.id) || [];
       const hijos = indexar(ps);
       const hojas = ps.filter(p => !hijos.has(p.id));
-      if (!hojas.some(p => (progMap.get(p.id) || []).length > 0)) { sin++; return; } // sin programa: no hay obra que seguir
+      // Se sigue la obra de un frente si tiene calendario programado o ya lleva avance real capturado.
+      if (!hojas.some(p => (progMap.get(p.id) || []).length > 0 || Number(p.avance_pct) > 0)) { sin++; return; }
       const arr = t.fecha_arranque || null;
       const r = resumen(hojas, progMap, arr);
       const desv = r.programado === null ? null : r.realProgramadas - r.programado;
       const porId = new Map(ps.map(p => [p.id, p]));
       let maxSem = 0, maxDia = 0;
       hojas.forEach(p => (progMap.get(p.id) || []).forEach(x => { if (x.semana > maxSem || (x.semana === maxSem && x.dia > maxDia)) { maxSem = x.semana; maxDia = x.dia; } }));
-      let semanaTxt = `${maxSem} semanas de programa`, terminaTxt = '';
-      if (arr) {
+      let semanaTxt = maxSem > 0 ? `${maxSem} semanas de programa` : 'Sin calendario (solo avance real)', terminaTxt = '';
+      if (arr && maxSem > 0) {
         const sem = Math.floor((parse(hoy) - parse(arr)) / 86400000 / 7) + 1;
         semanaTxt = sem < 1 ? `Arranca ${fechaCorta(arr)}` : sem > maxSem ? `Plazo cumplido (${maxSem} sem.)` : `Semana ${sem} de ${maxSem}`;
         terminaTxt = `Termina prog. ${fechaCorta(fechaDe(arr, maxSem, maxDia))}`;

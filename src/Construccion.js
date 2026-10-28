@@ -106,7 +106,7 @@ export default function Construccion() {
         const ps = partidas.filter(p => p.torre_id === t.id);
         const hijos = indexar(ps);
         const hojas = ps.filter(p => !hijos.has(p.id));
-        if (!hojas.some(p => progMap.has(p.id))) return; // sin programa no hay obra que reportar
+        if (!hojas.some(p => progMap.has(p.id) || Number(p.avance_pct) > 0)) return; // sin programa ni avance no hay obra que reportar
         const pct = Math.round(resumen(hojas, progMap, null).real * 10) / 10;
         const ligadas = ligas.filter(l => l.torre_id === t.id).map(l => l.unidad_id);
         let unidades = ligadas;
