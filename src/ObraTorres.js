@@ -345,12 +345,185 @@ function TopeEditor({ torre, tope, permisos, cargado, onCambio }) {
 }
 
 
+
+// Mano de obra por semana: lo programado y lo real (unidades de cada partida), como la hoja M.O. del control de obra.
+// Programado = el que se capture aquí o, si no hay, el que sale del calendario de días. Real = lo avanzado cada semana
+// (sale del historial de avance; al capturarlo aquí se registra como avance al cierre de esa semana).
+function ProgramaPartidasSemanal({ torre, partidas, hojas, etapas, progMap, semanas, avances, arr, puedeEditar, puedeCapturar, onMezclar, onReal }) {
+  const plantilla = torre.es_plantilla;
+  const hoy = hoyISO();
+  const semHoy = arr ? Math.floor((parse(hoy) - parse(arr)) / 86400000 / 7) + 1 : null;
+  const [extra, setExtra] = useState(0);
+  const [cerradas, setCerradas] = useState(null); // null = todas cerradas
+  const [repartiendo, setRepartiendo] = useState(null);
+  const porId = useMemo(() => new Map(partidas.map(p => [p.id, p])), [partidas]);
+  const semDeFecha = (f) => (arr ? Math.max(1, Math.floor((parse(f) - parse(arr)) / 86400000 / 7) + 1) : null);
+
+  const datos = useMemo(() => {
+    const explicito = new Map();
+    semanas.forEach(r => { if (!explicito.has(r.partida_id)) explicito.set(r.partida_id, new Map()); explicito.get(r.partida_id).set(r.semana, Number(r.programado) || 0); });
+    const real = new Map();
+    avances.forEach(a => {
+      const w = semDeFecha(a.fecha); if (!w) return;
+      const p = porId.get(a.partida_id); const cant = Number(p?.cantidad) || 0; if (!cant) return;
+      const u = ((Number(a.pct) - Number(a.pct_anterior || 0)) / 100) * cant;
+      if (!real.has(a.partida_id)) real.set(a.partida_id, new Map());
+      real.get(a.partida_id).set(w, (real.get(a.partida_id).get(w) || 0) + u);
+    });
+    const prog = new Map(); const derivado = new Set();
+    hojas.forEach(p => {
+      if (explicito.has(p.id)) { prog.set(p.id, explicito.get(p.id)); return; }
+      const dias = progMap.get(p.id) || [];
+      if (dias.length && Number(p.cantidad) > 0) {
+        const m = new Map(); dias.forEach(d => m.set(d.semana, (m.get(d.semana) || 0) + Number(p.cantidad) / dias.length));
+        prog.set(p.id, m); derivado.add(p.id);
+      } else prog.set(p.id, new Map());
+    });
+    let maxSem = 0;
+    [prog, real].forEach(mm => mm.forEach(m => m.forEach((_, w) => { if (w > maxSem) maxSem = w; })));
+    return { prog, real, derivado, maxSem };
+  }, [semanas, avances, hojas, progMap, porId, arr]); // eslint-disable-line
+
+  const nSem = Math.min(104, Math.max(12, datos.maxSem, (semHoy || 0) + 1) + extra * 4);
+  const cols = Array.from({ length: nSem }, (_, i) => i + 1);
+  const precio = (p) => Number(p.precio_unitario) || 0;
+  const valProg = (p, hasta) => { let t = 0; (datos.prog.get(p.id) || new Map()).forEach((u, w) => { if (hasta === undefined || w <= hasta) t += u; }); return t * precio(p); };
+  const valReal = (p) => { let t = 0; (datos.real.get(p.id) || new Map()).forEach(u => { t += u; }); return t * precio(p); };
+
+  let pres = 0, progHoy = 0, realVal = 0;
+  hojas.forEach(p => { pres += (Number(p.cantidad) || 0) * precio(p); progHoy += semHoy ? valProg(p, semHoy) : 0; realVal += valReal(p); });
+  const hayProg = arr && semHoy >= 1 && progHoy > 0;
+  const desvio = hayProg ? realVal - progHoy : null;
+
+  const guardarProg = async (p, w, valor) => {
+    const v = valor === '' ? 0 : Number(valor);
+    if (Number.isNaN(v) || v < 0) return;
+    const actual = datos.prog.get(p.id)?.get(w) || 0;
+    if (Math.abs(actual - v) < 0.0001) return;
+    // Si el programado venía del calendario, se vuelve explícito completo para no mezclar las dos fuentes.
+    const base = new Map(datos.prog.get(p.id) || []);
+    base.set(w, v);
+    const filas = [...base].filter(([, u]) => u !== 0 || w === undefined || semanas.some(r => r.partida_id === p.id && r.semana === w) || datos.derivado.has(p.id)).map(([semana, programado]) => ({ partida_id: p.id, semana, programado }));
+    if (!filas.some(f => f.semana === w)) filas.push({ partida_id: p.id, semana: w, programado: v });
+    const { data, error } = await supabase.from('obra_partidas_semana').upsert(filas, { onConflict: 'partida_id,semana' }).select();
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    onMezclar(data);
+  };
+  const guardarReal = async (p, w, valor) => {
+    const v = valor === '' ? 0 : Number(valor);
+    if (Number.isNaN(v) || v < 0) return;
+    const actual = datos.real.get(p.id)?.get(w) || 0;
+    if (Math.abs(actual - v) < 0.0001) return;
+    const { data, error } = await supabase.rpc('obra_capturar_real_semana', { p_partida: p.id, p_semana: w, p_unidades: v });
+    if (error) { alert('No se pudo guardar: ' + error.message); onReal(null); return; }
+    onReal(data);
+  };
+
+  const celdaInp = { ...inp, width: 54, padding: '3px 4px', textAlign: 'right', fontSize: 11 };
+  const colorProg = '#2a78d6', colorReal = '#eb6834';
+  const abierta = (nombre) => cerradas !== null && !cerradas.has(nombre);
+  const alternar = (nombre) => setCerradas(prev => { const n = new Set(prev || etapas.map(e => e.nombre)); if (n.has(nombre)) n.delete(nombre); else n.add(nombre); return n; });
+  const todas = cerradas !== null && etapas.every(e => !cerradas.has(e.nombre));
+
+  return (
+    <div>
+      {!plantilla && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 12 }}>
+          <Tarjeta titulo="Presupuesto" valor={$(pres)} sub={`${hojas.length} partidas`} />
+          <Tarjeta titulo="Programado a hoy" valor={hayProg ? $(progHoy) : '—'} sub={hayProg ? `${pres > 0 ? pct1((progHoy / pres) * 100) : '—'} del presupuesto` : 'sin programa semanal ni calendario'} />
+          <Tarjeta titulo="Real ejecutado" valor={$(realVal)} sub={pres > 0 ? `${pct1((realVal / pres) * 100)} del presupuesto` : ''} />
+          <Tarjeta titulo="Real vs programado" valor={desvio === null ? '—' : `${desvio >= 0 ? '+' : ''}${$(desvio)}`} color={desvio === null ? '#1a1a2e' : desvio >= -0.05 * Math.max(progHoy, 1) ? '#10B981' : '#C0392B'} sub="a la semana de hoy" />
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11 }}><span style={{ width: 10, height: 10, background: colorProg, borderRadius: 2 }} />Programado (unidades)</span>
+        {!plantilla && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11 }}><span style={{ width: 10, height: 10, background: colorReal, borderRadius: 2 }} />Real (unidades)</span>}
+        <button onClick={() => setCerradas(todas ? new Set(etapas.map(e => e.nombre)) : new Set())} style={{ ...btn, padding: '2px 10px' }}>{todas ? 'Cerrar etapas' : 'Abrir todas las etapas'}</button>
+        <button onClick={() => setExtra(e => e + 1)} style={{ ...btn, padding: '2px 10px', marginLeft: 'auto' }}>+ 4 semanas</button>
+      </div>
+      {hojas.length === 0 ? <div style={{ fontSize: 13, color: '#888' }}>Aún no hay partidas. Agrégalas en el Catálogo.</div> : (
+        <div style={{ overflow: 'auto', maxHeight: '68vh', border: '0.5px solid #e0e0e0', borderRadius: 12, background: '#fff' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th style={{ position: 'sticky', left: 0, top: 0, zIndex: 3, background: '#f7f7f9', textAlign: 'left', padding: '8px 10px', minWidth: 230, borderBottom: '1px solid #e0e0e0' }}>Partida</th>
+                <th style={{ position: 'sticky', left: 230, top: 0, zIndex: 3, background: '#f7f7f9', padding: '8px 6px', minWidth: 130, borderBottom: '1px solid #e0e0e0', textAlign: 'right' }}>Total</th>
+                {cols.map(w => (
+                  <th key={w} style={{ position: 'sticky', top: 0, zIndex: 2, background: semHoy === w ? '#FDE2E2' : '#f7f7f9', padding: '4px 4px', borderBottom: '1px solid #e0e0e0', borderLeft: '1px solid #eee', minWidth: 62 }}>
+                    <div style={{ fontWeight: 700, color: '#1a1a2e' }}>S{w}</div>
+                    {arr && <div style={{ fontWeight: 400, color: '#999', fontSize: 10 }}>{fechaCorta(fechaDe(arr, w, 1))}</div>}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {etapas.map(et => {
+                const hs = et.raices.flatMap(r => hojasDe(r, indexar(partidas)));
+                const pE = hs.reduce((t, p) => t + valProg(p), 0), rE = hs.reduce((t, p) => t + valReal(p), 0);
+                return (
+                  <React.Fragment key={et.nombre}>
+                    <tr onClick={() => alternar(et.nombre)} style={{ cursor: 'pointer' }}>
+                      <td colSpan={cols.length + 2} style={{ position: 'sticky', left: 0, background: '#1a1a2e', color: '#fff', padding: '6px 10px', fontWeight: 700 }}>
+                        <span style={{ display: 'inline-block', width: 12, transform: abierta(et.nombre) ? 'rotate(90deg)' : 'none' }}>▶</span> {et.nombre}
+                        <span style={{ fontWeight: 400, opacity: 0.8 }}> · {hs.length} partidas · programado {$(pE)}{!plantilla && ` · real ${$(rE)}`}</span>
+                      </td>
+                    </tr>
+                    {abierta(et.nombre) && hs.map(p => {
+                      const cant = Number(p.cantidad) || 0;
+                      const mp = datos.prog.get(p.id) || new Map(), mr = datos.real.get(p.id) || new Map();
+                      let sp = 0, sr = 0; mp.forEach(u => { sp += u; }); mr.forEach(u => { sr += u; });
+                      const descuadre = sp > 0 && cant > 0 && Math.abs(sp - cant) > 0.01 * Math.max(cant, 1);
+                      const filas = [['programado', colorProg, 'Prog.'], ...(plantilla ? [] : [['real', colorReal, 'Real']])];
+                      const ruta = p.parent_id ? rutaDe(p, porId).split(' › ').slice(1).join(' › ') : '';
+                      return filas.map(([campo, color, etiqueta], i) => (
+                        <tr key={p.id + campo}>
+                          {i === 0 && (
+                            <td rowSpan={filas.length} style={{ position: 'sticky', left: 0, zIndex: 1, background: '#fff', padding: '4px 10px', borderBottom: '1px solid #ececef', verticalAlign: 'top' }}>
+                              <div style={{ fontWeight: 600, color: '#1a1a2e', maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.descripcion}>{p.descripcion}</div>
+                              <div style={{ color: '#888', fontSize: 10 }}>{ruta ? ruta + ' · ' : ''}{fmtN(cant)} {p.unidad || ''} · {$(precio(p))} c/u{datos.derivado.has(p.id) ? ' · prog. del calendario' : ''}</div>
+                              {puedeEditar && cant > 0 && <button onClick={() => setRepartiendo(p)} style={{ ...btn, padding: '0 6px', fontSize: 10, marginTop: 2 }}>Repartir</button>}
+                            </td>
+                          )}
+                          <td style={{ position: 'sticky', left: 230, zIndex: 1, background: '#fff', padding: '2px 6px', textAlign: 'right', borderBottom: i === filas.length - 1 ? '1px solid #ececef' : 'none', whiteSpace: 'nowrap' }}>
+                            <span style={{ color, fontWeight: 600 }}>{etiqueta}</span>{' '}
+                            {campo === 'programado' ? <span style={{ color: descuadre ? '#C0392B' : '#555' }} title={descuadre ? 'Lo programado no coincide con la cantidad' : ''}>{fmtN(sp)}{cant > 0 ? ` / ${fmtN(cant)}` : ''}</span> : <span style={{ color: '#555' }}>{fmtN(sr)} · {$(sr * precio(p))}</span>}
+                          </td>
+                          {cols.map(w => {
+                            const val = (campo === 'programado' ? mp : mr).get(w);
+                            const editable = campo === 'programado' ? puedeEditar : puedeCapturar && cant > 0;
+                            return (
+                              <td key={w} style={{ padding: '1px 2px', borderLeft: '1px solid #f3f3f3', borderBottom: i === filas.length - 1 ? '1px solid #ececef' : 'none', background: semHoy === w ? '#FFF5F5' : '#fff' }}>
+                                <input key={`${p.id}-${w}-${campo}-${val ?? ''}`} type="number" min="0" step="any" disabled={!editable}
+                                  defaultValue={val === undefined || Math.abs(val) < 0.0005 ? '' : Math.round(val * 1000) / 1000}
+                                  onBlur={e => (campo === 'programado' ? guardarProg : guardarReal)(p, w, e.target.value)} onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                                  style={{ ...celdaInp, borderColor: val ? color : '#e6e6e9', background: editable ? '#fff' : '#fafafa', fontStyle: campo === 'programado' && datos.derivado.has(p.id) ? 'italic' : 'normal' }} />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ));
+                    })}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Programado: unidades que se esperan cada semana (en cursiva, el que sale del calendario de días). Real: lo avanzado cada semana; al capturarlo aquí queda registrado como avance al cierre de esa semana y se ve también en Avance. La cuadrícula por días sigue disponible en "Calendario por días".</div>
+      {repartiendo && <ModalRepartir concepto={repartiendo} tabla="obra_partidas_semana" campoId="partida_id" semanasTotales={nSem}
+        filas={[...(datos.prog.get(repartiendo.id) || new Map())].map(([semana, programado]) => ({ semana, programado }))}
+        onCerrar={() => setRepartiendo(null)} onGuardado={(rows) => { onMezclar(rows); setRepartiendo(null); }} />}
+    </div>
+  );
+}
+
 // ------------------------------------------------------- Programa por categoría
 // Materiales, subcontratos, maquinaria e indirectos: por concepto y semana, lo programado y lo real (unidades),
 // como las hojas MAT, CONTRATOS y MAQ. del control de obra. Mano de obra sigue con su calendario de días y avance.
 const CATS_PROGRAMA = [['mano_obra', 'Mano de obra'], ['materiales', 'Materiales'], ['maquinaria', 'Maquinaria'], ['subcontratos', 'Subcontratos'], ['indirectos', 'Indirectos']];
 
-function ModalRepartir({ concepto, filas, semanasTotales, onCerrar, onGuardado }) {
+function ModalRepartir({ concepto, filas, semanasTotales, onCerrar, onGuardado, tabla = 'obra_conceptos_semana', campoId = 'concepto_id' }) {
   const [desde, setDesde] = useState(1);
   const [hasta, setHasta] = useState(Math.min(4, semanasTotales));
   const [guardando, setGuardando] = useState(false);
@@ -363,7 +536,7 @@ function ModalRepartir({ concepto, filas, semanasTotales, onCerrar, onGuardado }
     const nuevas = new Map();
     for (let i = 0; i < n; i++) nuevas.set(Number(desde) + i, i === n - 1 ? Math.round((cant - base * (n - 1)) * 100) / 100 : base);
     filas.forEach(f => { if (!nuevas.has(f.semana) && Number(f.programado) !== 0) nuevas.set(f.semana, 0); });
-    const { data, error } = await supabase.from('obra_conceptos_semana').upsert([...nuevas].map(([semana, programado]) => ({ concepto_id: concepto.id, semana, programado })), { onConflict: 'concepto_id,semana' }).select();
+    const { data, error } = await supabase.from(tabla).upsert([...nuevas].map(([semana, programado]) => ({ [campoId]: concepto.id, semana, programado })), { onConflict: `${campoId},semana` }).select();
     if (error) { alert('No se pudo repartir: ' + error.message); setGuardando(false); return; }
     onGuardado(data);
   };
@@ -1448,6 +1621,13 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const [estimaciones, setEstimaciones] = useState([]);
   const [conceptos, setConceptos] = useState([]);
   const [semanasConcepto, setSemanasConcepto] = useState([]);
+  const [partidasSemana, setPartidasSemana] = useState([]);
+  const [vistaMO, setVistaMO] = useState('semanal');
+  const mezclarPartidasSemana = useCallback((rows) => setPartidasSemana(prev => {
+    const m = new Map(prev.map(r => [`${r.partida_id}:${r.semana}`, r]));
+    (rows || []).forEach(r => m.set(`${r.partida_id}:${r.semana}`, { ...(m.get(`${r.partida_id}:${r.semana}`) || {}), ...r }));
+    return [...m.values()];
+  }), []);
   const [catPrograma, setCatPrograma] = useState('mano_obra');
   const mezclarSemanas = useCallback((rows) => setSemanasConcepto(prev => {
     const m = new Map(prev.map(r => [`${r.concepto_id}:${r.semana}`, r]));
@@ -1512,6 +1692,9 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
       let prog = [];
       for (let i = 0; i < ids.length; i += 120) prog = prog.concat(await traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').in('partida_id', ids.slice(i, i + 120))));
       setPartidas(p); setPrograma(prog);
+      let psem = [];
+      for (let i = 0; i < ids.length; i += 120) psem = psem.concat(await traerTodo(() => supabase.from('obra_partidas_semana').select('*').in('partida_id', ids.slice(i, i + 120)).order('id')));
+      setPartidasSemana(psem);
       if (torre.tipo === 'tren' && !torre.es_plantilla) {
         const { data } = await supabase.from('obra_torre_unidades').select('inventario(numero)').eq('torre_id', torre.id);
         setViviendas((data || []).map(x => x.inventario?.numero).filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), 'es', { numeric: true })));
@@ -1535,6 +1718,11 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const total = useMemo(() => resumen(hojas, progMap, arr), [hojas, progMap, arr]);
   const hoy = hoyISO();
   const semanaHoy = arr ? Math.floor((parse(hoy) - parse(arr)) / 86400000 / 7) + 1 : null;
+
+  const tras_real = async (fila) => {
+    if (fila) setPartidas(prev => prev.map(x => x.id === fila.id ? { ...x, ...fila } : x));
+    try { setAvances(await traerTodo(() => supabase.from('obra_avance').select('partida_id, fecha, pct, pct_anterior, obra_partidas!inner(torre_id)').eq('obra_partidas.torre_id', torre.id).order('created_at'))); } catch (e) { /* se actualizará al recargar */ }
+  };
 
   const guardarArranque = async (valor) => {
     if (!puedeEditar) return;
@@ -1623,7 +1811,16 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
         )}
         {tab === 'programa' && catPrograma !== 'mano_obra' && <ProgramaConceptos torre={torre} categoria={catPrograma} conceptos={conceptos} semanas={semanasConcepto} arr={arr}
           semMaxMO={Math.max(0, ...programa.map(x => x.semana))} puedeEditar={puedeEditar} puedeCapturar={puedeCapturar && !torre.es_plantilla} onMezclar={mezclarSemanas} />}
-        {tab === 'programa' && catPrograma === 'mano_obra' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
+        {tab === 'programa' && catPrograma === 'mano_obra' && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {[['semanal', 'Semanal: programado y real'], ['calendario', 'Calendario por días']].map(([k, l]) => (
+              <button key={k} onClick={() => setVistaMO(k)} style={{ ...btn, padding: '3px 12px', background: vistaMO === k ? '#eef0f6' : '#fff', color: vistaMO === k ? '#1a1a2e' : '#777', fontWeight: vistaMO === k ? 600 : 400 }}>{l}</button>
+            ))}
+          </div>
+        )}
+        {tab === 'programa' && catPrograma === 'mano_obra' && vistaMO === 'semanal' && <ProgramaPartidasSemanal torre={torre} partidas={partidas} hojas={hojas} etapas={etapas} progMap={progMap} semanas={partidasSemana} avances={avances}
+          arr={arr} puedeEditar={puedeEditar} puedeCapturar={puedeCapturar && !torre.es_plantilla} onMezclar={mezclarPartidasSemana} onReal={tras_real} />}
+        {tab === 'programa' && catPrograma === 'mano_obra' && vistaMO === 'calendario' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           partidas={partidas} onCambio={cargar} />}
         {tab === 'catalogo' && <TabCatalogo torre={torre} partidas={partidas} etapas={etapas} hijos={hijos} progMap={progMap} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
         {tab === 'presupuesto' && <TabPresupuesto torre={torre} partidas={hojas} progMap={progMap} contratos={contratos} conceptos={conceptos} gastos={gastos} avances={avances} semanasConcepto={semanasConcepto} pagos={pagos} arr={arr} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
