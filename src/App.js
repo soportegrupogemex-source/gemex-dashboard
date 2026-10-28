@@ -24,12 +24,13 @@ import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe, puedeA
 import Construccion from './Construccion';
 import ObraTorres from './ObraTorres';
 import ObraDashboard from './ObraDashboard';
+import ObraRequisiciones from './ObraRequisiciones';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, LineChart,
   ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck, Banknote, HardHat,
-  TrendingUp, Landmark, Percent, SlidersHorizontal, Megaphone, ToggleRight, Layers, BarChart3,
+  TrendingUp, Landmark, Percent, SlidersHorizontal, Megaphone, ToggleRight, Layers, BarChart3, Receipt,
 } from 'lucide-react';
 
 function useIsMobile() {
@@ -87,6 +88,7 @@ const MENU_ICONS = {
   construccion: <HardHat size={18} />,
   obra_torres: <Layers size={18} />,
   obra_dashboard: <BarChart3 size={18} />,
+  obra_requisiciones: <Receipt size={18} />,
   objetivos: <Target size={18} />,
   tendencias_producto: <Flame size={18} />,
   buyer_persona: <UserCheck size={18} />,
@@ -763,6 +765,7 @@ function App() {
       case 'construccion': return <Construccion />;
       case 'obra_torres': return <ObraTorres />;
       case 'obra_dashboard': return <ObraDashboard />;
+      case 'obra_requisiciones': return <ObraRequisiciones />;
       case 'tendencias_producto': return <TendenciasProducto miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona': return <BuyerPersona miRol={miRol} miAgente={miAgente} />;
       case 'micuenta': return <MiCuenta user={session.user} miRol={miRol} />;

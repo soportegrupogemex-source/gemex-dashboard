@@ -50,8 +50,8 @@ export function useIsMobile() {
   return isMobile;
 }
 
-const btn = { padding: '6px 12px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', fontSize: '12px', cursor: 'pointer' };
-const inp = { padding: '6px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' };
+export const btn = { padding: '6px 12px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', fontSize: '12px', cursor: 'pointer' };
+export const inp = { padding: '6px 8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box' };
 
 // Métricas de un conjunto de partidas. prog = Map(partida_id -> [{semana, dia}])
 export function resumen(partidas, prog, arranque) {
@@ -307,7 +307,7 @@ function PrecioCelda({ p, disabled, onGuardar }) {
   return <InputDinero disabled={disabled} value={v} placeholder="Precio unit." onChange={e => setV(e.target.value)}
     onBlur={() => onGuardar(p, 'precio_unitario', v)} style={{ ...inp, width: 110, textAlign: 'right' }} />;
 }
-function Modal({ titulo, onCerrar, children, ancho = 460 }) {
+export function Modal({ titulo, onCerrar, children, ancho = 460 }) {
   return (
     <div onClick={onCerrar} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 14, padding: '1.25rem', width: '100%', maxWidth: ancho, maxHeight: '90vh', overflowY: 'auto' }}>
@@ -317,7 +317,7 @@ function Modal({ titulo, onCerrar, children, ancho = 460 }) {
     </div>
   );
 }
-const lbl = { fontSize: 12, color: '#555', display: 'block', marginBottom: 3 };
+export const lbl = { fontSize: 12, color: '#555', display: 'block', marginBottom: 3 };
 
 // ------------------------------------------------------------------ Costos
 
