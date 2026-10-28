@@ -320,14 +320,321 @@ function Modal({ titulo, onCerrar, children, ancho = 460 }) {
 const lbl = { fontSize: 12, color: '#555', display: 'block', marginBottom: 3 };
 
 // ------------------------------------------------------------------ Costos
-function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, estimaciones = [], tope, permisos, isMobile, onCambio }) {
+
+// Tope de presupuesto autorizado del frente (modificable por quien tenga permiso).
+function TopeEditor({ torre, tope, permisos, cargado, onCambio }) {
+  const [txt, setTxt] = useState(tope === null ? '' : String(tope));
+  useEffect(() => { setTxt(tope === null ? '' : String(tope)); }, [tope]);
+  const fijar = async (valor) => {
+    const v = valor === '' || valor === null ? null : Number(valor);
+    const { error } = await supabase.from('obra_torres').update({ presupuesto_tope: v }).eq('id', torre.id);
+    if (error) { alert('No se pudo fijar el tope: ' + error.message); setTxt(tope === null ? '' : String(tope)); return; }
+    onCambio();
+  };
+  return (
+    <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, padding: 12, marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>Tope de presupuesto autorizado</div>
+      <InputDinero disabled={!permisos.tope} value={txt} placeholder="Sin tope" onChange={e => setTxt(e.target.value)} style={{ ...inp, width: 150, textAlign: 'right' }} />
+      {permisos.tope && <button onClick={() => fijar(txt)} style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none' }}>Fijar tope</button>}
+      {permisos.tope && tope !== null && <button onClick={() => fijar(null)} style={btn}>Quitar tope</button>}
+      <div style={{ fontSize: 11, color: '#888', flex: '1 1 260px' }}>
+        Cargado {$(cargado)}{tope !== null ? ` · disponible ${$(tope - cargado)}` : ''}. Nadie puede cargar precios, contratos ni conceptos que hagan que el presupuesto rebase este tope.{!permisos.tope ? ' Solo quien tenga permiso lo fija.' : ''}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Presupuesto
+// Presupuesto contra ejecutado por categoría y por semana. Mano de obra se ejecuta por avance (lo devengado);
+// materiales, subcontratos, maquinaria e indirectos, por los gastos registrados.
+const CATEGORIAS = [['materiales', 'Materiales'], ['subcontratos', 'Subcontratos'], ['maquinaria', 'Maquinaria'], ['indirectos', 'Indirectos']];
+const NOMBRE_CAT = { mano_obra: 'Mano de obra', ...Object.fromEntries(CATEGORIAS) };
+
+function ModalConcepto({ torre, categoria, onCerrar, onCreado }) {
+  const [f, setF] = useState({ descripcion: '', unidad: '', cantidad: '1', precio: '', fiscal: '' });
+  const [guardando, setGuardando] = useState(false);
+  const crear = async () => {
+    if (!f.descripcion.trim()) { alert('Escribe la descripción.'); return; }
+    setGuardando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('obra_conceptos').insert({
+      torre_id: torre.id, categoria, descripcion: f.descripcion.trim(), unidad: f.unidad.trim().toUpperCase() || null,
+      cantidad: num(f.cantidad) ?? 1, precio_unitario: num(f.precio) ?? 0, fiscal: categoria === 'subcontratos' && f.fiscal !== '' ? f.fiscal === 'si' : null,
+      orden: Date.now() % 100000000, creado_por: user?.email || null,
+    });
+    if (error) { alert('No se pudo agregar: ' + error.message); setGuardando(false); return; }
+    onCreado();
+  };
+  return (
+    <Modal titulo={`Nuevo concepto · ${NOMBRE_CAT[categoria]}`} onCerrar={onCerrar}>
+      <label style={lbl}>Descripción</label>
+      <input value={f.descripcion} onChange={e => setF({ ...f, descripcion: e.target.value })} autoFocus style={{ ...inp, width: '100%', marginBottom: 8 }} />
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1 }}><label style={lbl}>Unidad</label><input value={f.unidad} onChange={e => setF({ ...f, unidad: e.target.value })} placeholder="M3, KG, LOTE, SEMANA…" style={{ ...inp, width: '100%' }} /></div>
+        <div style={{ flex: 1 }}><label style={lbl}>Cantidad</label><input type="number" value={f.cantidad} onChange={e => setF({ ...f, cantidad: e.target.value })} style={{ ...inp, width: '100%' }} /></div>
+        <div style={{ flex: 1 }}><label style={lbl}>Precio unitario</label><InputDinero value={f.precio} onChange={e => setF({ ...f, precio: e.target.value })} style={{ ...inp, width: '100%', textAlign: 'right' }} /></div>
+      </div>
+      {categoria === 'subcontratos' && (<>
+        <label style={lbl}>Fiscal</label>
+        <select value={f.fiscal} onChange={e => setF({ ...f, fiscal: e.target.value })} style={{ ...inp, width: '100%', marginBottom: 8 }}>
+          <option value="">Sin definir</option><option value="si">Fiscal</option><option value="no">No fiscal</option>
+        </select>
+      </>)}
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>Presupuesto = cantidad × precio unitario. Para algo global usa cantidad 1 y el monto como precio.</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Agregar'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ModalGasto({ concepto, onCerrar, onCreado }) {
+  const [fecha, setFecha] = useState(hoyISO());
+  const [monto, setMonto] = useState('');
+  const [desc, setDesc] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const crear = async () => {
+    if (!(Number(monto) > 0)) { alert('Escribe un monto mayor a cero.'); return; }
+    setGuardando(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('obra_gastos').insert({ concepto_id: concepto.id, fecha, monto: Number(monto), descripcion: desc.trim() || null, registrado_por: user?.email || null });
+    if (error) { alert('No se pudo registrar el gasto: ' + error.message); setGuardando(false); return; }
+    onCreado();
+  };
+  return (
+    <Modal titulo={`Registrar gasto · ${concepto.descripcion}`} onCerrar={onCerrar}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div style={{ flex: 1 }}><label style={lbl}>Fecha</label><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...inp, width: '100%' }} /></div>
+        <div style={{ flex: 1 }}><label style={lbl}>Monto</label><InputDinero value={monto} onChange={e => setMonto(e.target.value)} autoFocus style={{ ...inp, width: '100%', textAlign: 'right' }} /></div>
+      </div>
+      <label style={lbl}>Descripción (opcional)</label>
+      <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Factura, anticipo, estimación…" style={{ ...inp, width: '100%', marginBottom: 10 }} />
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>Aquí se capturan gastos históricos o sueltos. Lo que se pague por requisición se cargará solo.</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Registrar'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos, avances, arr, tope, permisos, isMobile, onCambio }) {
+  const plantilla = torre.es_plantilla;
+  const [abiertas, setAbiertas] = useState({});
+  const [nuevo, setNuevo] = useState(null);
+  const [gastando, setGastando] = useState(null);
+  const hoy = hoyISO();
+  const semDe = (fecha) => (arr ? Math.max(0, Math.floor((parse(fecha) - parse(arr)) / 86400000 / 7) + 1) : null);
+  const presP = (p) => (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0);
+
+  const d = useMemo(() => {
+    // Mano de obra: presupuesto y devengado por avance (igual que la pestaña Costos).
+    let moPres = 0, moDev = 0;
+    const valor = new Map();
+    contratos.forEach(c => {
+      const ps = partidas.filter(p => p.contrato_id === c.id);
+      const fijo = c.tipo === 'monto_fijo';
+      const total = fijo ? Number(c.monto_fijo || 0) : ps.reduce((t, p) => t + presP(p), 0);
+      const av = ps.length ? resumen(ps, progMap, null).real : 0;
+      moPres += total; moDev += fijo ? (total * av) / 100 : ps.reduce((t, p) => t + (presP(p) * Number(p.avance_pct || 0)) / 100, 0);
+      if (fijo) {
+        const conPrecio = ps.length > 0 && ps.every(p => presP(p) > 0);
+        const sw = ps.reduce((t, p) => t + (conPrecio ? presP(p) : 1), 0) || 1;
+        ps.forEach(p => valor.set(p.id, (total * (conPrecio ? presP(p) : 1)) / sw));
+      } else ps.forEach(p => valor.set(p.id, presP(p)));
+    });
+    partidas.filter(p => !p.contrato_id).forEach(p => { moPres += presP(p); moDev += (presP(p) * Number(p.avance_pct || 0)) / 100; valor.set(p.id, presP(p)); });
+
+    const cats = [{ clave: 'mano_obra', pres: moPres, eje: moDev, sem: new Map() }, ...CATEGORIAS.map(([k]) => ({ clave: k, pres: 0, eje: 0, sem: new Map() }))];
+    const porClave = new Map(cats.map(c => [c.clave, c]));
+    const suma = (c, w, m) => c.sem.set(w, (c.sem.get(w) || 0) + m);
+    // Semanal de mano de obra: lo que avanzó cada semana por el valor de la partida; el resto (avance sin historial) va a "sin fecha".
+    if (arr) {
+      let hist = 0;
+      avances.forEach(a => {
+        const m = ((Number(a.pct) - Number(a.pct_anterior || 0)) / 100) * (valor.get(a.partida_id) || 0);
+        suma(porClave.get('mano_obra'), semDe(a.fecha), m); hist += m;
+      });
+      if (Math.abs(moDev - hist) > 1) suma(porClave.get('mano_obra'), 'x', moDev - hist);
+    }
+    const catDe = new Map(conceptos.map(c => [c.id, c.categoria]));
+    conceptos.forEach(c => { porClave.get(c.categoria).pres += (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0); });
+    const ejePorConcepto = new Map();
+    gastos.forEach(g => {
+      const c = porClave.get(catDe.get(g.concepto_id)); if (!c) return;
+      c.eje += Number(g.monto); ejePorConcepto.set(g.concepto_id, (ejePorConcepto.get(g.concepto_id) || 0) + Number(g.monto));
+      if (arr) suma(c, semDe(g.fecha), Number(g.monto));
+    });
+    let maxSem = arr ? semDe(hoy) : 0;
+    cats.forEach(c => c.sem.forEach((_, w) => { if (w !== 'x' && w > maxSem) maxSem = w; }));
+    return { cats, ejePorConcepto, maxSem, total: { pres: cats.reduce((t, c) => t + c.pres, 0), eje: cats.reduce((t, c) => t + c.eje, 0) } };
+  }, [partidas, contratos, conceptos, gastos, avances, progMap, arr]); // eslint-disable-line
+
+  const semanas = Array.from({ length: d.maxSem + 1 }, (_, i) => i);
+  const hayX = d.cats.some(c => c.sem.has('x'));
+  const celda = (c, w) => c.sem.get(w) || 0;
+  const fm = (n) => (Math.abs(n) < 0.5 ? '' : $(n));
+  const th = { padding: '6px 10px', fontSize: 11, color: '#555', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' };
+  const td = { padding: '6px 10px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' };
+
+  const guardarCampo = async (c, campo, valor) => {
+    if (!permisos.costos) return;
+    const v = (campo === 'cantidad' || campo === 'precio_unitario') ? num(valor) : (String(valor).trim() || null);
+    if (campo === 'descripcion' && !v) return;
+    if ((campo === 'cantidad' || campo === 'precio_unitario') && v === null) return;
+    if (v === c[campo]) return;
+    const { error } = await supabase.from('obra_conceptos').update({ [campo]: v }).eq('id', c.id);
+    if (error) alert('No se pudo guardar: ' + error.message);
+    onCambio();
+  };
+  const eliminarConcepto = async (c) => {
+    const n = gastos.filter(g => g.concepto_id === c.id).length;
+    if (!window.confirm(`¿Eliminar "${c.descripcion}"${n ? ` y sus ${n} gastos registrados` : ''}?`)) return;
+    const { error } = await supabase.from('obra_conceptos').delete().eq('id', c.id);
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    onCambio();
+  };
+  const eliminarGasto = async (g) => {
+    if (!window.confirm(`¿Eliminar el gasto de ${$(g.monto)}?`)) return;
+    const { error } = await supabase.from('obra_gastos').delete().eq('id', g.id);
+    if (error) { alert('No se pudo eliminar: ' + error.message); return; }
+    onCambio();
+  };
+
+  return (
+    <div>
+      {!plantilla && (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+          <Tarjeta titulo="Presupuesto cargado" valor={$(d.total.pres)} sub={tope === null ? 'sin tope fijado' : `tope ${$(tope)}`} />
+          <Tarjeta titulo="Disponible del tope" valor={tope === null ? '—' : $(tope - d.total.pres)} sub={tope === null ? 'fija un tope para controlarlo' : 'lo que aún se puede cargar'} color={tope !== null && tope - d.total.pres < 0 ? '#C0392B' : '#1a1a2e'} />
+          <Tarjeta titulo="Ejecutado" valor={$(d.total.eje)} sub={d.total.pres > 0 ? `${pct1((d.total.eje / d.total.pres) * 100)} del presupuesto` : 'sin presupuesto'} />
+          <Tarjeta titulo="Por ejercer" valor={$(d.total.pres - d.total.eje)} sub="presupuesto − ejecutado" />
+        </div>
+      )}
+      <TopeEditor torre={torre} tope={tope} permisos={permisos} cargado={d.total.pres} onCambio={onCambio} />
+
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Presupuesto por categoría</div>
+      <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, overflowX: 'auto', marginBottom: 16 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+          <thead><tr style={{ background: '#f7f7f9' }}>
+            <th style={{ ...th, textAlign: 'left' }}>Categoría</th><th style={th}>Presupuesto</th>
+            {!plantilla && <><th style={th}>Ejecutado</th><th style={th}>%</th><th style={th}>Por ejercer</th></>}
+          </tr></thead>
+          <tbody>
+            {d.cats.map(c => (
+              <tr key={c.clave} style={{ borderTop: '0.5px solid #f0f0f0' }}>
+                <td style={{ ...td, textAlign: 'left', fontWeight: 600 }}>{NOMBRE_CAT[c.clave]}{c.clave === 'mano_obra' && <span style={{ fontWeight: 400, color: '#aaa' }}> · por avance</span>}</td>
+                <td style={td}>{$(c.pres)}</td>
+                {!plantilla && <>
+                  <td style={td}>{$(c.eje)}</td>
+                  <td style={td}>{c.pres > 0 ? pct1((c.eje / c.pres) * 100) : '—'}</td>
+                  <td style={{ ...td, color: c.pres - c.eje < 0 ? '#C0392B' : '#1a1a2e' }}>{$(c.pres - c.eje)}</td>
+                </>}
+              </tr>
+            ))}
+            <tr style={{ borderTop: '1px solid #ddd', background: '#fafafc', fontWeight: 700 }}>
+              <td style={{ ...td, textAlign: 'left' }}>Total</td><td style={td}>{$(d.total.pres)}</td>
+              {!plantilla && <><td style={td}>{$(d.total.eje)}</td><td style={td}>{d.total.pres > 0 ? pct1((d.total.eje / d.total.pres) * 100) : '—'}</td><td style={td}>{$(d.total.pres - d.total.eje)}</td></>}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {!plantilla && (<>
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Ejecutado por semana</div>
+        {!arr ? <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>Captura la fecha de arranque del frente para ver el gasto semana a semana.</div> : (
+          <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, overflowX: 'auto', marginBottom: 16 }}>
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+              <thead><tr style={{ background: '#f7f7f9' }}>
+                <th style={{ ...th, textAlign: 'left', position: 'sticky', left: 0, background: '#f7f7f9' }}>Categoría</th>
+                {semanas.map(w => <th key={w} style={th}>{w === 0 ? 'Previo' : `S${w}`}<div style={{ fontWeight: 400, color: '#aaa', fontSize: 10 }}>{w === 0 ? '' : fechaCorta(fechaDe(arr, w, 1))}</div></th>)}
+                {hayX && <th style={th}>Sin fecha</th>}
+              </tr></thead>
+              <tbody>
+                {d.cats.map(c => (
+                  <tr key={c.clave} style={{ borderTop: '0.5px solid #f0f0f0' }}>
+                    <td style={{ ...td, textAlign: 'left', fontWeight: 600, position: 'sticky', left: 0, background: '#fff' }}>{NOMBRE_CAT[c.clave]}</td>
+                    {semanas.map(w => <td key={w} style={td}>{fm(celda(c, w))}</td>)}
+                    {hayX && <td style={td}>{fm(celda(c, 'x'))}</td>}
+                  </tr>
+                ))}
+                <tr style={{ borderTop: '1px solid #ddd', background: '#fafafc', fontWeight: 700 }}>
+                  <td style={{ ...td, textAlign: 'left', position: 'sticky', left: 0, background: '#fafafc' }}>Total semana</td>
+                  {semanas.map(w => <td key={w} style={td}>{fm(d.cats.reduce((t, c) => t + celda(c, w), 0))}</td>)}
+                  {hayX && <td style={td}>{fm(d.cats.reduce((t, c) => t + celda(c, 'x'), 0))}</td>}
+                </tr>
+                <tr style={{ background: '#fafafc' }}>
+                  <td style={{ ...td, textAlign: 'left', color: '#888', position: 'sticky', left: 0, background: '#fafafc' }}>Acumulado</td>
+                  {(() => { let acc = d.cats.reduce((t, c) => t + celda(c, 'x'), 0); return semanas.map(w => { acc += d.cats.reduce((t, c) => t + celda(c, w), 0); return <td key={w} style={{ ...td, color: '#888' }}>{fm(acc)}</td>; }); })()}
+                  {hayX && <td />}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>)}
+
+      {CATEGORIAS.map(([clave, nombre]) => {
+        const lista = conceptos.filter(c => c.categoria === clave);
+        const cat = d.cats.find(c => c.clave === clave);
+        return (
+          <div key={clave} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 12px', background: '#f7f7f9', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 13, fontWeight: 700 }}>{nombre} <span style={{ fontWeight: 400, color: '#888' }}>· {lista.length} conceptos</span></div>
+              <div style={{ fontSize: 12, color: '#555', marginLeft: 'auto' }}>Presupuesto <b>{$(cat.pres)}</b>{!plantilla && <> · ejecutado <b>{$(cat.eje)}</b></>}</div>
+              {permisos.costos && <button onClick={() => setNuevo(clave)} style={{ ...btn, padding: '3px 10px' }}>+ Concepto</button>}
+            </div>
+            {lista.length === 0 && <div style={{ padding: '10px 14px', fontSize: 12, color: '#888' }}>Sin conceptos.{permisos.costos ? ' Agrega el primero con "+ Concepto".' : ''}</div>}
+            {lista.map(c => {
+              const pres = (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0);
+              const eje = d.ejePorConcepto.get(c.id) || 0;
+              const susGastos = gastos.filter(g => g.concepto_id === c.id).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+              const abierto = !!abiertas[c.id];
+              return (
+                <div key={c.id} style={{ borderTop: '0.5px solid #f3f3f3' }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '5px 12px', flexWrap: 'wrap' }}>
+                    {!plantilla ? <span onClick={() => setAbiertas(a => ({ ...a, [c.id]: !a[c.id] }))} style={{ cursor: 'pointer', fontSize: 9, width: 10, display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'none' }}>▶</span> : <span style={{ width: 10 }} />}
+                    <input defaultValue={c.descripcion} disabled={!permisos.costos} onBlur={e => guardarCampo(c, 'descripcion', e.target.value)} style={{ ...inp, flex: '1 1 220px', border: permisos.costos ? inp.border : 'none' }} />
+                    <input defaultValue={c.unidad || ''} disabled={!permisos.costos} onBlur={e => guardarCampo(c, 'unidad', e.target.value.toUpperCase())} style={{ ...inp, width: 64 }} />
+                    <input type="number" defaultValue={c.cantidad} disabled={!permisos.costos} onBlur={e => guardarCampo(c, 'cantidad', e.target.value)} style={{ ...inp, width: 90, textAlign: 'right' }} />
+                    <PrecioCelda p={c} disabled={!permisos.costos} onGuardar={guardarCampo} />
+                    <span style={{ width: 110, textAlign: 'right', fontSize: 12 }} title="Presupuesto = cantidad × precio unitario">{$(pres)}</span>
+                    {clave === 'subcontratos' && c.fiscal !== null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: c.fiscal ? '#EFF6FF' : '#f3f3f5', color: c.fiscal ? '#3B82F6' : '#888' }}>{c.fiscal ? 'Fiscal' : 'No fiscal'}</span>}
+                    {!plantilla && <span style={{ width: 150, textAlign: 'right', fontSize: 11, color: eje > pres && pres > 0 ? '#C0392B' : '#555' }}>ejecutado {$(eje)}{pres > 0 ? ` · ${pct1((eje / pres) * 100)}` : ''}</span>}
+                    {!plantilla && permisos.pagos && <button onClick={() => setGastando(c)} style={{ ...btn, padding: '2px 8px' }}>+ gasto</button>}
+                    {permisos.costos && <button onClick={() => eliminarConcepto(c)} style={{ ...btn, padding: '2px 8px', color: '#C0392B' }}>Eliminar</button>}
+                  </div>
+                  {abierto && !plantilla && (
+                    <div style={{ padding: '2px 14px 10px 36px' }}>
+                      {susGastos.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Sin gastos registrados.</div> : susGastos.map(g => (
+                        <div key={g.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '3px 0', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ width: 70 }}>{fechaCorta(g.fecha)}</span><b style={{ width: 110 }}>{$(g.monto)}</b>
+                          <span style={{ flex: 1, color: '#555' }}>{g.descripcion || ''}</span>
+                          <span style={{ color: '#aaa' }}>{g.origen === 'requisicion' ? 'requisición' : (g.registrado_por || '')}</span>
+                          {permisos.pagos && g.origen === 'manual' && <button onClick={() => eliminarGasto(g)} style={{ ...btn, padding: '1px 8px', color: '#C0392B' }}>Eliminar</button>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 11, color: '#aaa' }}>Mano de obra se captura en Catálogo (precios), Costos (contratos y pagos) y Avance. Subcontratos son los trabajos globales (cocinas, closets, aluminio…), distintos de los contratos de mano de obra.</div>
+      {nuevo && <ModalConcepto torre={torre} categoria={nuevo} onCerrar={() => setNuevo(null)} onCreado={() => { setNuevo(null); onCambio(); }} />}
+      {gastando && <ModalGasto concepto={gastando} onCerrar={() => setGastando(null)} onCreado={() => { setGastando(null); onCambio(); }} />}
+    </div>
+  );
+}
+
+function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, estimaciones = [], tope, otros = 0, permisos, isMobile, onCambio }) {
   const [modalContrato, setModalContrato] = useState(false);
   const [asignando, setAsignando] = useState(null);
   const [pagando, setPagando] = useState(null);
   const [abiertos, setAbiertos] = useState({});
-  const [topeTxt, setTopeTxt] = useState(tope === null ? '' : String(tope));
-  useEffect(() => { setTopeTxt(tope === null ? '' : String(tope)); }, [tope]);
-
   const presPartida = (p) => (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0);
   const contratoDe = (id) => contratos.find(c => c.id === id);
   const nombreContratista = (c) => contratistas.find(x => x.id === c.contratista_id)?.nombre || 'Contratista';
@@ -352,12 +659,6 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, e
     return { porContrato, libres, presLibres, presupuesto, devengado, pagado };
   }, [partidas, contratos, pagos, progMap]); // eslint-disable-line
 
-  const fijarTope = async (valor) => {
-    const v = valor === '' || valor === null ? null : Number(valor);
-    const { error } = await supabase.from('obra_torres').update({ presupuesto_tope: v }).eq('id', torre.id);
-    if (error) { alert('No se pudo fijar el tope: ' + error.message); setTopeTxt(tope === null ? '' : String(tope)); return; }
-    onCambio();
-  };
   const verComprobante = async (path) => {
     const { data } = await supabase.storage.from('obra').createSignedUrl(path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
@@ -401,9 +702,9 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, e
   };
   const pdfEstimacion = (e, c, pagado) => descargarEstimacionPdf({ est: e, contrato: c, contratista: nombreContratista(c), frente: nombreFrente(torre), desarrollo: torre.desarrollos?.nombre, pagado });
 
-  const disponible = tope === null ? null : tope - datos.presupuesto;
+  const disponible = tope === null ? null : tope - datos.presupuesto - otros;
   const tarjetas = [
-    ['Presupuesto cargado', $(datos.presupuesto), tope === null ? 'sin tope fijado' : `tope ${$(tope)}`, '#1a1a2e'],
+    ['Presupuesto cargado', $(datos.presupuesto + otros), tope === null ? 'sin tope fijado' : `tope ${$(tope)}`, '#1a1a2e'],
     ['Disponible del tope', disponible === null ? '—' : $(disponible), disponible === null ? 'fija un tope para controlarlo' : 'lo que aún se puede cargar', disponible !== null && disponible < 0 ? '#C0392B' : '#1a1a2e'],
     ['Devengado (por avance)', $(datos.devengado), 'avance real × presupuesto', '#1a1a2e'],
     ['Pagado', $(datos.pagado), `${pagos.length} pagos`, '#1a1a2e'],
@@ -416,15 +717,7 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, e
         {tarjetas.map(([t, v, sub, color]) => <Tarjeta key={t} titulo={t} valor={v} sub={sub} color={color} />)}
       </div>
 
-      <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, padding: 12, marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Tope de presupuesto autorizado</div>
-        <InputDinero disabled={!permisos.tope} value={topeTxt} placeholder="Sin tope" onChange={e => setTopeTxt(e.target.value)} style={{ ...inp, width: 150, textAlign: 'right' }} />
-        {permisos.tope && <button onClick={() => fijarTope(topeTxt)} style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none' }}>Fijar tope</button>}
-        {permisos.tope && tope !== null && <button onClick={() => fijarTope(null)} style={btn}>Quitar tope</button>}
-        <div style={{ fontSize: 11, color: '#888', flex: '1 1 260px' }}>
-          Construcción no puede cargar precios ni contratos que hagan que el presupuesto de la torre rebase este tope.{!permisos.tope ? ' Solo quien tenga permiso lo fija.' : ''}
-        </div>
-      </div>
+      <TopeEditor torre={torre} tope={tope} permisos={permisos} cargado={datos.presupuesto + otros} onCambio={onCambio} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 14, fontWeight: 700 }}>Contratos por contratista</div>
@@ -967,6 +1260,9 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const [contratos, setContratos] = useState([]);
   const [pagos, setPagos] = useState([]);
   const [estimaciones, setEstimaciones] = useState([]);
+  const [conceptos, setConceptos] = useState([]);
+  const [gastos, setGastos] = useState([]);
+  const [avances, setAvances] = useState([]);
   const [tope, setTope] = useState(torre.presupuesto_tope ?? null);
   const [viviendas, setViviendas] = useState([]);
   const [evCount, setEvCount] = useState(new Map());
@@ -986,8 +1282,15 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   useEffect(() => { cargarFotos(); }, [cargarFotos]);
 
   const cargarCostos = useCallback(async () => {
-    if (torre.es_plantilla) return;
     try {
+      const cps = await traerTodo(() => supabase.from('obra_conceptos').select('*').eq('torre_id', torre.id).order('orden').order('created_at'));
+      setConceptos(cps);
+      if (torre.es_plantilla) return;
+      const cids = cps.map(c => c.id);
+      let gs = [];
+      for (let i = 0; i < cids.length; i += 120) gs = gs.concat(await traerTodo(() => supabase.from('obra_gastos').select('*').in('concepto_id', cids.slice(i, i + 120)).order('id')));
+      setGastos(gs);
+      setAvances(await traerTodo(() => supabase.from('obra_avance').select('partida_id, fecha, pct, pct_anterior, obra_partidas!inner(torre_id)').eq('obra_partidas.torre_id', torre.id).order('created_at')));
       const [ct, cs, t] = await Promise.all([
         traerTodo(() => supabase.from('obra_contratistas').select('*').order('nombre')),
         traerTodo(() => supabase.from('obra_contratos').select('*').eq('torre_id', torre.id).order('created_at')),
@@ -1069,7 +1372,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
     onCerrar();
   };
 
-  const tabs = torre.es_plantilla ? [['catalogo', 'Catálogo'], ['programa', 'Programa']] : [['hoy', 'Hoy'], ['avance', 'Avance'], ['programa', 'Programa'], ['catalogo', 'Catálogo'], ['costos', 'Costos']];
+  const tabs = torre.es_plantilla ? [['catalogo', 'Catálogo'], ['presupuesto', 'Presupuesto'], ['programa', 'Programa']] : [['hoy', 'Hoy'], ['avance', 'Avance'], ['programa', 'Programa'], ['catalogo', 'Catálogo'], ['presupuesto', 'Presupuesto'], ['costos', 'Costos']];
 
   return (
     <div>
@@ -1117,7 +1420,8 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
         {tab === 'programa' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           partidas={partidas} onCambio={cargar} />}
         {tab === 'catalogo' && <TabCatalogo torre={torre} partidas={partidas} etapas={etapas} hijos={hijos} progMap={progMap} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
-        {tab === 'costos' && <TabCostos torre={torre} partidas={hojas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} estimaciones={estimaciones} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
+        {tab === 'presupuesto' && <TabPresupuesto torre={torre} partidas={hojas} progMap={progMap} contratos={contratos} conceptos={conceptos} gastos={gastos} avances={avances} arr={arr} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
+        {tab === 'costos' && <TabCostos torre={torre} partidas={hojas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} estimaciones={estimaciones} tope={tope} otros={conceptos.reduce((t, c) => t + (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0), 0)} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
       </>)}
     </div>
   );

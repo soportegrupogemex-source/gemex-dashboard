@@ -196,22 +196,24 @@ export default function ObraDashboard() {
   const isMobile = useIsMobile();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [datos, setDatos] = useState({ torres: [], partidas: [], programa: [], contratos: [], pagos: [], avances: [] });
+  const [datos, setDatos] = useState({ torres: [], partidas: [], programa: [], contratos: [], pagos: [], avances: [], conceptos: [], gastos: [] });
   const [filtro, setFiltro] = useState('');
   const [abiertos, setAbiertos] = useState({});
 
   const cargar = useCallback(async () => {
     setCargando(true); setError('');
     try {
-      const [torres, partidas, programa, contratos, pagos, avances] = await Promise.all([
+      const [torres, partidas, programa, contratos, pagos, avances, conceptos, gastos] = await Promise.all([
         traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(id, nombre)').eq('es_plantilla', false).order('created_at')),
         traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, etapa, etapa_orden, orden, descripcion, avance_pct, cantidad, precio_unitario, terminada_en, contrato_id').order('id')),
         traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').order('partida_id').order('semana').order('dia')),
         verCostos ? traerTodo(() => supabase.from('obra_contratos').select('id, torre_id, tipo, monto_fijo').order('id')) : Promise.resolve([]),
         verCostos ? traerTodo(() => supabase.from('obra_pagos').select('contrato_id, monto').order('id')) : Promise.resolve([]),
         traerTodo(() => supabase.from('obra_avance').select('partida_id, fecha, pct, created_at').order('partida_id').order('fecha').order('created_at')),
+        verCostos ? traerTodo(() => supabase.from('obra_conceptos').select('id, torre_id, cantidad, precio_unitario').order('id')) : Promise.resolve([]),
+        verCostos ? traerTodo(() => supabase.from('obra_gastos').select('concepto_id, monto').order('id')) : Promise.resolve([]),
       ]);
-      setDatos({ torres, partidas, programa, contratos, pagos, avances });
+      setDatos({ torres, partidas, programa, contratos, pagos, avances, conceptos, gastos });
     } catch (e) { setError(e.message || String(e)); }
     setCargando(false);
   }, [verCostos]);
@@ -219,7 +221,9 @@ export default function ObraDashboard() {
 
   const hoy = hoyISO();
   const { proyectos, sinPrograma, global } = useMemo(() => {
-    const { torres, partidas, programa, contratos, pagos, avances } = datos;
+    const { torres, partidas, programa, contratos, pagos, avances, conceptos, gastos } = datos;
+    const gastadoPorConcepto = new Map();
+    gastos.forEach(g => gastadoPorConcepto.set(g.concepto_id, (gastadoPorConcepto.get(g.concepto_id) || 0) + Number(g.monto || 0)));
     const hist = new Map();
     avances.forEach(a => { if (!hist.has(a.partida_id)) hist.set(a.partida_id, []); hist.get(a.partida_id).push({ fecha: a.fecha, pct: a.pct }); });
     const progMap = new Map();
@@ -259,9 +263,11 @@ export default function ObraDashboard() {
       const fijos = susContratos.filter(c => c.tipo === 'monto_fijo');
       const presupuesto = fijos.reduce((s, c) => s + Number(c.monto_fijo || 0), 0) +
         hojas.filter(p => contratoTorre.get(p.contrato_id)?.tipo !== 'monto_fijo').reduce((s, p) => s + (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0), 0);
-      const pagado = susContratos.reduce((s, c) => s + (pagadoPorContrato.get(c.id) || 0), 0);
+      const susConceptos = conceptos.filter(c => c.torre_id === t.id);
+      const presupuestoTotal = presupuesto + susConceptos.reduce((s, c) => s + (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0), 0);
+      const pagado = susContratos.reduce((s, c) => s + (pagadoPorContrato.get(c.id) || 0), 0) + susConceptos.reduce((s, c) => s + (gastadoPorConcepto.get(c.id) || 0), 0);
       const curva = arr ? curvaS(hojas, progMap, hist, arr, hoy) : null;
-      frentes.push({ t, hojas, r, desv, etapas, atrasadas, todasAtrasadas, semanaTxt, terminaTxt, presupuesto, pagado, arr, curva });
+      frentes.push({ t, hojas, r, desv, etapas, atrasadas, todasAtrasadas, semanaTxt, terminaTxt, presupuesto: presupuestoTotal, pagado, arr, curva });
     });
 
     const grupos = new Map();
