@@ -525,6 +525,20 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
 
   const docsDe = (movimientoId) => docsPorMovimiento[movimientoId] || {};
 
+  // FIX: "por revisar" solo cuenta los documentos que el expediente pide hoy
+  // (según su tipo de compra y si tiene coacreditado/conyugal) y que no están
+  // marcados "no aplica". Antes miraba TODOS los registros guardados, y un
+  // documento viejo en "pendiente" (de un tipo de crédito anterior o de un
+  // coacreditado quitado) dejaba el expediente en "Por revisar" para siempre,
+  // sin forma de aprobarlo porque ya no se muestra.
+  const tienePendientesDeRevisar = (movimiento) => {
+    const docs = docsDe(movimiento.id);
+    return docsRequeridosCompletos(movimiento).some(t => {
+      const d = docs[t.id];
+      return d && !d.no_aplica && getArchivosDoc(d).length > 0 && (d.estado_revision || 'pendiente') === 'pendiente';
+    });
+  };
+
   // FIX: comparar por correo (estable) en vez de solo por nombre — si el
   // agente corrige su nombre/apellidos en "Mi cuenta" después de registrar
   // un movimiento, el nombre guardado ahí deja de coincidir con el actual
@@ -830,7 +844,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // de revisar (no aprobado ni rechazado) — para avisarle a los
   // responsables que tienen trabajo por hacer.
   const expedientesPorRevisar = movimientosDescarga.filter(m =>
-    !expedienteArchivado(m.id) && Object.values(docsDe(m.id)).some(d => d?.archivo_path && d.estado_revision === 'pendiente')
+    !expedienteArchivado(m.id) && tienePendientesDeRevisar(m)
   );
 
   useEffect(() => {
@@ -1408,8 +1422,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             // de un vistazo qué expedientes tienen documentos subidos sin
             // revisar todavía — mismo criterio que expedientesPorRevisar,
             // como refuerzo visual además de la notificación push.
-            const porRevisar = !soloEnviadosATitulacion && puedeRevisarDocs && !archivado &&
-              Object.values(docsDe(m.id)).some(d => d?.archivo_path && d.estado_revision === 'pendiente');
+            const porRevisar = !soloEnviadosATitulacion && puedeRevisarDocs && !archivado && tienePendientesDeRevisar(m);
             return (
               <div key={m.id} onClick={() => setMovSel(m)}
                 style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>

@@ -344,6 +344,170 @@ function TopeEditor({ torre, tope, permisos, cargado, onCambio }) {
   );
 }
 
+
+// ------------------------------------------------------- Programa por categoría
+// Materiales, subcontratos, maquinaria e indirectos: por concepto y semana, lo programado y lo real (unidades),
+// como las hojas MAT, CONTRATOS y MAQ. del control de obra. Mano de obra sigue con su calendario de días y avance.
+const CATS_PROGRAMA = [['mano_obra', 'Mano de obra'], ['materiales', 'Materiales'], ['maquinaria', 'Maquinaria'], ['subcontratos', 'Subcontratos'], ['indirectos', 'Indirectos']];
+
+function ModalRepartir({ concepto, filas, semanasTotales, onCerrar, onGuardado }) {
+  const [desde, setDesde] = useState(1);
+  const [hasta, setHasta] = useState(Math.min(4, semanasTotales));
+  const [guardando, setGuardando] = useState(false);
+  const n = Math.max(0, Number(hasta) - Number(desde) + 1);
+  const cant = Number(concepto.cantidad) || 0;
+  const guardar = async () => {
+    if (n < 1) { alert('El final no puede ser antes del inicio.'); return; }
+    setGuardando(true);
+    const base = Math.round((cant / n) * 100) / 100;
+    const nuevas = new Map();
+    for (let i = 0; i < n; i++) nuevas.set(Number(desde) + i, i === n - 1 ? Math.round((cant - base * (n - 1)) * 100) / 100 : base);
+    filas.forEach(f => { if (!nuevas.has(f.semana) && Number(f.programado) !== 0) nuevas.set(f.semana, 0); });
+    const { data, error } = await supabase.from('obra_conceptos_semana').upsert([...nuevas].map(([semana, programado]) => ({ concepto_id: concepto.id, semana, programado })), { onConflict: 'concepto_id,semana' }).select();
+    if (error) { alert('No se pudo repartir: ' + error.message); setGuardando(false); return; }
+    onGuardado(data);
+  };
+  return (
+    <Modal titulo={`Repartir: ${concepto.descripcion}`} onCerrar={onCerrar}>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Reparte las {fmtN(cant)} {concepto.unidad || 'unidades'} presupuestadas en partes iguales entre las semanas que elijas. Reemplaza el programa actual de este concepto.</div>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10 }}>
+        <label style={{ fontSize: 12 }}>Desde la semana <input type="number" min="1" value={desde} onChange={e => setDesde(e.target.value)} style={{ ...inp, width: 70 }} /></label>
+        <label style={{ fontSize: 12 }}>hasta la <input type="number" min="1" max="104" value={hasta} onChange={e => setHasta(e.target.value)} style={{ ...inp, width: 70 }} /></label>
+      </div>
+      <div style={{ fontSize: 12, color: '#555', marginBottom: 12 }}>{n > 0 ? `${fmtN(cant / n)} por semana durante ${n} semanas.` : ''}</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
+        <button onClick={guardar} disabled={guardando || n < 1} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Repartir'}</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ProgramaConceptos({ torre, categoria, conceptos, semanas, arr, semMaxMO, puedeEditar, puedeCapturar, onMezclar }) {
+  const plantilla = torre.es_plantilla;
+  const hoy = hoyISO();
+  const semHoy = arr ? Math.floor((parse(hoy) - parse(arr)) / 86400000 / 7) + 1 : null;
+  const lista = conceptos.filter(c => c.categoria === categoria);
+  const [extra, setExtra] = useState(0);
+  const [precios, setPrecios] = useState(false);
+  const [repartiendo, setRepartiendo] = useState(null);
+
+  const porConcepto = useMemo(() => {
+    const m = new Map();
+    semanas.forEach(f => { if (!m.has(f.concepto_id)) m.set(f.concepto_id, new Map()); m.get(f.concepto_id).set(f.semana, f); });
+    return m;
+  }, [semanas]);
+  let maxDato = 0;
+  lista.forEach(c => (porConcepto.get(c.id) || new Map()).forEach((_, w) => { if (w > maxDato) maxDato = w; }));
+  const nSem = Math.min(104, Math.max(12, semMaxMO || 0, maxDato, (semHoy || 0) + 2) + extra * 4);
+  const cols = Array.from({ length: nSem }, (_, i) => i + 1);
+  const fila = (cid, w) => porConcepto.get(cid)?.get(w);
+  const precioC = (c) => Number(c.precio_unitario) || 0;
+
+  const guardar = async (c, semana, campo, valor) => {
+    const v = valor === '' ? (campo === 'precio' ? null : 0) : Number(valor);
+    if (v !== null && (Number.isNaN(v) || v < 0)) return;
+    const actual = fila(c.id, semana)?.[campo];
+    if ((actual === undefined || actual === null ? (campo === 'precio' ? null : 0) : Number(actual)) === v) return;
+    const { data, error } = await supabase.from('obra_conceptos_semana').upsert({ concepto_id: c.id, semana, [campo]: v }, { onConflict: 'concepto_id,semana' }).select();
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    onMezclar(data);
+  };
+
+  // Resumen de la categoría
+  let pres = 0, progHoy = 0, realVal = 0;
+  lista.forEach(c => {
+    pres += (Number(c.cantidad) || 0) * precioC(c);
+    (porConcepto.get(c.id) || new Map()).forEach((f, w) => {
+      if (semHoy !== null && w <= semHoy) progHoy += (Number(f.programado) || 0) * precioC(c);
+      realVal += (Number(f.real) || 0) * (f.precio !== null && f.precio !== undefined ? Number(f.precio) : precioC(c));
+    });
+  });
+  const hayProg = arr && semHoy >= 1;
+  const desvio = hayProg ? realVal - progHoy : null;
+  const celdaInp = { ...inp, width: 54, padding: '3px 4px', textAlign: 'right', fontSize: 11 };
+  const colorProg = '#2a78d6', colorReal = '#eb6834';
+
+  return (
+    <div>
+      {!plantilla && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, marginBottom: 12 }}>
+          <Tarjeta titulo="Presupuesto" valor={$(pres)} sub={`${lista.length} conceptos`} />
+          <Tarjeta titulo="Programado a hoy" valor={hayProg ? $(progHoy) : '—'} sub={hayProg ? `${pres > 0 ? pct1((progHoy / pres) * 100) : '—'} del presupuesto` : 'falta fecha de arranque'} />
+          <Tarjeta titulo="Real ejecutado" valor={$(realVal)} sub={pres > 0 ? `${pct1((realVal / pres) * 100)} del presupuesto` : ''} />
+          <Tarjeta titulo="Real vs programado" valor={desvio === null ? '—' : `${desvio >= 0 ? '+' : ''}${$(desvio)}`} color={desvio === null ? '#1a1a2e' : desvio >= -0.05 * Math.max(progHoy, 1) ? '#10B981' : '#C0392B'} sub="a la semana de hoy" />
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11 }}><span style={{ width: 10, height: 10, background: colorProg, borderRadius: 2 }} />Programado (unidades)</span>
+        {!plantilla && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11 }}><span style={{ width: 10, height: 10, background: colorReal, borderRadius: 2 }} />Real (unidades)</span>}
+        {!plantilla && <label style={{ fontSize: 11, color: '#555', display: 'flex', gap: 4, alignItems: 'center' }}><input type="checkbox" checked={precios} onChange={e => setPrecios(e.target.checked)} />Precio real por semana</label>}
+        <button onClick={() => setExtra(e => e + 1)} style={{ ...btn, padding: '2px 10px', marginLeft: 'auto' }}>+ 4 semanas</button>
+      </div>
+      {lista.length === 0 ? <div style={{ fontSize: 13, color: '#888' }}>Sin conceptos de {CATS_PROGRAMA.find(x => x[0] === categoria)?.[1].toLowerCase()}. Agrégalos en la pestaña Presupuesto.</div> : (
+        <div style={{ overflow: 'auto', maxHeight: '68vh', border: '0.5px solid #e0e0e0', borderRadius: 12, background: '#fff' }}>
+          <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
+            <thead>
+              <tr>
+                <th style={{ position: 'sticky', left: 0, top: 0, zIndex: 3, background: '#f7f7f9', textAlign: 'left', padding: '8px 10px', minWidth: 230, borderBottom: '1px solid #e0e0e0' }}>Concepto</th>
+                <th style={{ position: 'sticky', left: 230, top: 0, zIndex: 3, background: '#f7f7f9', padding: '8px 6px', minWidth: 120, borderBottom: '1px solid #e0e0e0', textAlign: 'right' }}>Total</th>
+                {cols.map(w => (
+                  <th key={w} style={{ position: 'sticky', top: 0, zIndex: 2, background: semHoy === w ? '#FDE2E2' : '#f7f7f9', padding: '4px 4px', borderBottom: '1px solid #e0e0e0', borderLeft: '1px solid #eee', minWidth: 62 }}>
+                    <div style={{ fontWeight: 700, color: '#1a1a2e' }}>S{w}</div>
+                    {arr && <div style={{ fontWeight: 400, color: '#999', fontSize: 10 }}>{fechaCorta(fechaDe(arr, w, 1))}</div>}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(c => {
+                const cant = Number(c.cantidad) || 0;
+                const sumProg = cols.reduce((t, w) => t + (Number(fila(c.id, w)?.programado) || 0), 0);
+                const sumReal = cols.reduce((t, w) => t + (Number(fila(c.id, w)?.real) || 0), 0);
+                const valReal = cols.reduce((t, w) => { const f = fila(c.id, w); return t + (Number(f?.real) || 0) * (f?.precio !== null && f?.precio !== undefined ? Number(f.precio) : precioC(c)); }, 0);
+                const descuadre = Math.abs(sumProg - cant) > 0.01 && sumProg > 0;
+                const filas = [['programado', colorProg, 'Prog.'], ...(plantilla ? [] : [['real', colorReal, 'Real']]), ...(precios && !plantilla ? [['precio', '#888', 'Precio']] : [])];
+                return filas.map(([campo, color, etiqueta], i) => (
+                  <tr key={c.id + campo}>
+                    {i === 0 && (
+                      <td rowSpan={filas.length} style={{ position: 'sticky', left: 0, zIndex: 1, background: '#fff', padding: '4px 10px', borderBottom: '1px solid #ececef', verticalAlign: 'top' }}>
+                        <div style={{ fontWeight: 600, color: '#1a1a2e', maxWidth: 210, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={c.descripcion}>{c.descripcion}</div>
+                        <div style={{ color: '#888', fontSize: 10 }}>{fmtN(cant)} {c.unidad || ''} · {$(precioC(c))} c/u</div>
+                        {puedeEditar && cant > 0 && <button onClick={() => setRepartiendo(c)} style={{ ...btn, padding: '0 6px', fontSize: 10, marginTop: 2 }}>Repartir</button>}
+                      </td>
+                    )}
+                    <td style={{ position: 'sticky', left: 230, zIndex: 1, background: '#fff', padding: '2px 6px', textAlign: 'right', borderBottom: i === filas.length - 1 ? '1px solid #ececef' : 'none', whiteSpace: 'nowrap' }}>
+                      <span style={{ color, fontWeight: 600 }}>{etiqueta}</span>{' '}
+                      {campo === 'programado' && <span style={{ color: descuadre ? '#C0392B' : '#555' }} title={descuadre ? 'Lo programado no coincide con la cantidad presupuestada' : ''}>{fmtN(sumProg)}{cant > 0 ? ` / ${fmtN(cant)}` : ''}</span>}
+                      {campo === 'real' && <span style={{ color: '#555' }}>{fmtN(sumReal)} · {$(valReal)}</span>}
+                    </td>
+                    {cols.map(w => {
+                      const f = fila(c.id, w);
+                      const val = f?.[campo];
+                      const editable = campo === 'programado' ? puedeEditar : puedeCapturar;
+                      return (
+                        <td key={w} style={{ padding: '1px 2px', borderLeft: '1px solid #f3f3f3', borderBottom: i === filas.length - 1 ? '1px solid #ececef' : 'none', background: semHoy === w ? '#FFF5F5' : '#fff' }}>
+                          <input key={`${c.id}-${w}-${campo}-${val ?? ''}`} type="number" min="0" step="any" disabled={!editable}
+                            defaultValue={val === undefined || val === null || (campo !== 'precio' && Number(val) === 0) ? '' : Number(val)}
+                            placeholder={campo === 'precio' ? String(precioC(c)) : ''}
+                            onBlur={e => guardar(c, w, campo, e.target.value)} onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+                            style={{ ...celdaInp, borderColor: val ? color : '#e6e6e9', background: editable ? '#fff' : '#fafafa' }} />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ));
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Programado: lo que se espera comprar o usar cada semana. Real: lo que realmente entró o se usó, con su precio de la semana si es distinto. Lo real alimenta el "ejecutado" de la pestaña Presupuesto. Los pagos se registran en Presupuesto o por requisición.</div>
+      {repartiendo && <ModalRepartir concepto={repartiendo} filas={[...(porConcepto.get(repartiendo.id) || new Map()).values()]} semanasTotales={nSem} onCerrar={() => setRepartiendo(null)} onGuardado={(rows) => { onMezclar(rows); setRepartiendo(null); }} />}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Presupuesto
 // Presupuesto contra ejecutado por categoría y por semana. Mano de obra se ejecuta por avance (lo devengado);
 // materiales, subcontratos, maquinaria e indirectos, por los gastos registrados.
@@ -403,14 +567,14 @@ function ModalGasto({ concepto, onCerrar, onCreado }) {
     onCreado();
   };
   return (
-    <Modal titulo={`Registrar gasto · ${concepto.descripcion}`} onCerrar={onCerrar}>
+    <Modal titulo={`Registrar pago · ${concepto.descripcion}`} onCerrar={onCerrar}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <div style={{ flex: 1 }}><label style={lbl}>Fecha</label><input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...inp, width: '100%' }} /></div>
         <div style={{ flex: 1 }}><label style={lbl}>Monto</label><InputDinero value={monto} onChange={e => setMonto(e.target.value)} autoFocus style={{ ...inp, width: '100%', textAlign: 'right' }} /></div>
       </div>
       <label style={lbl}>Descripción (opcional)</label>
       <input value={desc} onChange={e => setDesc(e.target.value)} placeholder="Factura, anticipo, estimación…" style={{ ...inp, width: '100%', marginBottom: 10 }} />
-      <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>Aquí se capturan gastos históricos o sueltos. Lo que se pague por requisición se cargará solo.</div>
+      <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>Aquí se capturan pagos históricos o sueltos. Lo que se pague por requisición se cargará solo. Lo ejecutado se captura por semana en Programa.</div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
         <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#1a1a2e', color: '#fff', border: 'none' }}>{guardando ? 'Guardando...' : 'Registrar'}</button>
@@ -419,11 +583,12 @@ function ModalGasto({ concepto, onCerrar, onCreado }) {
   );
 }
 
-function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos, avances, arr, tope, permisos, isMobile, onCambio }) {
+function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos, avances, semanasConcepto = [], pagos = [], arr, tope, permisos, isMobile, onCambio }) {
   const plantilla = torre.es_plantilla;
   const [abiertas, setAbiertas] = useState({});
   const [nuevo, setNuevo] = useState(null);
   const [gastando, setGastando] = useState(null);
+  const [vista, setVista] = useState('ejecutado');
   const hoy = hoyISO();
   const semDe = (fecha) => (arr ? Math.max(0, Math.floor((parse(fecha) - parse(arr)) / 86400000 / 7) + 1) : null);
   const presP = (p) => (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0);
@@ -446,7 +611,7 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
     });
     partidas.filter(p => !p.contrato_id).forEach(p => { moPres += presP(p); moDev += (presP(p) * Number(p.avance_pct || 0)) / 100; valor.set(p.id, presP(p)); });
 
-    const cats = [{ clave: 'mano_obra', pres: moPres, eje: moDev, sem: new Map() }, ...CATEGORIAS.map(([k]) => ({ clave: k, pres: 0, eje: 0, sem: new Map() }))];
+    const cats = [{ clave: 'mano_obra', pres: moPres, eje: moDev, pag: 0, sem: new Map(), semPag: new Map() }, ...CATEGORIAS.map(([k]) => ({ clave: k, pres: 0, eje: 0, pag: 0, sem: new Map(), semPag: new Map() }))];
     const porClave = new Map(cats.map(c => [c.clave, c]));
     const suma = (c, w, m) => c.sem.set(w, (c.sem.get(w) || 0) + m);
     // Semanal de mano de obra: lo que avanzó cada semana por el valor de la partida; el resto (avance sin historial) va a "sin fecha".
@@ -460,20 +625,32 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
     }
     const catDe = new Map(conceptos.map(c => [c.id, c.categoria]));
     conceptos.forEach(c => { porClave.get(c.categoria).pres += (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0); });
+    // Ejecutado de las demás categorías = lo real capturado por semana (unidades × precio de la semana o del concepto).
+    const precioDe = new Map(conceptos.map(c => [c.id, Number(c.precio_unitario) || 0]));
     const ejePorConcepto = new Map();
+    semanasConcepto.forEach(sc => {
+      const c = porClave.get(catDe.get(sc.concepto_id)); if (!c) return;
+      const v = (Number(sc.real) || 0) * (sc.precio !== null && sc.precio !== undefined ? Number(sc.precio) : (precioDe.get(sc.concepto_id) || 0));
+      if (!v) return;
+      c.eje += v; ejePorConcepto.set(sc.concepto_id, (ejePorConcepto.get(sc.concepto_id) || 0) + v); suma(c, sc.semana, v);
+    });
+    // Pagado = gastos registrados (requisiciones pagadas incluidas) y pagos a contratos de mano de obra.
+    const pagPorConcepto = new Map();
+    const sumaPag = (c, w, m) => c.semPag.set(w, (c.semPag.get(w) || 0) + m);
     gastos.forEach(g => {
       const c = porClave.get(catDe.get(g.concepto_id)); if (!c) return;
-      c.eje += Number(g.monto); ejePorConcepto.set(g.concepto_id, (ejePorConcepto.get(g.concepto_id) || 0) + Number(g.monto));
-      if (arr) suma(c, semDe(g.fecha), Number(g.monto));
+      c.pag += Number(g.monto); pagPorConcepto.set(g.concepto_id, (pagPorConcepto.get(g.concepto_id) || 0) + Number(g.monto));
+      if (arr) sumaPag(c, semDe(g.fecha), Number(g.monto));
     });
+    pagos.forEach(pg => { const c = porClave.get('mano_obra'); c.pag += Number(pg.monto); if (arr) sumaPag(c, semDe(pg.fecha), Number(pg.monto)); });
     let maxSem = arr ? semDe(hoy) : 0;
-    cats.forEach(c => c.sem.forEach((_, w) => { if (w !== 'x' && w > maxSem) maxSem = w; }));
-    return { cats, ejePorConcepto, maxSem, total: { pres: cats.reduce((t, c) => t + c.pres, 0), eje: cats.reduce((t, c) => t + c.eje, 0) } };
-  }, [partidas, contratos, conceptos, gastos, avances, progMap, arr]); // eslint-disable-line
+    cats.forEach(c => { c.sem.forEach((_, w) => { if (w !== 'x' && w > maxSem) maxSem = w; }); c.semPag.forEach((_, w) => { if (w > maxSem) maxSem = w; }); });
+    return { cats, ejePorConcepto, pagPorConcepto, maxSem, total: { pres: cats.reduce((t, c) => t + c.pres, 0), eje: cats.reduce((t, c) => t + c.eje, 0), pag: cats.reduce((t, c) => t + c.pag, 0) } };
+  }, [partidas, contratos, conceptos, gastos, avances, semanasConcepto, pagos, progMap, arr]); // eslint-disable-line
 
   const semanas = Array.from({ length: d.maxSem + 1 }, (_, i) => i);
   const hayX = d.cats.some(c => c.sem.has('x'));
-  const celda = (c, w) => c.sem.get(w) || 0;
+  const celda = (c, w) => (vista === 'pagado' ? c.semPag : c.sem).get(w) || 0;
   const fm = (n) => (Math.abs(n) < 0.5 ? '' : $(n));
   const th = { padding: '6px 10px', fontSize: 11, color: '#555', fontWeight: 600, textAlign: 'right', whiteSpace: 'nowrap' };
   const td = { padding: '6px 10px', fontSize: 12, textAlign: 'right', whiteSpace: 'nowrap' };
@@ -505,10 +682,11 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
   return (
     <div>
       {!plantilla && (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: 10, marginBottom: 14 }}>
           <Tarjeta titulo="Presupuesto cargado" valor={$(d.total.pres)} sub={tope === null ? 'sin tope fijado' : `tope ${$(tope)}`} />
           <Tarjeta titulo="Disponible del tope" valor={tope === null ? '—' : $(tope - d.total.pres)} sub={tope === null ? 'fija un tope para controlarlo' : 'lo que aún se puede cargar'} color={tope !== null && tope - d.total.pres < 0 ? '#C0392B' : '#1a1a2e'} />
           <Tarjeta titulo="Ejecutado" valor={$(d.total.eje)} sub={d.total.pres > 0 ? `${pct1((d.total.eje / d.total.pres) * 100)} del presupuesto` : 'sin presupuesto'} />
+          <Tarjeta titulo="Pagado" valor={$(d.total.pag)} sub={d.total.eje > 0 ? `${$(d.total.eje - d.total.pag)} ejecutado sin pagar` : 'requisiciones y pagos'} color={d.total.pag > d.total.eje && d.total.eje > 0 ? '#B45309' : '#1a1a2e'} />
           <Tarjeta titulo="Por ejercer" valor={$(d.total.pres - d.total.eje)} sub="presupuesto − ejecutado" />
         </div>
       )}
@@ -519,7 +697,7 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead><tr style={{ background: '#f7f7f9' }}>
             <th style={{ ...th, textAlign: 'left' }}>Categoría</th><th style={th}>Presupuesto</th>
-            {!plantilla && <><th style={th}>Ejecutado</th><th style={th}>%</th><th style={th}>Por ejercer</th></>}
+            {!plantilla && <><th style={th}>Ejecutado</th><th style={th}>%</th><th style={th}>Pagado</th><th style={th}>Por ejercer</th></>}
           </tr></thead>
           <tbody>
             {d.cats.map(c => (
@@ -529,45 +707,52 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
                 {!plantilla && <>
                   <td style={td}>{$(c.eje)}</td>
                   <td style={td}>{c.pres > 0 ? pct1((c.eje / c.pres) * 100) : '—'}</td>
+                  <td style={td}>{$(c.pag)}</td>
                   <td style={{ ...td, color: c.pres - c.eje < 0 ? '#C0392B' : '#1a1a2e' }}>{$(c.pres - c.eje)}</td>
                 </>}
               </tr>
             ))}
             <tr style={{ borderTop: '1px solid #ddd', background: '#fafafc', fontWeight: 700 }}>
               <td style={{ ...td, textAlign: 'left' }}>Total</td><td style={td}>{$(d.total.pres)}</td>
-              {!plantilla && <><td style={td}>{$(d.total.eje)}</td><td style={td}>{d.total.pres > 0 ? pct1((d.total.eje / d.total.pres) * 100) : '—'}</td><td style={td}>{$(d.total.pres - d.total.eje)}</td></>}
+              {!plantilla && <><td style={td}>{$(d.total.eje)}</td><td style={td}>{d.total.pres > 0 ? pct1((d.total.eje / d.total.pres) * 100) : '—'}</td><td style={td}>{$(d.total.pag)}</td><td style={td}>{$(d.total.pres - d.total.eje)}</td></>}
             </tr>
           </tbody>
         </table>
       </div>
 
       {!plantilla && (<>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Ejecutado por semana</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>{vista === 'pagado' ? 'Pagado por semana' : 'Ejecutado por semana'}</div>
+          {[['ejecutado', 'Ejecutado'], ['pagado', 'Pagado']].map(([k, l]) => (
+            <button key={k} onClick={() => setVista(k)} style={{ ...btn, padding: '2px 10px', background: vista === k ? '#1a1a2e' : '#fff', color: vista === k ? '#fff' : '#555' }}>{l}</button>
+          ))}
+          <span style={{ fontSize: 11, color: '#888' }}>{vista === 'ejecutado' ? 'Mano de obra por avance; el resto, lo real capturado en Programa.' : 'Pagos a contratistas y requisiciones pagadas.'}</span>
+        </div>
         {!arr ? <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>Captura la fecha de arranque del frente para ver el gasto semana a semana.</div> : (
           <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, overflowX: 'auto', marginBottom: 16 }}>
             <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead><tr style={{ background: '#f7f7f9' }}>
                 <th style={{ ...th, textAlign: 'left', position: 'sticky', left: 0, background: '#f7f7f9' }}>Categoría</th>
                 {semanas.map(w => <th key={w} style={th}>{w === 0 ? 'Previo' : `S${w}`}<div style={{ fontWeight: 400, color: '#aaa', fontSize: 10 }}>{w === 0 ? '' : fechaCorta(fechaDe(arr, w, 1))}</div></th>)}
-                {hayX && <th style={th}>Sin fecha</th>}
+                {hayX && vista === 'ejecutado' && <th style={th}>Sin fecha</th>}
               </tr></thead>
               <tbody>
                 {d.cats.map(c => (
                   <tr key={c.clave} style={{ borderTop: '0.5px solid #f0f0f0' }}>
                     <td style={{ ...td, textAlign: 'left', fontWeight: 600, position: 'sticky', left: 0, background: '#fff' }}>{NOMBRE_CAT[c.clave]}</td>
                     {semanas.map(w => <td key={w} style={td}>{fm(celda(c, w))}</td>)}
-                    {hayX && <td style={td}>{fm(celda(c, 'x'))}</td>}
+                    {hayX && vista === 'ejecutado' && <td style={td}>{fm(celda(c, 'x'))}</td>}
                   </tr>
                 ))}
                 <tr style={{ borderTop: '1px solid #ddd', background: '#fafafc', fontWeight: 700 }}>
                   <td style={{ ...td, textAlign: 'left', position: 'sticky', left: 0, background: '#fafafc' }}>Total semana</td>
                   {semanas.map(w => <td key={w} style={td}>{fm(d.cats.reduce((t, c) => t + celda(c, w), 0))}</td>)}
-                  {hayX && <td style={td}>{fm(d.cats.reduce((t, c) => t + celda(c, 'x'), 0))}</td>}
+                  {hayX && vista === 'ejecutado' && <td style={td}>{fm(d.cats.reduce((t, c) => t + celda(c, 'x'), 0))}</td>}
                 </tr>
                 <tr style={{ background: '#fafafc' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#888', position: 'sticky', left: 0, background: '#fafafc' }}>Acumulado</td>
                   {(() => { let acc = d.cats.reduce((t, c) => t + celda(c, 'x'), 0); return semanas.map(w => { acc += d.cats.reduce((t, c) => t + celda(c, w), 0); return <td key={w} style={{ ...td, color: '#888' }}>{fm(acc)}</td>; }); })()}
-                  {hayX && <td />}
+                  {hayX && vista === 'ejecutado' && <td />}
                 </tr>
               </tbody>
             </table>
@@ -582,13 +767,14 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
           <div key={clave} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
             <div style={{ padding: '10px 12px', background: '#f7f7f9', display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ fontSize: 13, fontWeight: 700 }}>{nombre} <span style={{ fontWeight: 400, color: '#888' }}>· {lista.length} conceptos</span></div>
-              <div style={{ fontSize: 12, color: '#555', marginLeft: 'auto' }}>Presupuesto <b>{$(cat.pres)}</b>{!plantilla && <> · ejecutado <b>{$(cat.eje)}</b></>}</div>
+              <div style={{ fontSize: 12, color: '#555', marginLeft: 'auto' }}>Presupuesto <b>{$(cat.pres)}</b>{!plantilla && <> · ejecutado <b>{$(cat.eje)}</b> · pagado <b>{$(cat.pag)}</b></>}</div>
               {permisos.costos && <button onClick={() => setNuevo(clave)} style={{ ...btn, padding: '3px 10px' }}>+ Concepto</button>}
             </div>
             {lista.length === 0 && <div style={{ padding: '10px 14px', fontSize: 12, color: '#888' }}>Sin conceptos.{permisos.costos ? ' Agrega el primero con "+ Concepto".' : ''}</div>}
             {lista.map(c => {
               const pres = (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0);
               const eje = d.ejePorConcepto.get(c.id) || 0;
+              const pagC = d.pagPorConcepto.get(c.id) || 0;
               const susGastos = gastos.filter(g => g.concepto_id === c.id).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
               const abierto = !!abiertas[c.id];
               return (
@@ -601,13 +787,13 @@ function TabPresupuesto({ torre, partidas, progMap, contratos, conceptos, gastos
                     <PrecioCelda p={c} disabled={!permisos.costos} onGuardar={guardarCampo} />
                     <span style={{ width: 110, textAlign: 'right', fontSize: 12 }} title="Presupuesto = cantidad × precio unitario">{$(pres)}</span>
                     {clave === 'subcontratos' && c.fiscal !== null && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: c.fiscal ? '#EFF6FF' : '#f3f3f5', color: c.fiscal ? '#3B82F6' : '#888' }}>{c.fiscal ? 'Fiscal' : 'No fiscal'}</span>}
-                    {!plantilla && <span style={{ width: 150, textAlign: 'right', fontSize: 11, color: eje > pres && pres > 0 ? '#C0392B' : '#555' }}>ejecutado {$(eje)}{pres > 0 ? ` · ${pct1((eje / pres) * 100)}` : ''}</span>}
-                    {!plantilla && permisos.pagos && <button onClick={() => setGastando(c)} style={{ ...btn, padding: '2px 8px' }}>+ gasto</button>}
+                    {!plantilla && <span style={{ width: 220, textAlign: 'right', fontSize: 11, color: eje > pres && pres > 0 ? '#C0392B' : '#555' }}>ejecutado {$(eje)}{pres > 0 ? ` · ${pct1((eje / pres) * 100)}` : ''} · pagado {$(pagC)}</span>}
+                    {!plantilla && permisos.pagos && <button onClick={() => setGastando(c)} style={{ ...btn, padding: '2px 8px' }}>+ pago</button>}
                     {permisos.costos && <button onClick={() => eliminarConcepto(c)} style={{ ...btn, padding: '2px 8px', color: '#C0392B' }}>Eliminar</button>}
                   </div>
                   {abierto && !plantilla && (
                     <div style={{ padding: '2px 14px 10px 36px' }}>
-                      {susGastos.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Sin gastos registrados.</div> : susGastos.map(g => (
+                      {susGastos.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Sin pagos registrados.</div> : susGastos.map(g => (
                         <div key={g.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '3px 0', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ width: 70 }}>{fechaCorta(g.fecha)}</span><b style={{ width: 110 }}>{$(g.monto)}</b>
                           <span style={{ flex: 1, color: '#555' }}>{g.descripcion || ''}</span>
@@ -1261,6 +1447,13 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
   const [pagos, setPagos] = useState([]);
   const [estimaciones, setEstimaciones] = useState([]);
   const [conceptos, setConceptos] = useState([]);
+  const [semanasConcepto, setSemanasConcepto] = useState([]);
+  const [catPrograma, setCatPrograma] = useState('mano_obra');
+  const mezclarSemanas = useCallback((rows) => setSemanasConcepto(prev => {
+    const m = new Map(prev.map(r => [`${r.concepto_id}:${r.semana}`, r]));
+    (rows || []).forEach(r => m.set(`${r.concepto_id}:${r.semana}`, { ...(m.get(`${r.concepto_id}:${r.semana}`) || {}), ...r }));
+    return [...m.values()];
+  }), []);
   const [gastos, setGastos] = useState([]);
   const [avances, setAvances] = useState([]);
   const [tope, setTope] = useState(torre.presupuesto_tope ?? null);
@@ -1285,6 +1478,10 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
     try {
       const cps = await traerTodo(() => supabase.from('obra_conceptos').select('*').eq('torre_id', torre.id).order('orden').order('created_at'));
       setConceptos(cps);
+      const cidsTodos = cps.map(c => c.id);
+      let sc = [];
+      for (let i = 0; i < cidsTodos.length; i += 120) sc = sc.concat(await traerTodo(() => supabase.from('obra_conceptos_semana').select('*').in('concepto_id', cidsTodos.slice(i, i + 120)).order('id')));
+      setSemanasConcepto(sc);
       if (torre.es_plantilla) return;
       const cids = cps.map(c => c.id);
       let gs = [];
@@ -1417,10 +1614,19 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
       {cargando ? <div style={{ color: '#888', fontSize: 13 }}>Cargando...</div> : (<>
         {tab === 'hoy' && <TabHoy hojas={hojas} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} evCount={evCount} onFotos={cargarFotos} />}
         {tab === 'avance' && <TabAvance etapas={etapas} hijos={hijos} porId={porId} progMap={progMap} arr={arr} hoy={hoy} puedeCapturar={puedeCapturar} onRegistrar={registrarAvance} evCount={evCount} onFotos={cargarFotos} />}
-        {tab === 'programa' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
+        {tab === 'programa' && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+            {CATS_PROGRAMA.map(([k, l]) => (
+              <button key={k} onClick={() => setCatPrograma(k)} style={{ ...btn, background: catPrograma === k ? '#1a1a2e' : '#fff', color: catPrograma === k ? '#fff' : '#555' }}>{l}</button>
+            ))}
+          </div>
+        )}
+        {tab === 'programa' && catPrograma !== 'mano_obra' && <ProgramaConceptos torre={torre} categoria={catPrograma} conceptos={conceptos} semanas={semanasConcepto} arr={arr}
+          semMaxMO={Math.max(0, ...programa.map(x => x.semana))} puedeEditar={puedeEditar} puedeCapturar={puedeCapturar && !torre.es_plantilla} onMezclar={mezclarSemanas} />}
+        {tab === 'programa' && catPrograma === 'mano_obra' && <TabPrograma torre={torre} etapas={etapas} hijos={hijos} progMap={progMap} arr={arr} hoy={hoy} puedeEditar={puedeEditar} filtroEtapa={filtroEtapa} setFiltroEtapa={setFiltroEtapa}
           partidas={partidas} onCambio={cargar} />}
         {tab === 'catalogo' && <TabCatalogo torre={torre} partidas={partidas} etapas={etapas} hijos={hijos} progMap={progMap} puedeEditar={puedeEditar} puedeCostos={permisosCostos.costos} contratos={contratos} contratistas={contratistas} onCambio={cargar} />}
-        {tab === 'presupuesto' && <TabPresupuesto torre={torre} partidas={hojas} progMap={progMap} contratos={contratos} conceptos={conceptos} gastos={gastos} avances={avances} arr={arr} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
+        {tab === 'presupuesto' && <TabPresupuesto torre={torre} partidas={hojas} progMap={progMap} contratos={contratos} conceptos={conceptos} gastos={gastos} avances={avances} semanasConcepto={semanasConcepto} pagos={pagos} arr={arr} tope={tope} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
         {tab === 'costos' && <TabCostos torre={torre} partidas={hojas} progMap={progMap} contratistas={contratistas} contratos={contratos} pagos={pagos} estimaciones={estimaciones} tope={tope} otros={conceptos.reduce((t, c) => t + (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0), 0)} permisos={permisosCostos} isMobile={isMobile} onCambio={cargar} />}
       </>)}
     </div>
