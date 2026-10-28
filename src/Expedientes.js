@@ -210,6 +210,9 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const [formReferencias, setFormReferencias] = useState({ referencia1_nombre: '', referencia1_telefono: '', referencia2_nombre: '', referencia2_telefono: '' });
   const [guardandoExtra, setGuardandoExtra] = useState(false);
   const [msgExtra, setMsgExtra] = useState('');
+  const [formObservaciones, setFormObservaciones] = useState('');
+  const [guardandoObs, setGuardandoObs] = useState(false);
+  const [msgObs, setMsgObs] = useState('');
   // FIX: mapa correo -> nombre completo, para mostrar quién aprobó/rechazó
   // cada documento (registro de validación, por temas de manipulación de
   // información).
@@ -272,6 +275,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       referencia2_nombre: movSel?.referencia2_nombre || '', referencia2_telefono: movSel?.referencia2_telefono || '',
     });
     setMsgExtra('');
+    setFormObservaciones(movSel?.observaciones_expediente || '');
+    setMsgObs('');
   }, [movSel?.id]);
 
   const cargarMovimientos = async () => {
@@ -450,6 +455,23 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
     setMsgExtra('✅ Guardado correctamente');
     setTimeout(() => setMsgExtra(''), 3000);
+  };
+
+  // FIX: "Observaciones" — nota libre del asesor sobre el expediente, para
+  // que Mesa de Control y Titulación sepan qué trae. Aplica a todos los tipos
+  // de compra (incluido Contado) y la ven todos los que abren el expediente.
+  const handleGuardarObservaciones = async () => {
+    if (!movSel) return;
+    setGuardandoObs(true); setMsgObs('');
+    const texto = formObservaciones.trim();
+    const { data, error } = await supabase.from('movimientos').update({ observaciones_expediente: texto || null }).eq('id', movSel.id).select().single();
+    setGuardandoObs(false);
+    if (error) { setMsgObs('❌ Error al guardar: ' + error.message); return; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+    setFormObservaciones(data.observaciones_expediente || '');
+    setMsgObs('✅ Guardado correctamente');
+    setTimeout(() => setMsgObs(''), 3000);
   };
 
   // FIX: "Expediente completo" — casilla que solo el responsable puede
@@ -1019,6 +1041,29 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           </div>
         )}
 
+        {/* FIX: observaciones del asesor — visible en todas las pestañas y
+            tipos de compra (también para Mesa de Control y Titulación); solo
+            el asesor del expediente la edita. Sin texto y sin poder editar,
+            no ocupa espacio. */}
+        {((esMio && !archivado) || movSel.observaciones_expediente) && (
+          <div style={{ background: movSel.observaciones_expediente ? '#FFF8E1' : '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>💬 Observaciones</div>
+            <textarea rows={3} placeholder={esMio && !archivado ? 'Si este expediente tiene alguna observación, escríbela aquí (Mesa de Control y Titulación la verán)' : ''}
+              disabled={!esMio || archivado} value={formObservaciones}
+              onChange={e => setFormObservaciones(e.target.value)}
+              style={{ width: '100%', padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
+            {esMio && !archivado && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                <button onClick={handleGuardarObservaciones} disabled={guardandoObs || formObservaciones.trim() === (movSel.observaciones_expediente || '').trim()}
+                  style={{ padding: '8px 18px', background: (guardandoObs || formObservaciones.trim() === (movSel.observaciones_expediente || '').trim()) ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoObs ? 'default' : 'pointer' }}>
+                  {guardandoObs ? 'Guardando...' : 'Guardar'}
+                </button>
+                {msgObs && <span style={{ fontSize: '12px', color: msgObs.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgObs}</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === 'descargar' && !soloEnviadosATitulacion && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '1.5rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.expediente_completo ? '#EAF3DE' : '#FFF8E1', borderRadius: '8px', cursor: puedoMarcarCompleto ? 'pointer' : 'default' }}>
@@ -1456,6 +1501,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   ) : (
                     <>
                       {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
+                      {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>💬 Observaciones</span>}
                       {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
                       {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
                       {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
