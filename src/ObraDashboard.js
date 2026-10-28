@@ -24,7 +24,7 @@ function Chip({ children, color = '#555', fondo = '#f3f3f5' }) {
 }
 
 function EstadoChip({ f }) {
-  if (f.r.programado === null) return <Chip color="#856404" fondo="#FFF8E1">Sin fecha de arranque</Chip>;
+  if (f.r.programado === null) return <Chip color="#856404" fondo="#FFF8E1">{f.arr ? 'Sin calendario' : 'Sin fecha de arranque'}</Chip>;
   if (f.r.atrasadas > 0 && f.desv < -TOLERANCIA) return <Chip color={ROJO} fondo="#FDECEC">Atrasado</Chip>;
   if (f.r.real >= 100) return <Chip color="#27500A" fondo="#EAF3DE">Terminado</Chip>;
   return <Chip color="#27500A" fondo="#EAF3DE">En tiempo</Chip>;
