@@ -142,12 +142,12 @@ export default function Cobranza({ miRol, miAgente }) {
     const rec1 = recibidoNum(s.financiera_1_recibido);
     const rec2 = recibidoNum(s.financiera_2_recibido);
     const cotejada = !!s.liquidacion_final_completada;
-    const aplicada1 = cotejada ? (rec1 ?? aut1) : 0;
-    const aplicada2 = cotejada ? (rec2 ?? aut2) : 0;
-    const saldoNeto = r2(diferenciaPorCubrir - aplicada1 - aplicada2);
+    // Los depósitos de las financieras ya van en los pagos (Tesorería captura todo lo que cae en la
+    // cuenta), por eso el saldo es solo valor - pagos; "recibido en bancos" es únicamente el cruce.
+    const saldoNeto = diferenciaPorCubrir;
     const enBancos = r2((rec1 ?? (cotejada ? aut1 : 0)) + (rec2 ?? (cotejada ? aut2 : 0)));
     const remanente = r2(enBancos - Number(s.liberacion_monto || 0));
-    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente, aut1, aut2, rec1, rec2, aplicada1, aplicada2, cotejada };
+    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente, aut1, aut2, rec1, rec2, cotejada };
   };
 
   const abrirUnidad = (u) => {
@@ -236,9 +236,9 @@ export default function Cobranza({ miRol, miAgente }) {
     return construirLiquidacionPdf({
       cliente: venta.contacto_nombre, tipoCompra: venta.tipo_compra,
       unidadNumero: unidadAbierta.numero, desarrolloNombre: unidadAbierta.desarrollo_nombre,
-      valorVenta: c.valorVenta, pagado: c.pagado,
-      // Lo que se descuenta es lo recibido en bancos (cotejada); sin cotejar solo lo que ya se capturó como recibido.
-      f1: c.rec1 ?? (cotejada ? c.aut1 : 0), f2: c.rec2 ?? (cotejada ? c.aut2 : 0),
+      valorVenta: c.valorVenta, pagado: c.pagado, pagos: pagosPorUnidad[unidadAbierta.id] || [],
+      // Solo se desglosa lo capturado como recibido en bancos (ya está dentro de los pagos).
+      f1: c.rec1 ?? 0, f2: c.rec2 ?? 0,
       f1Autorizado: c.aut1, f2Autorizado: c.aut2,
       cuotas: form.cuotas_condominales,
       firmantes, preliminar: !cotejada,
@@ -452,7 +452,7 @@ export default function Cobranza({ miRol, miAgente }) {
                         onChange={ev => setForm(f => ({ ...f, [campo]: ev.target.value }))}
                         style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
                       <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: '600', color: legado ? '#888' : dif === null ? '#aaa' : dif === 0 ? '#27500A' : '#C0392B' }}>
-                        {legado ? 'Cotejada antes de este control: se toma lo autorizado'
+                        {legado ? 'Cotejada antes de este control: sin recibido capturado'
                           : dif === null ? (aut > 0 ? 'Pendiente de capturar' : '')
                           : dif === 0 ? '✓ Cuadra con lo autorizado'
                           : `Diferencia: ${fmt(dif)}`}
@@ -462,7 +462,7 @@ export default function Cobranza({ miRol, miAgente }) {
                 })}
               </div>
               <div style={{ fontSize: '11px', color: '#aaa', marginBottom: '12px' }}>
-                El autorizado lo captura Titulación. Las financieras se restan del saldo hasta que la unidad esté cotejada, y se resta lo recibido en bancos.
+                El autorizado lo captura Titulación. "Recibido en bancos" solo sirve para cuadrar contra lo autorizado: los depósitos de la financiera se capturan arriba como pagos y no se vuelven a restar del saldo.
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Liberación</label>
