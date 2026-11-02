@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { cargarFirmantes, construirLiquidacionPdf, etiquetasCredito } from './liquidacionPdf';
+import { cargarFirmantes, construirLiquidacionPdf, etiquetasCredito, repartirCotejo } from './liquidacionPdf';
 import { fmtDinero, InputDinero } from './dinero';
 import { usePuede } from './PermisosContext';
 
@@ -13,6 +13,8 @@ const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 // Importes con centavos (los pagos y montos de cobranza pueden llevarlos).
 const fmt = (n) => fmtDinero(n, { centavos: true });
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// Tipo de cada movimiento de "Enganche y pagos". "Cotejo" = ya pagó la financiera.
+const TIPOS_PAGO = ['Apartado', 'Enganche', 'Abono', 'Cotejo'];
 
 const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, financiera_1_recibido: null, financiera_2_recibido: null, liberacion_monto: 0, cuotas_condominales: 0 };
 // Lo recibido en bancos: vacío = aún no capturado (distinto de 0, que es "no cayó nada").
@@ -51,7 +53,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(SEG_VACIO);
-  const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
+  const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '', tipo: '', archivo: null });
   const [guardando, setGuardando] = useState(false);
   const [procesandoLiquidacion, setProcesandoLiquidacion] = useState(false);
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
@@ -139,21 +141,25 @@ export default function Cobranza({ miRol, miAgente }) {
     const diferenciaPorCubrir = r2(valorVenta - pagado);
     const aut1 = Number(montosTit[unidadId]?.f1 || 0);
     const aut2 = Number(montosTit[unidadId]?.f2 || 0);
-    const rec1 = recibidoNum(s.financiera_1_recibido);
-    const rec2 = recibidoNum(s.financiera_2_recibido);
+    // Pagos tipo "Cotejo" = lo que ya pagó la financiera: van dentro de los pagos, así que reemplazan
+    // al "recibido en bancos" y no se restan otra vez del saldo.
+    const cot = repartirCotejo(pagosPorUnidad[unidadId], aut1, aut2);
+    const cotejoIncluido = cot.total > 0;
+    const rec1 = cotejoIncluido ? (cot.f1 > 0 || aut1 > 0 ? cot.f1 : null) : recibidoNum(s.financiera_1_recibido);
+    const rec2 = cotejoIncluido ? (cot.f2 > 0 || aut2 > 0 ? cot.f2 : null) : recibidoNum(s.financiera_2_recibido);
     const cotejada = !!s.liquidacion_final_completada;
-    const aplicada1 = cotejada ? (rec1 ?? aut1) : 0;
-    const aplicada2 = cotejada ? (rec2 ?? aut2) : 0;
+    const aplicada1 = cotejoIncluido ? 0 : (cotejada ? (rec1 ?? aut1) : 0);
+    const aplicada2 = cotejoIncluido ? 0 : (cotejada ? (rec2 ?? aut2) : 0);
     const saldoNeto = r2(diferenciaPorCubrir - aplicada1 - aplicada2);
-    const enBancos = r2((rec1 ?? (cotejada ? aut1 : 0)) + (rec2 ?? (cotejada ? aut2 : 0)));
+    const enBancos = cotejoIncluido ? cot.total : r2((rec1 ?? (cotejada ? aut1 : 0)) + (rec2 ?? (cotejada ? aut2 : 0)));
     const remanente = r2(enBancos - Number(s.liberacion_monto || 0));
-    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente, aut1, aut2, rec1, rec2, aplicada1, aplicada2, cotejada };
+    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente, aut1, aut2, rec1, rec2, aplicada1, aplicada2, cotejada, cotejoIncluido };
   };
 
   const abrirUnidad = (u) => {
     setUnidadAbierta(u);
     setForm({ ...SEG_VACIO, ...(seguimientos[u.id] || {}), financiera_1_monto: montosTit[u.id]?.f1 || 0, financiera_2_monto: montosTit[u.id]?.f2 || 0 });
-    setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
+    setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', tipo: '', archivo: null });
   };
 
   const guardarSeguimiento = async () => {
@@ -190,6 +196,7 @@ export default function Cobranza({ miRol, miAgente }) {
   const agregarPago = async () => {
     if (!puedeAgregarPagos) return;
     if (!nuevoPago.monto || r2(nuevoPago.monto) <= 0) return;
+    if (!nuevoPago.tipo) { alert('Elige el tipo de pago: Apartado, Enganche, Abono o Cotejo'); return; }
     setSubiendoComprobante(true);
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -205,6 +212,7 @@ export default function Cobranza({ miRol, miAgente }) {
       unidad_id: unidadAbierta.id,
       fecha: nuevoPago.fecha,
       monto: r2(nuevoPago.monto),
+      tipo_pago: nuevoPago.tipo,
       comprobante_path: comprobantePath,
       capturado_por: user?.email || null,
     }]).select().single();
@@ -212,7 +220,7 @@ export default function Cobranza({ miRol, miAgente }) {
     if (error) { alert('No se pudo registrar el pago: ' + error.message); return; }
     if (data) {
       setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: [...(prev[unidadAbierta.id] || []), data] }));
-      setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
+      setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', tipo: '', archivo: null });
     }
   };
 
@@ -405,6 +413,9 @@ export default function Cobranza({ miRol, miAgente }) {
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '0.5px solid #f0f0f0', fontSize: '13px' }}>
                       <span style={{ color: '#888' }}>{p.fecha}</span>
                       <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(p.monto)}</span>
+                      {p.tipo_pago
+                        ? <span style={{ fontSize: '11px', padding: '2px 9px', borderRadius: '20px', fontWeight: '600', background: p.tipo_pago === 'Cotejo' ? '#EAF3DE' : '#F3F0FF', color: p.tipo_pago === 'Cotejo' ? '#27500A' : '#8B5CF6' }}>{p.tipo_pago}</span>
+                        : <span style={{ fontSize: '11px', color: '#bbb' }}>—</span>}
                       {p.comprobante_path
                         ? <button onClick={() => verComprobante(p.comprobante_path)} style={{ border: 'none', background: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: '12px' }}>Ver comprobante</button>
                         : <span style={{ fontSize: '11px', color: '#bbb' }}>Sin comprobante</span>}
@@ -419,6 +430,11 @@ export default function Cobranza({ miRol, miAgente }) {
                   style={{ flex: 1, minWidth: '120px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
                 <InputDinero placeholder="Monto" value={nuevoPago.monto} onChange={e => setNuevoPago(p => ({ ...p, monto: e.target.value }))}
                   style={{ flex: 1, minWidth: '90px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                <select value={nuevoPago.tipo} onChange={e => setNuevoPago(p => ({ ...p, tipo: e.target.value }))}
+                  style={{ flex: 1, minWidth: '110px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', color: nuevoPago.tipo ? '#1a1a2e' : '#999' }}>
+                  <option value="">Tipo de pago</option>
+                  {TIPOS_PAGO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
                 <input type="file" onChange={e => setNuevoPago(p => ({ ...p, archivo: e.target.files[0] || null }))}
                   style={{ flex: 1, minWidth: '140px', fontSize: '12px' }} />
                 <button onClick={agregarPago} disabled={subiendoComprobante}
@@ -447,8 +463,8 @@ export default function Cobranza({ miRol, miAgente }) {
                       <div style={{ fontSize: '12px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>{t} — {e}</div>
                       <div style={{ fontSize: '11px', color: '#888' }}>Autorizado (Titulación)</div>
                       <div style={{ padding: '7px 10px', background: '#f3f3f3', border: '0.5px solid #e5e5e5', borderRadius: '8px', fontSize: '13px', color: '#1a1a2e', marginBottom: '8px' }}>{fmt(aut)}</div>
-                      <div style={{ fontSize: '11px', color: '#888' }}>Recibido en bancos</div>
-                      <InputDinero disabled={!puedeCapturarRecibido} value={form[campo] ?? ''} placeholder="Lo que cayó en bancos"
+                      <div style={{ fontSize: '11px', color: '#888' }}>{calcAbierta.cotejoIncluido ? 'Cotejo (pagos tipo Cotejo)' : 'Recibido en bancos'}</div>
+                      <InputDinero disabled={!puedeCapturarRecibido || calcAbierta.cotejoIncluido} value={calcAbierta.cotejoIncluido ? (rec ?? '') : (form[campo] ?? '')} placeholder="Lo que cayó en bancos"
                         onChange={ev => setForm(f => ({ ...f, [campo]: ev.target.value }))}
                         style={{ width: '100%', padding: '7px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
                       <div style={{ fontSize: '11px', marginTop: '4px', fontWeight: '600', color: legado ? '#888' : dif === null ? '#aaa' : dif === 0 ? '#27500A' : '#C0392B' }}>

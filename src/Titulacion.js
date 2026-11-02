@@ -285,7 +285,7 @@ export default function Titulacion({ miRol, miAgente }) {
       const [{ data: movs }, { data: pagos }, { data: cob }, { data: tit }, firmantes] = await Promise.all([
         supabase.from('movimientos').select('tipo, contacto_nombre, monto, tipo_compra, created_at')
           .eq('unidad_id', unidad.id).in('tipo', ['Vendida', 'Apartado']).order('created_at', { ascending: false }),
-        supabase.from('cobranza_pagos').select('monto, fecha').eq('unidad_id', unidad.id).order('fecha'),
+        supabase.from('cobranza_pagos').select('monto, fecha, tipo_pago').eq('unidad_id', unidad.id).order('fecha'),
         supabase.from('cobranza_seguimiento').select('cuotas_condominales, financiera_1_recibido, financiera_2_recibido').eq('unidad_id', unidad.id).maybeSingle(),
         supabase.from('titulacion_seguimiento').select('autorizacion_financiera_1_monto, autorizacion_financiera_2_monto').eq('unidad_id', unidad.id).maybeSingle(),
         cargarFirmantes(supabase),
@@ -296,8 +296,11 @@ export default function Titulacion({ miRol, miAgente }) {
         unidadNumero: unidad.numero, desarrolloNombre: unidad.desarrollo_nombre,
         valorVenta: Number(venta.monto || 0),
         pagado: (pagos || []).reduce((t, p) => t + Number(p.monto || 0), 0), pagos: pagos || [],
-        // Antes del cotejo la financiera no se resta: solo cuenta lo que Tesorería ya registró como recibido en bancos.
-        f1: cob?.financiera_1_recibido ?? 0, f2: cob?.financiera_2_recibido ?? 0,
+        // En el estado de cuenta de Titulación, lo autorizado a la financiera ya aparece como abonado para que el
+        // cliente vea cuánto le presta la institución y cuánto le queda por pagar. Cuando Tesorería registra lo
+        // recibido en bancos, se usa ese monto en lugar del autorizado.
+        f1: cob?.financiera_1_recibido ?? tit?.autorizacion_financiera_1_monto ?? 0,
+        f2: cob?.financiera_2_recibido ?? tit?.autorizacion_financiera_2_monto ?? 0,
         f1Autorizado: tit?.autorizacion_financiera_1_monto, f2Autorizado: tit?.autorizacion_financiera_2_monto,
         cuotas: cob?.cuotas_condominales, firmantes, preliminar: true,
       });

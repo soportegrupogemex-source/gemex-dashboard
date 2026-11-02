@@ -6,6 +6,16 @@ import { CLAVE_TITULADOR, CLAVE_TESORERO } from './AjustesAdministracion';
 // vivo el estado de cuenta antes de que Cobranza coteje).
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
+// Los pagos tipo "Cotejo" son lo que ya pagó la financiera. Ya van dentro de los pagos (no se suman
+// otra vez) y se cuadran contra lo autorizado por Titulación; se reparten entre Financiera 1 y 2.
+export const repartirCotejo = (pagos, aut1, aut2) => {
+  const total = r2((pagos || []).filter(p => p.tipo_pago === 'Cotejo').reduce((t, p) => t + Number(p.monto || 0), 0));
+  if (!(total > 0)) return { total: 0, f1: 0, f2: 0 };
+  const a1 = r2(aut1); const a2 = r2(aut2);
+  if (a1 > 0 && a2 > 0) { const f1 = Math.min(total, a1); return { total, f1, f2: r2(total - f1) }; }
+  return a2 > 0 ? { total, f1: 0, f2: total } : { total, f1: total, f2: 0 };
+};
+
 // A qué crédito corresponde cada "Financiera" según el tipo de compra.
 const ETIQUETAS_CREDITO = {
   Infonavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
@@ -44,19 +54,23 @@ export const cargarFirmantes = async (supabase) => {
   return { titulacion: valorDe(CLAVE_TITULADOR), tesorero: valorDe(CLAVE_TESORERO) };
 };
 
-// d: { cliente, tipoCompra, unidadNumero, desarrolloNombre, valorVenta, pagado, pagos: [{ fecha, monto }], f1, f2, cuotas, firmantes, preliminar }
+// d: { cliente, tipoCompra, unidadNumero, desarrolloNombre, valorVenta, pagado, pagos: [{ fecha, monto, tipo_pago }], f1, f2, cuotas, firmantes, preliminar }
 // preliminar = true marca el documento como estado de cuenta en proceso (aún sin cotejo de Cobranza).
 export const construirLiquidacionPdf = async (d) => {
   const valorVenta = Number(d.valorVenta) || 0;
   const pagado = r2(d.pagado);
-  const f1 = r2(d.f1);
-  const f2 = r2(d.f2);
+  const cotejo = repartirCotejo(d.pagos, d.f1Autorizado, d.f2Autorizado);
+  const cotejoIncluido = cotejo.total > 0;
+  const f1 = cotejoIncluido ? cotejo.f1 : r2(d.f1);
+  const f2 = cotejoIncluido ? cotejo.f2 : r2(d.f2);
   const cuotas = r2(d.cuotas);
   const cliente = (d.cliente || 'Sin comprador registrado').replace(/\s+/g, ' ').trim().toUpperCase();
   const { edificio, departamento } = partirUnidad(d.unidadNumero);
   const et = etiquetasCredito(d.tipoCompra);
-  const totalPagos = r2(pagado + f1 + f2);
-  const saldoNeto = r2(valorVenta - pagado - f1 - f2);
+  // Con pagos tipo "Cotejo" la financiera ya está dentro de `pagado`: solo se desglosa del enganche.
+  const totalPagos = cotejoIncluido ? pagado : r2(pagado + f1 + f2);
+  const saldoNeto = r2(valorVenta - totalPagos);
+  const enganche = cotejoIncluido ? r2(pagado - cotejo.total) : pagado;
   const firmantes = d.firmantes || { titulacion: '', tesorero: '' };
 
   const doc = new jsPDF('p', 'mm', 'letter');
@@ -111,7 +125,7 @@ export const construirLiquidacionPdf = async (d) => {
   linea(y, L, R, 0.3); y += 1; linea(y, L, R, 0.3);
 
   y += 11;
-  fila(y, 'ENGANCHE (+)', fmtN(pagado)); y += 6;
+  fila(y, 'ENGANCHE (+)', fmtN(enganche)); y += 6;
   // Debajo de cada crédito: lo autorizado vs. lo recibido en bancos (solo si hay algo que aclarar).
   const notaFinanciera = (autorizado, recibido) => {
     const a = r2(autorizado);
@@ -122,7 +136,7 @@ export const construirLiquidacionPdf = async (d) => {
       doc.text(`Autorizado ${fmtN(a)} — por recibir (aún no se resta)`, L + 4, y + 4);
     } else if (r2(a - recibido) !== 0) {
       doc.setTextColor(192, 32, 58);
-      doc.text(`Autorizado ${fmtN(a)} · recibido ${fmtN(recibido)} · diferencia ${fmtN(r2(a - recibido))}`, L + 4, y + 4);
+      doc.text(`Autorizado ${fmtN(a)} · ${cotejoIncluido ? 'cotejo' : 'recibido'} ${fmtN(recibido)} · diferencia ${fmtN(r2(a - recibido))}`, L + 4, y + 4);
     } else { doc.setFontSize(10); doc.setFont('helvetica', 'normal'); return; }
     doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal');
     y += 4;
@@ -184,6 +198,7 @@ export const construirLiquidacionPdf = async (d) => {
       const f = String(p.fecha || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
       doc.setFont('helvetica', 'normal');
       doc.text(f ? fechaCorta(new Date(Number(f[1]), Number(f[2]) - 1, Number(f[3]))) : '', x0, yy);
+      if (p.tipo_pago) { doc.setFontSize(7); doc.text(p.tipo_pago, x0 + 19, yy); doc.setFontSize(8); }
       doc.text(fmtN(p.monto), x0 + anchoCol, yy, { align: 'right' });
     });
     doc.setFontSize(10);
