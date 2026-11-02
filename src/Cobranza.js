@@ -236,7 +236,7 @@ export default function Cobranza({ miRol, miAgente }) {
     return construirLiquidacionPdf({
       cliente: venta.contacto_nombre, tipoCompra: venta.tipo_compra,
       unidadNumero: unidadAbierta.numero, desarrolloNombre: unidadAbierta.desarrollo_nombre,
-      valorVenta: c.valorVenta, pagado: c.pagado,
+      valorVenta: c.valorVenta, pagado: c.pagado, pagos: pagosPorUnidad[unidadAbierta.id] || [],
       // Lo que se descuenta es lo recibido en bancos (cotejada); sin cotejar solo lo que ya se capturó como recibido.
       f1: c.rec1 ?? (cotejada ? c.aut1 : 0), f2: c.rec2 ?? (cotejada ? c.aut2 : 0),
       f1Autorizado: c.aut1, f2Autorizado: c.aut2,
