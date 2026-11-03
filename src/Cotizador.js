@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { planAplicaAUnidad } from './planesTorre';
 
 export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrollo, onClose }) {
   const [planes, setPlanes] = useState([]);
@@ -383,7 +384,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px', textAlign: 'center', background: '#f0f0f0', padding: '6px', borderRadius: '4px' }}>
                   Unidad {u.numero} — {fmt(u.precio_lista)}
                 </div>
-                {planes.map(plan => {
+                {planes.filter(plan => planAplicaAUnidad(plan, u)).map(plan => {
                   const calc = calcularPlan(plan, u.precio_lista || 0, u);
                   return (
                     <div key={plan.id} style={{ border: '1px solid #ddd', borderRadius: '6px', marginBottom: '8px', overflow: 'hidden' }}>
@@ -487,9 +488,9 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#333', marginBottom: '14px', textAlign: 'center' }}>Opciones de pago</div>
-          {planes.length === 0 ? (
+          {planes.filter(plan => planAplicaAUnidad(plan, u)).length === 0 ? (
             <div style={{ fontSize: '12px', color: '#888', textAlign: 'center', padding: '2rem' }}>No hay planes activos configurados</div>
-          ) : planes.map((plan) => {
+          ) : planes.filter(plan => planAplicaAUnidad(plan, u)).map((plan) => {
             const calc = calcularPlan(plan, precio, u);
             return (
               <div key={plan.id} style={{ border: '1px solid #ddd', borderRadius: '6px', marginBottom: '12px', overflow: 'hidden' }}>

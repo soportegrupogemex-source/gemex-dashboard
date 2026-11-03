@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
+import { torreDeUnidad } from './planesTorre';
 
 // FIX: antes este componente no recibía miRol/miAgente en absoluto —
 // cualquiera que llegara a esta pantalla (por ejemplo un Agente, si
@@ -12,6 +13,8 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
   const [planes, setPlanes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  // torres (letras) que existen en la etapa seleccionada, para limitar un plan a algunas
+  const [torresDisponibles, setTorresDisponibles] = useState([]);
   // FIX: selector de torre/etapa, igual que en Inventario
   const [estructuraSel, setEstructuraSel] = useState(desarrollo.tiene_etapas ? `${desarrollo.tipo_estructura} 1` : null);
 
@@ -31,6 +34,11 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
     if (desarrollo.tiene_etapas) query = query.eq('estructura', estructuraSel);
     const { data } = await query.order('created_at');
     setPlanes(data || []);
+    // torres de la etapa: prefijo de letras del número de cada unidad
+    let qU = supabase.from('inventario').select('numero').eq('desarrollo_id', desarrollo.id).limit(5000);
+    if (desarrollo.tiene_etapas) qU = qU.eq('estructura', estructuraSel);
+    const { data: unidades } = await qU;
+    setTorresDisponibles([...new Set((unidades || []).map(u => torreDeUnidad(u.numero)).filter(Boolean))].sort());
     setLoading(false);
   };
 
@@ -64,6 +72,12 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
     setPlanes(prev => prev.map(p => p.id === id ? { ...p, [campo]: valor } : p));
   };
 
+  const toggleTorre = (plan, torre) => {
+    const actuales = plan.torres || [];
+    const nuevas = actuales.includes(torre) ? actuales.filter(t => t !== torre) : [...actuales, torre].sort();
+    handleCambio(plan.id, 'torres', nuevas);
+  };
+
   const handleGuardar = async (plan) => {
     if (!puedeEditar) return; // FIX: respaldo de seguridad
     setGuardando(true);
@@ -74,7 +88,8 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
       descuento_plan: plan.descuento_plan,
       enganche: plan.enganche,
       durante_obra: plan.durante_obra,
-      meses_plan: plan.meses_plan
+      meses_plan: plan.meses_plan,
+      torres: plan.torres && plan.torres.length > 0 ? plan.torres : null
     }).eq('id', plan.id);
     setGuardando(false);
   };
@@ -140,6 +155,11 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
                   <input type='checkbox' checked={plan.activo} disabled={!puedeEditar} onChange={e => handleCambio(plan.id, 'activo', e.target.checked)} />
                   Activar
                 </label>
+                {(plan.torres || []).length > 0 && (
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: '#FCEBEB', color: '#C0203A', fontWeight: '500' }}>
+                    Solo {plan.torres.length > 1 ? 'torres' : 'torre'} {plan.torres.join(', ')}
+                  </span>
+                )}
               </div>
               {puedeEditar && (
                 <button onClick={() => handleEliminar(plan.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#e53935', fontSize: '13px' }}>
@@ -156,6 +176,30 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
               {inp(plan, '% Durante la obra', 'durante_obra')}
               {inp(plan, `Meses plan ${i + 1}`, 'meses_plan')}
             </div>
+
+            {torresDisponibles.length > 1 && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '6px' }}>
+                  Aplica a {desarrollo.tipo_estructura === 'Torre' ? 'edificios' : 'torres'}
+                  <span style={{ marginLeft: '6px', color: '#aaa' }}>(sin selección aplica a todas)</span>
+                </label>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <button type='button' disabled={!puedeEditar} onClick={() => handleCambio(plan.id, 'torres', [])}
+                    style={{ ...chipTorre, background: !(plan.torres || []).length ? '#1a1a2e' : '#fff', color: !(plan.torres || []).length ? '#fff' : '#666', borderColor: !(plan.torres || []).length ? '#1a1a2e' : '#ddd', cursor: puedeEditar ? 'pointer' : 'default' }}>
+                    Todas
+                  </button>
+                  {torresDisponibles.map(t => {
+                    const sel = (plan.torres || []).includes(t);
+                    return (
+                      <button key={t} type='button' disabled={!puedeEditar} onClick={() => toggleTorre(plan, t)}
+                        style={{ ...chipTorre, background: sel ? '#C0203A' : '#fff', color: sel ? '#fff' : '#666', borderColor: sel ? '#C0203A' : '#ddd', cursor: puedeEditar ? 'pointer' : 'default' }}>
+                        {t}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={{ background: '#f9f9f9', borderRadius: '8px', padding: '12px', fontSize: '12px', color: '#666', marginBottom: '12px' }}>
               <div style={{ fontWeight: '500', marginBottom: '4px', color: '#333' }}>Vista previa (sobre precio de ejemplo $1,000,000)</div>
@@ -177,4 +221,5 @@ export default function Planes({ desarrollo, onBack, miRol, miAgente }) {
 }
 
 const btnPrimary = { background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' };
+const chipTorre = { padding: '5px 14px', borderRadius: '20px', border: '0.5px solid', fontSize: '12px', fontWeight: '500' };
 const btnOutline = { background: '#fff', color: '#333', border: '0.5px solid #ddd', borderRadius: '8px', padding: '8px 16px', fontSize: '13px', cursor: 'pointer' };

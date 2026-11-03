@@ -5,6 +5,7 @@ import { saveAs } from 'file-saver';
 import Cotizador from './Cotizador';
 import { InputDinero } from './dinero';
 import { usePuede } from './PermisosContext';
+import { planAplicaAUnidad } from './planesTorre';
 
 const ESTATUS_OPCIONES = ['Libre', 'Bloqueado', 'Apartado', 'Vendido'];
 const ORIENTACION_OPCIONES = ['', 'Norte', 'Sur', 'Este', 'Oeste', 'Noreste', 'Noroeste', 'Sureste', 'Suroeste'];
@@ -921,10 +922,11 @@ const { data } = await query.limit(5000);
                     </td>
                     {planes.map(plan => {
                       const calc = calcularPlan(plan, u.precio_lista || 0);
+                      const aplica = planAplicaAUnidad(plan, u);
                       return (
                         <td key={plan.id} style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontSize: '12px', color: '#333' }}>
-                            {precioVisible(u) ? fmt(calc.precioConDescuento) : '—'}
+                          <div style={{ fontSize: '12px', color: aplica ? '#333' : '#ccc' }}>
+                            {aplica && precioVisible(u) ? fmt(calc.precioConDescuento) : '—'}
                           </div>
                         </td>
                       );
@@ -1050,7 +1052,7 @@ const { data } = await query.limit(5000);
             {planes.length > 0 && (
               <div style={{ marginTop: '1rem' }}>
                 <div style={{ fontSize: '11px', color: '#888', fontWeight: '500', marginBottom: '10px' }}>PLANES DE PAGO</div>
-                {planes.map(plan => {
+                {planes.filter(plan => planAplicaAUnidad(plan, unidadDetalle)).map(plan => {
                   const calc = calcularPlan(plan, unidadDetalle.precio_lista || 0);
                   return (
                     <div key={plan.id} style={{ padding: '10px', background: '#f9f9f9', borderRadius: '8px', marginBottom: '8px', fontSize: '13px' }}>
