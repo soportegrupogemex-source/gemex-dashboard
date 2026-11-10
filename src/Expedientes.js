@@ -968,6 +968,50 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     const docsTitular = docsRequeridos(movSel, 'titular');
     const docsCoacreditado = hayOtraPersona(movSel) ? docsRequeridos(movSel, 'coacreditado') : [];
 
+    // Equipo adicional: el asesor lo indica al CARGAR el expediente; Admin describe qué equipo es; el Super Admin lo autoriza en DESCARGAR.
+    const renderEquipo = () => {
+      const enCargar = tab === 'cargar';
+      const puedoMarcar = enCargar && puedoEquipoSolicitar && esMio && !(movSel.equipo_adicional_autorizacion === 'autorizado' && !puedoEquipoAutorizar);
+      if (!movSel.equipo_adicional && !puedoMarcar) return null;
+      const est = estadoEquipo(movSel);
+      return (
+        <div style={{ padding: '12px 16px', background: est ? est.fondo : '#F7F7F9', border: `1px solid ${est ? est.color + '55' : '#eee'}`, borderRadius: '8px', marginBottom: '14px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: puedoMarcar ? 'pointer' : 'default' }}>
+            <input type='checkbox' checked={!!movSel.equipo_adicional} disabled={!puedoMarcar}
+              onChange={e => toggleEquipo(movSel, e.target.checked)} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: est ? est.color : '#444' }}>
+                Equipo adicional
+                {est && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: '#fff', border: `1px solid ${est.color}55` }}>{est.txt}</span>}
+              </div>
+              <div style={{ fontSize: '11px', color: '#888' }}>
+                {enCargar ? 'Marca si la unidad lleva equipamiento extra que depende de Construcción. Admin indicará qué equipo es y un Super Admin lo autoriza.' : 'Lo indicó el asesor al cargar el expediente. Admin describe el equipo y el Super Admin lo autoriza aquí.'}
+              </div>
+            </div>
+          </label>
+          {movSel.equipo_adicional && (
+            <div style={{ marginTop: '10px' }}>
+              <textarea value={detalleEquipo} onChange={e => setDetalleEquipo(e.target.value)} disabled={!puedoEquipoDetallar} rows={3}
+                placeholder={puedoEquipoDetallar ? 'Describe el equipo adicional (qué es, dónde va, observaciones)…' : 'Admin describirá el equipo adicional'}
+                style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical', background: puedoEquipoDetallar ? '#fff' : '#fafafa' }} />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {puedoEquipoDetallar && (detalleEquipo.trim() !== (movSel.equipo_adicional_detalle || '').trim()) && (
+                  <button onClick={() => guardarDetalleEquipo(movSel)} style={{ padding: '6px 14px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Guardar descripción</button>
+                )}
+                {!enCargar && puedoEquipoAutorizar && est && (est.clave === 'por_autorizar' || est.clave === 'rechazado') && (<>
+                  <button onClick={() => resolverEquipo(movSel, 'autorizado')} style={{ padding: '6px 14px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Autorizar</button>
+                  {est.clave === 'por_autorizar' && <button onClick={() => resolverEquipo(movSel, 'rechazado')} style={{ padding: '6px 14px', background: '#fff', color: '#C0392B', border: '0.5px solid #C0392B', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Rechazar</button>}
+                </>)}
+                {enCargar && puedoEquipoAutorizar && est?.clave === 'por_autorizar' && <span style={{ fontSize: '11px', color: '#B45309' }}>Se autoriza en la pestaña Descargar.</span>}
+                {est?.clave === 'autorizado' && <span style={{ fontSize: '11px', color: '#27500A' }}>Autorizado por {(movSel.equipo_adicional_autorizado_por || '').split('@')[0]}{movSel.equipo_adicional_autorizado_en ? ` el ${new Date(movSel.equipo_adicional_autorizado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}` : ''}. Construcción ya fue avisada.</span>}
+                {est?.clave === 'por_detallar' && !puedoEquipoDetallar && <span style={{ fontSize: '11px', color: '#856404' }}>Pendiente de que Admin describa el equipo.</span>}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
     // FIX: card de un documento — se reutiliza para Titular y Coacreditado,
     // ya que ambos viven en el mismo mapa plano de documentos (el id del
     // coacreditado viene prefijado `coac_`).
@@ -1131,41 +1175,6 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                 <div style={{ fontSize: '11px', color: '#888' }}>La documentación ya está lista.</div>
               </div>
             </label>
-            {(puedoEquipoSolicitar || movSel.equipo_adicional) && (() => {
-              const est = estadoEquipo(movSel);
-              return (
-                <div style={{ padding: '12px 16px', background: est ? est.fondo : '#F7F7F9', border: `1px solid ${est ? est.color + '55' : 'transparent'}`, borderRadius: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: puedoEquipoSolicitar ? 'pointer' : 'default' }}>
-                    <input type='checkbox' checked={!!movSel.equipo_adicional} disabled={!puedoEquipoSolicitar}
-                      onChange={e => toggleEquipo(movSel, e.target.checked)} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: est ? est.color : '#444' }}>
-                        Equipo adicional{est && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: '#fff', border: `1px solid ${est.color}55` }}>{est.txt}</span>}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#888' }}>La unidad lleva equipamiento extra que depende de Construcción. El asesor lo indica, Admin lo describe y un Super Admin lo autoriza.</div>
-                    </div>
-                  </label>
-                  {movSel.equipo_adicional && (
-                    <div style={{ marginTop: '10px' }}>
-                      <textarea value={detalleEquipo} onChange={e => setDetalleEquipo(e.target.value)} disabled={!puedoEquipoDetallar} rows={3}
-                        placeholder={puedoEquipoDetallar ? 'Describe el equipo adicional (qué es, dónde va, observaciones)…' : 'Admin describirá el equipo adicional'}
-                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical', background: puedoEquipoDetallar ? '#fff' : '#fafafa' }} />
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {puedoEquipoDetallar && (detalleEquipo.trim() !== (movSel.equipo_adicional_detalle || '').trim()) && (
-                          <button onClick={() => guardarDetalleEquipo(movSel)} style={{ padding: '6px 14px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Guardar descripción</button>
-                        )}
-                        {puedoEquipoAutorizar && est && (est.clave === 'por_autorizar' || est.clave === 'rechazado') && (<>
-                          <button onClick={() => resolverEquipo(movSel, 'autorizado')} style={{ padding: '6px 14px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Autorizar</button>
-                          {est.clave === 'por_autorizar' && <button onClick={() => resolverEquipo(movSel, 'rechazado')} style={{ padding: '6px 14px', background: '#fff', color: '#C0392B', border: '0.5px solid #C0392B', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Rechazar</button>}
-                        </>)}
-                        {est?.clave === 'autorizado' && <span style={{ fontSize: '11px', color: '#27500A' }}>Autorizado por {(movSel.equipo_adicional_autorizado_por || '').split('@')[0]}{movSel.equipo_adicional_autorizado_en ? ` el ${new Date(movSel.equipo_adicional_autorizado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}` : ''}. Construcción ya fue avisada.</span>}
-                        {est?.clave === 'por_detallar' && !puedoEquipoDetallar && <span style={{ fontSize: '11px', color: '#856404' }}>Pendiente de que Admin describa el equipo.</span>}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
             {movSel.tipo_compra === 'Contado' ? (
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#FFF4E5' : '#F3F0FF', border: `1px solid ${movSel.enviar_titulacion ? '#F59E0B' : 'transparent'}`, borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
                 <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
@@ -1199,6 +1208,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             )}
           </div>
         )}
+
+        {!soloEnviadosATitulacion && (tab === 'cargar' || tab === 'descargar') && renderEquipo()}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {esFinanciado && (
