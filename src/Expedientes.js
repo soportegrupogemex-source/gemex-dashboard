@@ -490,7 +490,9 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // mandarlo (Titulación filtra por esta casilla, no por la anterior).
   const handleToggleEnviarTitulacion = async (mov, valor) => {
     if (!puedoEnviarTitulacion) return;
-    const { data, error } = await supabase.from('movimientos').update({ enviar_titulacion: valor }).eq('id', mov.id).select().single();
+    // Contado: se manda a Titulación aunque todavía no se pueda titular y allá aparece "Por liberar".
+    const payload = { enviar_titulacion: valor, titulacion_por_liberar: mov.tipo_compra === 'Contado' ? valor : false };
+    const { data, error } = await supabase.from('movimientos').update(payload).eq('id', mov.id).select().single();
     if (error) return;
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
@@ -1076,16 +1078,29 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                 <div style={{ fontSize: '11px', color: '#888' }}>La documentación ya está lista.</div>
               </div>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#EAF3DE' : '#F3F0FF', borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
-              <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
-                onChange={e => handleToggleEnviarTitulacion(movSel, e.target.checked)} />
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#27500A' : '#5B21B6' }}>
-                  Enviar a Titulación{!puedoEnviarTitulacion ? ' — solo el responsable puede cambiarlo' : ''}
+            {movSel.tipo_compra === 'Contado' ? (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#FFF4E5' : '#F3F0FF', border: `1px solid ${movSel.enviar_titulacion ? '#F59E0B' : 'transparent'}`, borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
+                <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
+                  onChange={e => handleToggleEnviarTitulacion(movSel, e.target.checked)} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#B45309' : '#5B21B6' }}>
+                    Enviar a Titulación — por liberar{!puedoEnviarTitulacion ? ' — solo el responsable puede cambiarlo' : ''}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Contado: la unidad pasa a Titulación aunque todavía no se pueda titular, y allá aparece como "Por liberar" hasta que Construcción la libere (DTU y lista para avalúo).</div>
                 </div>
-                <div style={{ fontSize: '11px', color: '#888' }}>Al activarla, la unidad pasa a Titulación.</div>
-              </div>
-            </label>
+              </label>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#EAF3DE' : '#F3F0FF', borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
+                <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
+                  onChange={e => handleToggleEnviarTitulacion(movSel, e.target.checked)} />
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#27500A' : '#5B21B6' }}>
+                    Enviar a Titulación{!puedoEnviarTitulacion ? ' — solo el responsable puede cambiarlo' : ''}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Al activarla, la unidad pasa a Titulación.</div>
+                </div>
+              </label>
+            )}
           </div>
         )}
 
@@ -1501,6 +1516,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   ) : (
                     <>
                       {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
+                      {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>⏳ En Titulación · por liberar</span>}
                       {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>💬 Observaciones</span>}
                       {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
                       {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}

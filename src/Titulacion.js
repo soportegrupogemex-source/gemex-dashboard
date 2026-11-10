@@ -76,6 +76,9 @@ export default function Titulacion({ miRol, miAgente }) {
   const [tiposCompra, setTiposCompra] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [etapaSel, setEtapaSel] = useState('');
+  // Contado enviado a Titulación antes de poder titularse: "Por liberar" hasta que Construcción libere la unidad (DTU + lista para avalúo).
+  const [porLiberar, setPorLiberar] = useState({});
+  const esPorLiberar = (id) => !!porLiberar[id] && !(seguimientos[id]?.dtu && seguimientos[id]?.lista_avaluo);
   const [semanaSel, setSemanaSel] = useState(''); // '', 'actual' o 'anterior': solo las escrituradas en esa semana (lunes a domingo)
   const [cotejoSel, setCotejoSel] = useState('');
   const [generandoEstado, setGenerandoEstado] = useState(false);
@@ -123,7 +126,7 @@ export default function Titulacion({ miRol, miAgente }) {
     // "expediente completo" que solo el responsable enciende/apaga en
     // Expedientes) sin esperar a que la unidad tenga estatus='Vendido'.
     const { data: apartados } = await supabase.from('movimientos')
-      .select('id, unidad_id, contacto_nombre, tipo_compra, enviar_titulacion, created_at')
+      .select('id, unidad_id, contacto_nombre, tipo_compra, enviar_titulacion, titulacion_por_liberar, created_at')
       .in('tipo', ['Apartado', 'Vendida']).eq('enviar_titulacion', true)
       .order('created_at', { ascending: false });
     const apartadoPorUnidad = {};
@@ -134,8 +137,10 @@ export default function Titulacion({ miRol, miAgente }) {
       return;
     }
     const mapaTipos = {};
-    idsConExpediente.forEach(id => { mapaTipos[id] = apartadoPorUnidad[id]?.tipo_compra; });
+    const mapaPorLiberar = {};
+    idsConExpediente.forEach(id => { mapaTipos[id] = apartadoPorUnidad[id]?.tipo_compra; mapaPorLiberar[id] = !!apartadoPorUnidad[id]?.titulacion_por_liberar && apartadoPorUnidad[id]?.tipo_compra === 'Contado'; });
     setTiposCompra(mapaTipos);
+    setPorLiberar(mapaPorLiberar);
 
     const { data: inv } = await supabase.from('inventario')
       .select('id, numero, desarrollo_id, precio_lista_respaldo')
@@ -439,6 +444,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  {esPorLiberar(u.id) && <span title="Contado enviado a Titulación; falta que Construcción la libere (DTU y lista para avalúo)" style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '700' }}>⏳ Por liberar</span>}
                   {liquidacionesCobranza[u.id] && <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>}
                   {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
