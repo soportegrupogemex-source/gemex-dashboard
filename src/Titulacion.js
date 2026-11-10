@@ -166,17 +166,16 @@ export default function Titulacion({ miRol, miAgente }) {
     setCargando(false);
   };
 
-  const unidadesVisibles = unidades.filter(u => {
+  // Unidades que cumplen los filtros de proyecto y cotejo (las tarjetas de etapa cuentan sobre estas, para que
+  // al elegir una etapa las otras tarjetas no se pongan en cero).
+  const unidadesSinEtapa = unidades.filter(u => {
     if (ROLES_GERENTE.includes(miRol) && !idsPermitidos.includes(u.desarrollo_id)) return false;
     if (desarrolloSel && u.desarrollo_nombre !== desarrolloSel) return false;
-    if (etapaSel) {
-      const s = seguimientos[u.id] || VACIO;
-      if (calcularEtapa(s) !== etapaSel) return false;
-    }
     if (cotejoSel === 'cotejadas' && !liquidacionesCobranza[u.id]) return false;
     if (cotejoSel === 'sin_cotejar' && liquidacionesCobranza[u.id]) return false;
     return true;
   });
+  const unidadesVisibles = etapaSel ? unidadesSinEtapa.filter(u => calcularEtapa(seguimientos[u.id] || VACIO) === etapaSel) : unidadesSinEtapa;
 
   const abrirUnidad = async (u) => {
     setUnidadAbierta(u);
@@ -319,7 +318,7 @@ export default function Titulacion({ miRol, miAgente }) {
   };
 
   const conteos = { 'Contrato y Expediente': 0, 'Titulación': 0, 'Escriturado': 0 };
-  unidadesVisibles.forEach(u => { conteos[calcularEtapa(seguimientos[u.id] || VACIO)]++; });
+  unidadesSinEtapa.forEach(u => { conteos[calcularEtapa(seguimientos[u.id] || VACIO)]++; });
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
@@ -363,7 +362,9 @@ export default function Titulacion({ miRol, miAgente }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem', maxWidth: isMobile ? 'none' : '600px' }}>
         {Object.entries(conteos).map(([etapa, n]) => (
-          <div key={etapa} style={{ background: '#fff', border: `2px solid ${COLOR_ETAPA[etapa]}`, borderRadius: '12px', padding: '12px' }}>
+          <div key={etapa} role="button" tabIndex={0} title={etapaSel === etapa ? 'Quitar el filtro' : `Ver solo ${etapa}`}
+            onClick={() => setEtapaSel(etapaSel === etapa ? '' : etapa)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setEtapaSel(etapaSel === etapa ? '' : etapa); }}
+            style={{ background: etapaSel === etapa ? COLOR_ETAPA[etapa] + '1A' : '#fff', border: `2px solid ${COLOR_ETAPA[etapa]}`, borderRadius: '12px', padding: '12px', cursor: 'pointer', opacity: etapaSel && etapaSel !== etapa ? 0.55 : 1, boxShadow: etapaSel === etapa ? `0 0 0 2px ${COLOR_ETAPA[etapa]}33` : 'none', transition: 'opacity .15s' }}>
             <div style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a2e' }}>{n}</div>
             <div style={{ fontSize: '11px', color: '#888' }}>{etapa}</div>
           </div>
