@@ -268,10 +268,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     return data;
   };
   const puedoLiberarContado = puede('expedientes.liberar_contado');
-  // Contado "por liberar": Titulación ya lo ve pero no avanza hasta que se confirme el pago del crédito puente.
+  // Contado "por liberar": Titulación ya lo ve pero no avanza hasta que se libere.
   const liberarContado = async (mov) => {
     if (!puedoLiberarContado) return;
-    if (!window.confirm(`¿Confirmas que el crédito puente de ${mov.unidad_numero || 'esta unidad'} ya está pagado? Titulación podrá avanzar con este expediente.`)) return;
+    if (!window.confirm(`¿Liberar ${mov.unidad_numero || 'esta unidad'}? Titulación podrá avanzar con este expediente.`)) return;
     const { data, error } = await supabase.from('movimientos').update({ titulacion_por_liberar: false }).eq('id', mov.id).select().single();
     if (error) { alert('No se pudo liberar: ' + error.message); return; }
     setMovSel(data);
@@ -1183,14 +1183,14 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   <div style={{ fontSize: '13px', fontWeight: '600', color: movSel.enviar_titulacion ? '#B45309' : '#5B21B6' }}>
                     Enviar a Titulación — por liberar{!puedoEnviarTitulacion ? ' — solo el responsable puede cambiarlo' : ''}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#888' }}>Contado: la unidad ya se ve en Titulación como "Por liberar", pero Titulación no avanza con ella hasta que se confirme el pago del crédito puente.</div>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Contado: la unidad ya se ve en Titulación como "Por liberar", pero Titulación no avanza con ella hasta que se libere.</div>
                   {movSel.enviar_titulacion && movSel.titulacion_por_liberar && puedoLiberarContado && (
                     <button type='button' onClick={(e) => { e.preventDefault(); liberarContado(movSel); }}
                       style={{ marginTop: '8px', padding: '6px 14px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                      Liberar — crédito puente pagado
+                      Liberar para Titulación
                     </button>
                   )}
-                  {movSel.enviar_titulacion && movSel.titulacion_por_liberar && !puedoLiberarContado && <div style={{ fontSize: '11px', color: '#B45309', marginTop: '6px' }}>Pendiente del pago del crédito puente; lo libera Admin o Tesorería.</div>}
+                  {movSel.enviar_titulacion && movSel.titulacion_por_liberar && !puedoLiberarContado && <div style={{ fontSize: '11px', color: '#B45309', marginTop: '6px' }}>Pendiente de liberar; lo libera Admin o Tesorería.</div>}
                   {movSel.enviar_titulacion && !movSel.titulacion_por_liberar && <div style={{ fontSize: '11px', color: '#27500A', marginTop: '6px' }}>✓ Liberado: Titulación ya puede avanzar.</div>}
                 </div>
               </label>
@@ -1624,7 +1624,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                     <>
                       {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
                       {estadoEquipo(m) && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: estadoEquipo(m).fondo, color: estadoEquipo(m).color, fontWeight: '600' }}>➕ Equipo adicional · {estadoEquipo(m).txt}</span>}
-                      {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>⏳ En Titulación · por liberar (crédito puente)</span>}
+                      {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>⏳ En Titulación · por liberar</span>}
                       {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>💬 Observaciones</span>}
                       {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
                       {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}

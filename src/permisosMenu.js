@@ -158,7 +158,7 @@ export const ACCIONES = [
   { id: 'expedientes.revisar_documentos', seccion: 'Expedientes', label: 'Aprobar o rechazar documentos', defecto: roles('Super Admin', 'Admin', 'Mesa de Control') },
   { id: 'expedientes.marcar_completo', seccion: 'Expedientes', label: 'Marcar "Expediente completo"', defecto: roles('Mesa de Control'), sinSuperAdmin: true },
   { id: 'expedientes.enviar_titulacion', seccion: 'Expedientes', label: 'Marcar "Enviar a Titulación"', defecto: roles('Mesa de Control'), sinSuperAdmin: true },
-  { id: 'expedientes.liberar_contado', seccion: 'Expedientes', label: 'Liberar contados "por liberar" para que Titulación avance (crédito puente pagado)', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
+  { id: 'expedientes.liberar_contado', seccion: 'Expedientes', label: 'Liberar contados "por liberar" para que Titulación avance', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
   { id: 'expedientes.equipo_adicional_solicitar', seccion: 'Expedientes', label: 'Equipo adicional: indicar que la unidad lo lleva (al cargar el expediente)', defecto: roles('Super Admin', 'Admin', 'Agente', 'Asesor Premium') },
   { id: 'expedientes.equipo_adicional_detallar', seccion: 'Expedientes', label: 'Equipo adicional: describir el equipo', defecto: roles('Super Admin', 'Admin') },
   { id: 'expedientes.equipo_adicional_autorizar', seccion: 'Expedientes', label: 'Equipo adicional: autorizar o rechazar (avisa a Construcción)', defecto: roles('Super Admin') },
