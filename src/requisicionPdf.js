@@ -8,7 +8,7 @@ const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'o
 const fecha = (s) => { if (!s) return ''; const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return `${d}-${MESES[m - 1]}-${y}`; };
 const FORMA = { cheque: 'CHEQUE', transferencia: 'TRANSFERENCIA', efectivo: 'EFECTIVO' };
 
-export async function descargarRequisicionPdf({ req, lineas, torres, desarrollo, autorizo }) {
+export async function descargarRequisicionPdf({ req, lineas, torres, etiquetaTorres = 'TORRES', desarrollo, autorizo }) {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const W = doc.internal.pageSize.getWidth();
   const logo = await cargarLogo();
@@ -27,7 +27,7 @@ export async function descargarRequisicionPdf({ req, lineas, torres, desarrollo,
       [...par('CATEGORÍA', (req.categoria === 'indirectos' ? 'INDIRECTOS' : 'EDIFICACIÓN') + (req.etapa ? ` · ${req.etapa.toUpperCase()}` : '')), ...par('FISCAL', req.fiscal ? 'SÍ' : 'NO')],
       [...par('UBICACIÓN', (req.ubicacion || '').toUpperCase()), ...par('Nº FACTURA', req.factura || 'PENDIENTE')],
       [...par('PROYECTO', (desarrollo || '').toUpperCase()), ...par('CONCEPTO', (req.concepto || '').toUpperCase())],
-      [...par('TORRES', torres || ''), ...par('FORMA DE PAGO', FORMA[req.forma_pago] || '')],
+      [...par(etiquetaTorres, torres || ''), ...par('FORMA DE PAGO', FORMA[req.forma_pago] || '')],
     ],
   });
   autoTable(doc, {

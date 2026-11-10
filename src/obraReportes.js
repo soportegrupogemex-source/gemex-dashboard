@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cargarLogo } from './liquidacionPdf';
-import { nombreFrente, TIPOS_FRENTE } from './ObraTorres';
+import { nombreFrente, nombreTipoFrente } from './ObraTorres';
 
 // Reportes del Dashboard de obra: Excel (resumen + partidas atrasadas) y PDF ejecutivo.
 const r1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
@@ -12,7 +12,7 @@ const nombreArchivo = (ext) => `Dashboard-de-obra-${new Date().toISOString().sli
 
 const filasResumen = (proyectos, verCostos) => proyectos.flatMap(p => p.frentes.map(f => {
   const base = {
-    Proyecto: p.nombre, Frente: nombreFrente(f.t), Tipo: TIPOS_FRENTE[f.t.tipo] || f.t.tipo,
+    Proyecto: p.nombre, Frente: nombreFrente(f.t), Tipo: nombreTipoFrente(f.t),
     'Avance real %': r1(f.r.real), 'Programado a hoy %': f.r.programado === null ? '' : r1(f.r.programado),
     'Desviación (pts)': f.desv === null ? '' : r1(f.desv),
     'Partidas terminadas': f.r.terminadas, 'Partidas totales': f.r.total, 'Partidas atrasadas': f.r.atrasadas,

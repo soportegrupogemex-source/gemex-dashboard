@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
-import { resumen, traerTodo, indexar, nombreFrente } from './ObraTorres';
+import { resumen, traerTodo, indexar, nombreFrente, etiquetaAgrupacion } from './ObraTorres';
 
 // FIX: módulo de Construcción — reporta el Paso 1 del proceso de
 // Titulación (Avance de obra, DTU, Lista para avalúo) para TODAS las
@@ -54,7 +54,7 @@ export default function Construccion() {
 
   const cargarTodo = async () => {
     setCargando(true);
-    const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
+    const { data: des } = await supabase.from('desarrollos').select('id, nombre, estructura').eq('activo', true).order('nombre');
     setDesarrollos(des || []);
     const mapaNombres = {};
     (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
@@ -111,7 +111,7 @@ export default function Construccion() {
         const ligadas = ligas.filter(l => l.torre_id === t.id).map(l => l.unidad_id);
         let unidades = ligadas;
         if (t.tipo === 'torre' && ligadas.length === 0) {
-          const letra = String(t.nombre || t.torre || '').trim().replace(/^torre\s+/i, '').toUpperCase();
+          const letra = String(t.nombre || t.torre || '').trim().replace(/^(?:torre|manzana)\s+/i, '').toUpperCase();
           unidades = inv.filter(u => u.desarrollo_id === t.desarrollo_id && torreDe(u) === letra).map(u => u.id);
         }
         unidades.forEach(id => { mapa[id] = { pct, frente: nombreFrente(t) }; });
@@ -236,6 +236,7 @@ export default function Construccion() {
               const lista = porDesarrollo[nombre].slice().sort(natural);
               const claveDes = nombre;
               const abierto = !!abiertos[claveDes];
+              const etiq = etiquetaAgrupacion(desarrollos.find(d => d.nombre === nombre)?.estructura); // Torre (vertical) o Manzana (horizontal)
               const hayTorres = lista.some(u => torreDe(u));
               const torres = {};
               if (hayTorres) lista.forEach(u => { const t = torreDe(u) || '—'; (torres[t] = torres[t] || []).push(u); });
@@ -248,7 +249,7 @@ export default function Construccion() {
                       <span style={{ fontSize: '12px', display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
                       <span style={{ fontSize: '14px', fontWeight: '600' }}>{nombre}</span>
                       <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>
-                        {hayTorres ? `${Object.keys(torres).length} ${Object.keys(torres).length === 1 ? 'torre' : 'torres'} · ` : ''}{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}
+                        {hayTorres ? `${Object.keys(torres).length} ${Object.keys(torres).length === 1 ? etiq.toLowerCase() : (etiq === 'Manzana' ? 'manzanas' : 'torres')} · ` : ''}{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}
                       </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px' }}>
@@ -268,12 +269,12 @@ export default function Construccion() {
                               style={{ background: '#f0f0f5', color: '#1a1a2e', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <span style={{ fontSize: '11px', display: 'inline-block', transform: torreAbierta ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
-                                <span style={{ fontSize: '13px', fontWeight: '600' }}>{t === '—' ? 'Sin torre' : `Torre ${t}`}</span>
+                                <span style={{ fontSize: '13px', fontWeight: '600' }}>{t === '—' ? `Sin ${etiq.toLowerCase()}` : `${etiq} ${t}`}</span>
                                 <span style={{ fontSize: '11px', color: '#888' }}>{torres[t].length} {torres[t].length === 1 ? 'unidad' : 'unidades'}</span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: '#666' }}>
                                 {deObra[torres[t][0]?.id] && <span>Obra marca <b>{deObra[torres[t][0].id].pct}%</b></span>}
-                                {botonAplicar(torres[t], `Torre ${t}`)}
+                                {botonAplicar(torres[t], `${etiq} ${t}`)}
                                 <span>Avance promedio: <b>{promedio(torres[t])}%</b></span>
                               </div>
                             </div>

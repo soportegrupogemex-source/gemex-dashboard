@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
 import {
   resumen, progPct, Barra, Tarjeta, traerTodo, useIsMobile, parse, hoyISO, fechaCorta, pct1, $,
-  indexar, hojasDe, etapasDe, rutaDe, TIPOS_FRENTE, nombreFrente, TOLERANCIA, fechaDe, curvaS,
+  indexar, hojasDe, etapasDe, rutaDe, nombreTipoFrente, nombreFrente, TOLERANCIA, fechaDe, curvaS,
 } from './ObraTorres';
 import { exportarExcel, exportarPdf } from './obraReportes';
 
@@ -123,7 +123,7 @@ function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
         <div style={{ flex: isMobile ? '1 1 60%' : '0 0 210px' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>{nombreFrente(t)}</div>
           <div style={{ fontSize: 11, color: '#888' }}>
-            {TIPOS_FRENTE[t.tipo] || t.tipo}{t.tipo === 'tren' && t.num_viviendas ? ` · ${t.num_viviendas} viviendas` : ''}
+            {nombreTipoFrente(t)}{t.tipo === 'tren' && t.num_viviendas ? ` · ${t.num_viviendas} viviendas` : ''}
           </div>
         </div>
         <div style={{ flex: '1 1 180px', minWidth: 160 }}>
@@ -204,7 +204,7 @@ export default function ObraDashboard() {
     setCargando(true); setError('');
     try {
       const [torres, partidas, programa, contratos, pagos, avances, conceptos, gastos] = await Promise.all([
-        traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(id, nombre)').eq('es_plantilla', false).order('created_at')),
+        traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(id, nombre, estructura)').eq('es_plantilla', false).order('created_at')),
         traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, etapa, etapa_orden, orden, descripcion, avance_pct, cantidad, precio_unitario, terminada_en, contrato_id').order('id')),
         traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').order('partida_id').order('semana').order('dia')),
         verCostos ? traerTodo(() => supabase.from('obra_contratos').select('id, torre_id, tipo, monto_fijo').order('id')) : Promise.resolve([]),

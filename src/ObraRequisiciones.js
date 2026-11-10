@@ -5,7 +5,7 @@ import { InputDinero } from './dinero';
 import { enviarPush } from './enviarPush';
 import { descargarRequisicionPdf } from './requisicionPdf';
 import { EMPRESA } from './empresa';
-import { traerTodo, useIsMobile, fechaCorta, hoyISO, $, Modal, btn, inp, lbl, nombreFrente } from './ObraTorres';
+import { traerTodo, useIsMobile, fechaCorta, hoyISO, $, Modal, btn, inp, lbl, nombreFrente, etiquetaAgrupacion } from './ObraTorres';
 
 // Requisiciones de pago de obra (formato de la hoja oficial): Construcción solicita, Dirección Administrativa
 // autoriza y Tesorería paga con comprobante. Al pagarse, cada parte se carga a la torre y al concepto de
@@ -20,9 +20,9 @@ const FORMAS = { cheque: 'Cheque', transferencia: 'Transferencia', efectivo: 'Ef
 const NOMBRE_CAT = { materiales: 'Materiales', subcontratos: 'Subcontratos', maquinaria: 'Maquinaria', indirectos: 'Indirectos' };
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-const letrasTorres = (cargos) => {
+const letrasTorres = (cargos) => {  // Torre X o Manzana X -> X
   const nombres = [...new Set(cargos.map(c => c.obra_torres).filter(Boolean).map(t => nombreFrente(t)))];
-  return nombres.map(n => (/^torre\s+([A-Za-zÁÉÍÓÚÑ]+)$/i.exec(n)?.[1] || n).toUpperCase()).join(nombres.every(n => /^torre\s+\S+$/i.test(n)) ? '' : ', ');
+  return nombres.map(n => (/^(?:torre|manzana)\s+([A-Za-zÁÉÍÓÚÑ]+)$/i.exec(n)?.[1] || n).toUpperCase()).join(nombres.every(n => /^(?:torre|manzana)\s+\S+$/i.test(n)) ? '' : ', ');
 };
 
 // Encabezado con el logo de la empresa, como en el formato impreso.
@@ -61,6 +61,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
   const [guardando, setGuardando] = useState(false);
 
   const frentes = torres.filter(t => t.desarrollo_id === f.desarrollo_id);
+  const etiq = etiquetaAgrupacion(frentes[0]?.desarrollos?.estructura); // Torre o Manzana
   const subtotal = lineas.reduce((t, l) => t + r2((Number(l.cantidad) || 0) * (Number(l.precio) || 0)), 0);
   const iva = f.fiscal === 'si' ? r2(subtotal * 0.16) : 0;
   const total = r2(subtotal + iva);
@@ -158,7 +159,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
         </div>
       </div>
 
-      <div style={{ fontSize: 13, fontWeight: 700, margin: '14px 0 2px' }}>A qué torre se carga</div>
+      <div style={{ fontSize: 13, fontWeight: 700, margin: '14px 0 2px' }}>{`A qué ${etiq.toLowerCase()} se carga`}</div>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Cada torre absorbe lo que le corresponde: indica la torre, el concepto de presupuesto (o el contrato de mano de obra) y el monto. La suma debe ser igual al total.</div>
       {f.desarrollo_id === '' ? <div style={{ fontSize: 12, color: '#888' }}>Elige primero el proyecto.</div> : frentes.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Este proyecto aún no tiene torres cargadas en Programa.</div> : (
         <>
@@ -169,7 +170,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
               <div key={i} style={{ marginBottom: 6 }}>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   <select value={c.torre_id} onChange={e => setCargo(i, 'torre_id', e.target.value)} style={{ ...inp, width: 150 }}>
-                    <option value="">Torre...</option>{frentes.map(t => <option key={t.id} value={t.id}>{nombreFrente(t)}</option>)}
+                    <option value="">{etiq}...</option>{frentes.map(t => <option key={t.id} value={t.id}>{nombreFrente(t)}</option>)}
                   </select>
                   <select value={c.destino} onChange={e => setCargo(i, 'destino', e.target.value)} disabled={!c.torre_id} style={{ ...inp, flex: '1 1 260px' }}>
                     <option value="">Cargar a…</option>
@@ -188,7 +189,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
             );
           })}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => setCargos(cs => [...cs, { torre_id: '', destino: '', monto: '' }])} style={btn}>+ Torre</button>
+            <button onClick={() => setCargos(cs => [...cs, { torre_id: '', destino: '', monto: '' }])} style={btn}>{`+ ${etiq}`}</button>
             <button onClick={repartir} disabled={total <= 0} style={btn}>Repartir parejo</button>
             <span style={{ fontSize: 12, color: cuadra ? '#27500A' : '#C0392B' }}>Reparto {$(sumaCargos)} de {$(total)}{cuadra ? ' ✓' : ''}</span>
           </div>
@@ -271,7 +272,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
     const { data } = await supabase.storage.from('obra').createSignedUrl(req.comprobante_path, 300);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank');
   };
-  const pdf = () => descargarRequisicionPdf({ req, lineas: lineas || [], torres: letrasTorres(cargos), desarrollo: req.desarrollos?.nombre, autorizo });
+  const pdf = () => descargarRequisicionPdf({ req, lineas: lineas || [], torres: letrasTorres(cargos), etiquetaTorres: req.desarrollos?.estructura === 'Horizontal' ? 'MANZANAS' : 'TORRES', desarrollo: req.desarrollos?.nombre, autorizo });
 
   const dato = (k, v) => v ? <div style={{ minWidth: 150 }}><div style={{ fontSize: 10, color: '#888' }}>{k}</div><div style={{ fontSize: 12, fontWeight: 600 }}>{v}</div></div> : null;
   return (
@@ -282,7 +283,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
         <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto' }}>PDF</button>
       </div>
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
-        {dato('Proyecto', req.desarrollos?.nombre)}{dato('Torres', letrasTorres(cargos))}{dato('Categoría', req.categoria === 'indirectos' ? 'Indirectos' : 'Edificación')}
+        {dato('Proyecto', req.desarrollos?.nombre)}{dato(req.desarrollos?.estructura === 'Horizontal' ? 'Manzanas' : 'Torres', letrasTorres(cargos))}{dato('Categoría', req.categoria === 'indirectos' ? 'Indirectos' : 'Edificación')}
         {dato('Semana', req.semana)}{dato('Periodo', req.periodo)}{dato('Etapa', req.etapa)}{dato('Ubicación', req.ubicacion)}
         {dato('Fiscal', req.fiscal ? 'Sí' : 'No')}{dato('Nº factura', req.factura || 'Pendiente')}{dato('Forma de pago', FORMAS[req.forma_pago])}
         {dato('Razón social', req.razon_social)}{dato('Concepto', req.concepto)}
@@ -360,9 +361,9 @@ export default function ObraRequisiciones() {
     setCargando(true); setError('');
     try {
       const [rs, cg, torres, conceptos, contratos, contratistas, gastos, { data: { user } }] = await Promise.all([
-        traerTodo(() => supabase.from('obra_requisiciones').select('*, desarrollos(nombre)').order('folio', { ascending: false })),
+        traerTodo(() => supabase.from('obra_requisiciones').select('*, desarrollos(nombre, estructura)').order('folio', { ascending: false })),
         traerTodo(() => supabase.from('obra_requisicion_cargos').select('requisicion_id, obra_torres(nombre, torre)').order('id')),
-        traerTodo(() => supabase.from('obra_torres').select('id, desarrollo_id, torre, nombre, desarrollos(nombre)').eq('es_plantilla', false).order('created_at')),
+        traerTodo(() => supabase.from('obra_torres').select('id, desarrollo_id, torre, nombre, desarrollos(nombre, estructura)').eq('es_plantilla', false).order('created_at')),
         traerTodo(() => supabase.from('obra_conceptos').select('id, torre_id, categoria, descripcion, cantidad, precio_unitario').order('orden')),
         traerTodo(() => supabase.from('obra_contratos').select('id, torre_id, contratista_id, concepto').order('created_at')),
         traerTodo(() => supabase.from('obra_contratistas').select('id, nombre').order('nombre')),
@@ -412,7 +413,7 @@ export default function ObraRequisiciones() {
               <span style={{ width: 56, fontSize: 12, color: '#888' }}>{fechaCorta(r.fecha)}</span>
               <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.razon_social}</div>
-                <div style={{ fontSize: 11, color: '#888' }}>{r.concepto} · {r.desarrollos?.nombre}{(cargosPorReq.get(r.id) || []).length > 0 ? ` · Torres ${letrasTorres(cargosPorReq.get(r.id))}` : ''}</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{r.concepto} · {r.desarrollos?.nombre}{(cargosPorReq.get(r.id) || []).length > 0 ? ` · ${r.desarrollos?.estructura === 'Horizontal' ? 'Manzanas' : 'Torres'} ${letrasTorres(cargosPorReq.get(r.id))}` : ''}</div>
               </div>
               {r.fiscal ? <span style={{ fontSize: 10, color: '#3B82F6', background: '#EFF6FF', padding: '2px 8px', borderRadius: 20 }}>Fiscal</span> : <span style={{ fontSize: 10, color: '#888', background: '#f3f3f5', padding: '2px 8px', borderRadius: 20 }}>No fiscal</span>}
               <b style={{ width: 110, textAlign: 'right', fontSize: 13 }}>{$(r.total)}</b>

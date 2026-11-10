@@ -98,7 +98,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
   function formVacio() {
     return {
-      nombre: '', tipo: '', direccion: '', ciudad: '', codigo_postal: '',
+      nombre: '', tipo: '', estructura: 'Vertical', direccion: '', ciudad: '', codigo_postal: '',
       coordenadas: '', area: '', telefono: '', telefono_whatsapp: '',
       amenidades: [], mensaje_whatsapp: '', precio_desde: 0, apartado: 0,
       precio_en: 'Pesos MXN', fecha_entrega: '', datos_bancarios: '',
@@ -221,7 +221,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
     if (!(editando ? puede('desarrollos.editar') : puede('desarrollos.crear'))) return; // respaldo de seguridad
     setGuardando(true);
     // fecha_entrega es columna `date` — '' no es una fecha válida para Postgres.
-    const payload = { ...form, fecha_entrega: form.fecha_entrega || null };
+    const payload = { ...form, estructura: form.estructura || 'Vertical', fecha_entrega: form.fecha_entrega || null };
     let desarrolloId = editando;
     const esNuevo = !editando;
     let error;
@@ -689,6 +689,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                   <div>
                     {inp('Nombre', 'nombre')}
                     {sel('Tipo', 'tipo', TIPOS)}
+                  {sel('Estructura (torres o manzanas)', 'estructura', ['Vertical', 'Horizontal'])}
+                    {sel('Estructura (torres o manzanas)', 'estructura', ['Vertical', 'Horizontal'])}
                     {inp('Dirección', 'direccion')}
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '4px' }}>Ciudad</label>

@@ -1365,7 +1365,10 @@ export const rutaDe = (p, porId) => {
   return [...partes, ...cadena].join(' › ');
 };
 export const TIPOS_FRENTE = { torre: 'Torre', tren: 'Tren de viviendas', otro: 'Otro frente' };
-export const nombreFrente = (t) => t.nombre || `Torre ${t.torre}`;
+// Un desarrollo vertical se organiza en torres; uno horizontal (casas), en manzanas.
+export const etiquetaAgrupacion = (estructura) => (estructura === 'Horizontal' ? 'Manzana' : 'Torre');
+export const nombreTipoFrente = (t) => (t.tipo === 'torre' ? etiquetaAgrupacion(t.desarrollos?.estructura) : (TIPOS_FRENTE[t.tipo] || t.tipo));
+export const nombreFrente = (t) => t.nombre || `${etiquetaAgrupacion(t.desarrollos?.estructura)} ${t.torre}`;
 
 // ------------------------------------------------------------------ Lista
 function ListaObra() {
@@ -1386,9 +1389,9 @@ function ListaObra() {
     setCargando(true); setError('');
     try {
       const [t, p, d] = await Promise.all([
-        traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(nombre)').order('created_at')),
+        traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(nombre, estructura)').order('created_at')),
         traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, avance_pct, cantidad, precio_unitario, terminada_en').order('id')),
-        supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre'),
+        supabase.from('desarrollos').select('id, nombre, estructura').eq('activo', true).order('nombre'),
       ]);
       setTorres(t); setPartidas(p); setDesarrollos(d.data || []);
     } catch (e) { setError(e.message || String(e)); }
@@ -1413,7 +1416,7 @@ function ListaObra() {
       <div key={t.id} onClick={() => setAbierta(t.id)} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, padding: 14, cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1a2e' }}>{nombreFrente(t)}</div>
-          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F0FF', color: '#6D28D9', whiteSpace: 'nowrap' }}>{t.es_plantilla ? 'Plantilla · ' : ''}{TIPOS_FRENTE[t.tipo] || t.tipo}</span>
+          <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: '#F3F0FF', color: '#6D28D9', whiteSpace: 'nowrap' }}>{t.es_plantilla ? 'Plantilla · ' : ''}{nombreTipoFrente(t)}</span>
         </div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>{t.desarrollos?.nombre || (t.es_plantilla ? 'Cantidades por vivienda' : '')}{t.tipo === 'tren' && t.num_viviendas ? ` · ${t.num_viviendas} viviendas` : ''}</div>
         {!t.es_plantilla && (<>
@@ -1452,6 +1455,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
   const [tipo, setTipo] = useState('torre');
   const [esPlantilla, setEsPlantilla] = useState(false);
   const [desarrolloId, setDesarrolloId] = useState('');
+  const etiq = etiquetaAgrupacion(desarrollos.find(d => d.id === desarrolloId)?.estructura); // Torre (vertical) o Manzana (horizontal)
   const [nombre, setNombre] = useState('');
   const [plantillaId, setPlantillaId] = useState('');
   const [arranque, setArranque] = useState('');
@@ -1479,7 +1483,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
   const alternar = (id) => setSel(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const plantillasDelTipo = plantillas.filter(p => p.tipo === tipo);
 
-  const letrasLibres = sugeridas.filter(l => !existentes.some(t => !t.es_plantilla && t.desarrollo_id === desarrolloId && (t.nombre || t.torre) === `Torre ${l}`));
+  const letrasLibres = sugeridas.filter(l => !existentes.some(t => !t.es_plantilla && t.desarrollo_id === desarrolloId && (t.nombre || t.torre) === `${etiq} ${l}`));
   const variasDesdePlantilla = tipo === 'torre' && !esPlantilla && !!plantillaId && letras.size > 0;
 
   const crear = async () => {
@@ -1488,7 +1492,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
       const hechas = [];
       for (const l of [...letras].sort()) {
         const { error } = await supabase.rpc('obra_crear_desde_plantilla', {
-          p_plantilla: plantillaId, p_desarrollo: desarrolloId, p_nombre: `Torre ${l}`, p_tipo: 'torre',
+          p_plantilla: plantillaId, p_desarrollo: desarrolloId, p_nombre: `${etiq} ${l}`, p_tipo: 'torre',
           p_unidades: [], p_arranque: arranque ? lunesDe(arranque) : null,
         });
         if (error) { alert(`Se crearon ${hechas.length} torres (${hechas.join(', ')}) y falló la Torre ${l}: ${error.message}`); setGuardando(false); onCreado(); return; }
@@ -1530,7 +1534,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
     <Modal titulo="Agregar frente de obra" onCerrar={onCerrar} ancho={560}>
       <label style={lbl}>Tipo de frente</label>
       <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-        {Object.entries(TIPOS_FRENTE).map(([k, l]) => (
+        {Object.entries({ ...TIPOS_FRENTE, torre: etiq }).map(([k, l]) => (
           <button key={k} onClick={() => { setTipo(k); setPlantillaId(''); setSel(new Set()); }} style={{ ...btn, background: tipo === k ? '#1a1a2e' : '#fff', color: tipo === k ? '#fff' : '#555' }}>{l}</button>
         ))}
       </div>
@@ -1545,10 +1549,10 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
         </select>
       </>)}
       <label style={lbl}>Nombre</label>
-      <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder={tipo === 'torre' ? 'Ej. Torre L' : tipo === 'tren' ? 'Ej. Tren 1 (A1–A8)' : 'Ej. Amenidades'} style={{ ...inp, width: '100%', marginBottom: 6 }} />
+      <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder={tipo === 'torre' ? `Ej. ${etiq} L` : tipo === 'tren' ? 'Ej. Tren 1 (A1–A8)' : 'Ej. Amenidades'} style={{ ...inp, width: '100%', marginBottom: 6 }} />
       {tipo === 'torre' && sugeridas.length > 0 && (
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
-          {sugeridas.map(l => <button key={l} onClick={() => setNombre(`Torre ${l}`)} style={{ ...btn, padding: '3px 9px' }}>Torre {l}</button>)}
+          {sugeridas.map(l => <button key={l} onClick={() => setNombre(`${etiq} ${l}`)} style={{ ...btn, padding: '3px 9px' }}>{etiq} {l}</button>)}
         </div>
       )}
       {!esPlantilla && (<>
@@ -1567,13 +1571,13 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
       {tipo === 'torre' && !esPlantilla && plantillaId && letrasLibres.length > 0 && (
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-            <label style={{ ...lbl, marginBottom: 0 }}>Crear varias torres a la vez con esta plantilla ({letras.size} elegidas)</label>
+            <label style={{ ...lbl, marginBottom: 0 }}>Crear varias torres o manzanas a la vez con esta plantilla ({letras.size} elegidas)</label>
             <button onClick={() => setLetras(letras.size === letrasLibres.length ? new Set() : new Set(letrasLibres))} style={{ ...btn, padding: '2px 8px' }}>{letras.size === letrasLibres.length ? 'Ninguna' : 'Todas las libres'}</button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {letrasLibres.map(l => (
               <button key={l} onClick={() => setLetras(prev => { const n = new Set(prev); if (n.has(l)) n.delete(l); else n.add(l); return n; })}
-                style={{ ...btn, padding: '3px 10px', background: letras.has(l) ? '#1a1a2e' : '#fff', color: letras.has(l) ? '#fff' : '#555' }}>Torre {l}</button>
+                style={{ ...btn, padding: '3px 10px', background: letras.has(l) ? '#1a1a2e' : '#fff', color: letras.has(l) ? '#fff' : '#555' }}>{etiq} {l}</button>
             ))}
           </div>
           <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>Si eliges torres aquí, se crea una por cada una y el campo Nombre se ignora. Cada torre recibe una copia de las partidas, subpartidas y programa (sin avance).</div>
@@ -1600,7 +1604,7 @@ function AgregarFrente({ desarrollos, existentes, plantillas, onCerrar, onCreado
       {plantillaId && tipo === 'tren' && <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>Las cantidades de la plantilla (por vivienda) se multiplican por {sel.size || 'el número de'} viviendas; ajústalas después si cambian los m² o materiales.</div>}
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <button onClick={onCerrar} style={{ ...btn, flex: 1 }}>Cancelar</button>
-        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#C0203A', color: '#fff', border: 'none' }}>{guardando ? 'Creando...' : variasDesdePlantilla ? `Crear ${letras.size} ${letras.size === 1 ? 'torre' : 'torres'}` : 'Crear'}</button>
+        <button onClick={crear} disabled={guardando} style={{ ...btn, flex: 1, background: '#C0203A', color: '#fff', border: 'none' }}>{guardando ? 'Creando...' : variasDesdePlantilla ? `Crear ${letras.size} ${letras.size === 1 ? etiq.toLowerCase() : (etiq === 'Manzana' ? 'manzanas' : 'torres')}` : 'Crear'}</button>
       </div>
     </Modal>
   );
@@ -1764,7 +1768,7 @@ function DetalleTorre({ torre, puedeCapturar, puedeEditar, permisosCostos, isMob
       <button onClick={onCerrar} style={{ ...btn, marginBottom: 12 }}>← Todos los frentes</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>{nombreFrente(torre)} <span style={{ fontSize: 11, fontWeight: 400, padding: '2px 8px', borderRadius: 20, background: '#F3F0FF', color: '#6D28D9' }}>{torre.es_plantilla ? 'Plantilla · ' : ''}{TIPOS_FRENTE[torre.tipo] || torre.tipo}</span></div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>{nombreFrente(torre)} <span style={{ fontSize: 11, fontWeight: 400, padding: '2px 8px', borderRadius: 20, background: '#F3F0FF', color: '#6D28D9' }}>{torre.es_plantilla ? 'Plantilla · ' : ''}{nombreTipoFrente(torre)}</span></div>
           <div style={{ fontSize: 12, color: '#888' }}>{torre.desarrollos?.nombre || ''}{viviendas.length > 0 ? ` · ${viviendas.length} viviendas: ${viviendas.join(', ')}` : ''}</div>
           {torre.es_plantilla && <div style={{ fontSize: 11, color: '#888' }}>Las cantidades de esta plantilla son por vivienda (en un tren se multiplican por el número de viviendas).</div>}
         </div>
