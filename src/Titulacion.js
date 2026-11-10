@@ -76,6 +76,7 @@ export default function Titulacion({ miRol, miAgente }) {
   const [tiposCompra, setTiposCompra] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [etapaSel, setEtapaSel] = useState('');
+  const [semanaSel, setSemanaSel] = useState(''); // '', 'actual' o 'anterior': solo las escrituradas en esa semana (lunes a domingo)
   const [cotejoSel, setCotejoSel] = useState('');
   const [generandoEstado, setGenerandoEstado] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -175,7 +176,24 @@ export default function Titulacion({ miRol, miAgente }) {
     if (cotejoSel === 'sin_cotejar' && liquidacionesCobranza[u.id]) return false;
     return true;
   });
-  const unidadesVisibles = etapaSel ? unidadesSinEtapa.filter(u => calcularEtapa(seguimientos[u.id] || VACIO) === etapaSel) : unidadesSinEtapa;
+  // Semana de lunes a domingo (0 = la actual, -1 = la anterior) y cuándo se escrituró cada unidad
+  // (el sistema estampa la fecha en el momento en que la unidad pasa a Escriturado).
+  const rangoSemana = (offset) => {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0); ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7) + offset * 7);
+    const fin = new Date(ini); fin.setDate(fin.getDate() + 6); fin.setHours(23, 59, 59, 999);
+    return { ini, fin };
+  };
+  const semanas = { actual: rangoSemana(0), anterior: rangoSemana(-1) };
+  const escrituradaEn = (u, r) => {
+    const f = seguimientos[u.id]?.escriturado_en;
+    if (!f) return false;
+    const d = new Date(f);
+    return d >= r.ini && d <= r.fin;
+  };
+  const porEtapa = etapaSel ? unidadesSinEtapa.filter(u => calcularEtapa(seguimientos[u.id] || VACIO) === etapaSel) : unidadesSinEtapa;
+  const unidadesVisibles = semanaSel ? porEtapa.filter(u => escrituradaEn(u, semanas[semanaSel])) : porEtapa;
+  const escritasSemana = { actual: unidadesSinEtapa.filter(u => escrituradaEn(u, semanas.actual)).length, anterior: unidadesSinEtapa.filter(u => escrituradaEn(u, semanas.anterior)).length };
+  const fechaSemana = (r) => `${r.ini.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')} – ${r.fin.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}`;
 
   const abrirUnidad = async (u) => {
     setUnidadAbierta(u);
@@ -352,6 +370,12 @@ export default function Titulacion({ miRol, miAgente }) {
           <option value=''>Todas las etapas</option>
           {Object.keys(COLOR_ETAPA).map(e => <option key={e} value={e}>{e}</option>)}
         </select>
+        <select value={semanaSel} onChange={e => setSemanaSel(e.target.value)}
+          style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: semanaSel ? '#EEF2FF' : '#fff' }}>
+          <option value=''>Escrituradas: todas</option>
+          <option value='actual'>Escrituradas esta semana</option>
+          <option value='anterior'>Escrituradas la semana anterior</option>
+        </select>
         <select value={cotejoSel} onChange={e => setCotejoSel(e.target.value)}
           style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
           <option value=''>Cotejo: todas</option>
@@ -370,6 +394,31 @@ export default function Titulacion({ miRol, miAgente }) {
           </div>
         ))}
       </div>
+
+      {(() => {
+        const dif = escritasSemana.actual - escritasSemana.anterior;
+        const pctDif = escritasSemana.anterior > 0 ? Math.round((dif / escritasSemana.anterior) * 100) : null;
+        const colorDif = dif > 0 ? '#10B981' : dif < 0 ? '#EF4444' : '#888';
+        const bloque = (clave, titulo) => (
+          <div role="button" tabIndex={0} onClick={() => setSemanaSel(semanaSel === clave ? '' : clave)} title={semanaSel === clave ? 'Quitar el filtro' : 'Ver estas unidades'}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSemanaSel(semanaSel === clave ? '' : clave); }}
+            style={{ flex: '1 1 150px', background: semanaSel === clave ? '#EEF2FF' : '#fff', border: `1.5px solid ${semanaSel === clave ? '#6366F1' : '#e0e0e0'}`, borderRadius: '10px', padding: '10px 14px', cursor: 'pointer' }}>
+            <div style={{ fontSize: '11px', color: '#888' }}>{titulo} <span style={{ color: '#bbb' }}>({fechaSemana(semanas[clave])})</span></div>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a2e' }}>{escritasSemana[clave]}</div>
+          </div>
+        );
+        return (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap', marginBottom: '1.25rem', maxWidth: isMobile ? 'none' : '720px' }}>
+            {bloque('anterior', 'Escrituradas semana anterior')}
+            {bloque('actual', 'Escrituradas esta semana')}
+            <div style={{ flex: '1 1 150px', background: '#fafafa', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#888' }}>Comparativa (semana lunes a domingo)</div>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: colorDif }}>{dif > 0 ? '▲ +' : dif < 0 ? '▼ ' : '= '}{dif}</div>
+              <div style={{ fontSize: '11px', color: colorDif }}>{pctDif === null ? (escritasSemana.actual > 0 ? 'sin escrituradas la semana anterior' : 'sin cambios') : `${pctDif > 0 ? '+' : ''}${pctDif}% vs semana anterior`}</div>
+            </div>
+          </div>
+        );
+      })()}
 
       {cargando ? (
         <div style={{ color: '#888', fontSize: '13px' }}>Cargando...</div>
@@ -393,6 +442,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   {liquidacionesCobranza[u.id] && <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>}
                   {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
+                  {etapa === 'Escriturado' && s.escriturado_en && <div style={{ fontSize: '11px', color: '#888' }}>Escriturada el {new Date(s.escriturado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}</div>}
                   <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: COLOR_ETAPA[etapa], borderRadius: '20px', padding: '4px 12px' }}>{etapa}</div>
                 </div>
               </div>
