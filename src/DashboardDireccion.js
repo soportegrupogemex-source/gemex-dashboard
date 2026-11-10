@@ -271,8 +271,8 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const desarrolloPorId = new Map(desarrollos.map(d => [d.id, d.nombre]));
   const ventaPorUnidad = new Map();
   movimientos.forEach(m => { if (m.tipo === 'Vendida' && m.unidad_id) ventaPorUnidad.set(m.unidad_id, m); });
-  const hitosDelPeriodo = (lista, campoFecha) => lista.map(h => ({ mov: ventaPorUnidad.get(h.unidad_id), h, f: parseFechaLocal(h[campoFecha]) })).filter(({ mov, h, f }) => {
-    if (!f || f.getFullYear() !== anioSel || f < rangoConsolidado.inicio || f > rangoConsolidado.fin) return false;
+  const hitosEnRango = (lista, campoFecha, inicio, fin) => lista.map(h => ({ mov: ventaPorUnidad.get(h.unidad_id), h, f: parseFechaLocal(h[campoFecha]) })).filter(({ mov, h, f }) => {
+    if (!f || f.getFullYear() !== anioSel || f < inicio || f > fin) return false;
     const nombre = mov?.desarrollo_nombre || desarrolloPorId.get(h.desarrollo_id);
     if (desarrolloSel && nombre !== desarrolloSel) return false;
     if (!desarrolloSel && !nombresPermitidos.includes(nombre)) return false;
@@ -286,7 +286,22 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     }
     return true;
   });
+  const hitosDelPeriodo = (lista, campoFecha) => hitosEnRango(lista, campoFecha, rangoConsolidado.inicio, rangoConsolidado.fin);
   const montoDe = (lista) => lista.reduce((t, { mov }) => t + Number(mov?.monto || 0), 0);
+  // Por mes del año elegido: se muestra siempre el real, haya o no meta capturada en Objetivos.
+  const titAnio = hitosEnRango(hitos.tit, 'escriturado_en', new Date(anioSel, 0, 1), new Date(anioSel, 11, 31, 23, 59, 59, 999));
+  const cobAnio = hitosEnRango(hitos.cob, 'liquidacion_final_fecha', new Date(anioSel, 0, 1), new Date(anioSel, 11, 31, 23, 59, 59, 999));
+  const tablaTitCob = MESES.map((nombreMes, i) => {
+    const mesNum = i + 1;
+    const t = titAnio.filter(x => x.f.getMonth() + 1 === mesNum), c = cobAnio.filter(x => x.f.getMonth() + 1 === mesNum);
+    const objMes = objetivosData.filter(o => o.mes === mesNum && (!desarrolloSel || o.desarrollo_nombre === desarrolloSel) &&
+      (desarrolloSel || nombresPermitidos.includes(o.desarrollo_nombre) || nombresPermitidos.length === desarrollos.length));
+    const suma = (col) => objMes.reduce((a, o) => a + (o[col] || 0), 0);
+    return { mes: nombreMes, mesNum, titU: t.length, titM: montoDe(t), cobU: c.length, cobM: montoDe(c),
+      metaTitU: suma('meta_titulacion_unidades'), metaTitM: suma('meta_titulacion_monto'), metaCobU: suma('meta_cobranza_unidades'), metaCobM: suma('meta_cobranza_monto') };
+  });
+  const titCobMes = tablaTitCob[mesActual - 1];
+  const titCobAnio = { titU: titAnio.length, titM: montoDe(titAnio), cobU: cobAnio.length, cobM: montoDe(cobAnio) };
   const tituladasP = hitosDelPeriodo(hitos.tit, 'escriturado_en');
   const totalTituladasP = tituladasP.length;
   const totalMontoTitulacionP = montoDe(tituladasP);
@@ -566,12 +581,14 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{label}</div>
       <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', color: '#1a1a2e' }}>{valor}</div>
       {meta && <div style={{ fontSize: '11px', color: '#888' }}>{meta}</div>}
-      <div style={{ height: '4px', background: '#f0f0f0', borderRadius: '2px', margin: '8px 0 4px' }}>
-        <div style={{ height: '100%', background: barColor || color, borderRadius: '2px', width: `${pct}%` }} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#888' }}>
-        <span>{pctLabel}</span><span>{pct}%</span>
-      </div>
+      {meta ? (<>
+        <div style={{ height: '4px', background: '#f0f0f0', borderRadius: '2px', margin: '8px 0 4px' }}>
+          <div style={{ height: '100%', background: barColor || color, borderRadius: '2px', width: `${pct}%` }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#888' }}>
+          <span>{pctLabel}</span><span>{pct}%</span>
+        </div>
+      </>) : <div style={{ fontSize: '10px', color: '#bbb', marginTop: '10px' }}>Sin meta capturada</div>}
     </div>
   );
 
@@ -783,7 +800,73 @@ export default function DashboardDireccion({ miRol, miAgente }) {
             <div style={{ fontSize: '11px', fontWeight: '600', color: colorPct(pctM) }}>{pctM}% del año</div>
           </div>
         </div>
+        {!EMPRESA.hojas && (
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginTop: '10px' }}>
+            {[
+              { t: `Titulación — ${MESES[mesActual-1]}`, u: titCobMes.titU, m: titCobMes.titM, mu: titCobMes.metaTitU, mm: titCobMes.metaTitM, c: '#6366F1' },
+              { t: `Cobranza — ${MESES[mesActual-1]}`, u: titCobMes.cobU, m: titCobMes.cobM, mu: titCobMes.metaCobU, mm: titCobMes.metaCobM, c: '#14B8A6' },
+              { t: `Titulación acumulada ${anioSel}`, u: titCobAnio.titU, m: titCobAnio.titM, mu: objetivosTitulacion.unidades, mm: objetivosTitulacion.monto, c: '#6366F1' },
+              { t: `Cobranza acumulada ${anioSel}`, u: titCobAnio.cobU, m: titCobAnio.cobM, mu: objetivosCobranza.unidades, mm: objetivosCobranza.monto, c: '#14B8A6' },
+            ].map(x => (
+              <div key={x.t} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderLeft: `4px solid ${x.c}`, borderRadius: '12px', padding: '16px' }}>
+                <div style={{ fontSize: '11px', color: '#888', marginBottom: '6px' }}>{x.t}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div><div style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a2e' }}>{x.u}</div><div style={{ fontSize: '10px', color: '#888' }}>Unidades</div></div>
+                  <div style={{ textAlign: 'right' }}><div style={{ fontSize: isMobile ? '14px' : '16px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(x.m)}</div><div style={{ fontSize: '10px', color: '#888' }}>Monto</div></div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#aaa', marginTop: '6px' }}>{x.mu > 0 || x.mm > 0 ? `Meta: ${x.mu || 0} ud. · ${fmt(x.mm || 0)}` : 'Sin meta capturada'}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
+      {!EMPRESA.hojas && (
+        <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', overflow: 'auto', marginBottom: '1.5rem' }}>
+          <div style={{ padding: '16px 16px 8px', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '0.5px solid #f0f0f0' }}>
+            Titulación y Cobranza por Mes — {anioSel}
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', minWidth: '640px' }}>
+            <thead>
+              <tr style={{ background: '#fafafa', borderBottom: '0.5px solid #e0e0e0' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: '600', color: '#555', width: '100px' }}>Mes</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '500', color: '#6366F1' }}>Tituladas</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '500', color: '#6366F1' }}>Monto titulado</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '500', color: '#14B8A6' }}>Cobradas</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '500', color: '#14B8A6' }}>Monto cobrado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tablaTitCob.map(f => {
+                const esMesActual = f.mesNum === mesActual;
+                const vacio = f.titU === 0 && f.cobU === 0;
+                const celda = (real, meta, esMonto) => (
+                  <>
+                    <span style={{ fontWeight: '600', color: '#1a1a2e' }}>{real > 0 ? (esMonto ? fmt(real) : real) : '—'}</span>
+                    {meta > 0 && <span style={{ fontSize: '10px', color: '#aaa', marginLeft: '6px' }}>meta {esMonto ? fmt(meta) : meta}</span>}
+                  </>
+                );
+                return (
+                  <tr key={f.mesNum} style={{ borderBottom: '0.5px solid #f0f0f0', background: esMesActual ? '#F0FDF4' : vacio ? '#fafafa' : '#fff', opacity: vacio && !esMesActual ? 0.5 : 1 }}>
+                    <td style={{ padding: '10px 16px', fontWeight: esMesActual ? '700' : '500', color: esMesActual ? '#1a1a2e' : '#555' }}>{f.mes}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>{celda(f.titU, f.metaTitU, false)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '11px' }}>{celda(f.titM, f.metaTitM, true)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center' }}>{celda(f.cobU, f.metaCobU, false)}</td>
+                    <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '11px' }}>{celda(f.cobM, f.metaCobM, true)}</td>
+                  </tr>
+                );
+              })}
+              <tr style={{ borderTop: '2px solid #e0e0e0', background: '#f0f0f0', fontWeight: '700' }}>
+                <td style={{ padding: '10px 16px', color: '#1a1a2e' }}>Total {anioSel}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>{titCobAnio.titU}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '11px' }}>{fmt(titCobAnio.titM)}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>{titCobAnio.cobU}</td>
+                <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: '11px' }}>{fmt(titCobAnio.cobM)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', overflow: 'auto', marginBottom: '1.5rem' }}>
         <div style={{ padding: '16px 16px 8px', fontSize: '14px', fontWeight: '600', color: '#1a1a2e', borderBottom: '0.5px solid #f0f0f0' }}>
