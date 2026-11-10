@@ -8,6 +8,20 @@ import { usePuede } from './PermisosContext';
 // además de PDF (aceptaImagen). "comprobante_apartado" además admite
 // varios archivos (hasta 10) — muchas veces el apartado se hace en
 // varios movimientos/transferencias distintas.
+// Equipo adicional: el asesor indica que la unidad lo lleva, Admin describe el equipo y un Super Admin lo autoriza;
+// al autorizarlo, Construcción recibe una alerta y lo ve marcado en "Avance por unidad".
+const estadoEquipo = (m) => {
+  if (!m?.equipo_adicional) return null;
+  if (m.equipo_adicional_autorizacion === 'autorizado') return { clave: 'autorizado', txt: 'Autorizado', fondo: '#EAF3DE', color: '#27500A' };
+  if (m.equipo_adicional_autorizacion === 'rechazado') return { clave: 'rechazado', txt: 'Rechazado', fondo: '#FDECEC', color: '#C0392B' };
+  if ((m.equipo_adicional_detalle || '').trim()) return { clave: 'por_autorizar', txt: 'Por autorizar', fondo: '#FFF4E5', color: '#B45309' };
+  return { clave: 'por_detallar', txt: 'Por describir', fondo: '#FFF8E1', color: '#856404' };
+};
+const correosDeRoles = async (roles) => {
+  const { data } = await supabase.from('agentes').select('correo').in('rol', roles).eq('activo', true);
+  return (data || []).map(a => a.correo).filter(Boolean);
+};
+
 const DOCS_ASESOR = [
   { id: 'ine_pasaporte', label: 'INE o Pasaporte (ambas hojas)', multiple: true, maxArchivos: 4, nota: 'Hasta 4 archivos (ambas hojas del INE, o pasaporte + hojas adicionales)', avisoRojo: 'SOLO DOCUMENTOS ESCANEADOS A COLOR, NO SE ACEPTARÁN ESCANEOS CON EL CELULAR O FOTOGRAFIAS' },
   { id: 'validacion_ine', label: 'Validación INE lista nominal', nota: 'Solo si subiste INE (no aplica si subiste Pasaporte)', aceptaImagen: true },
@@ -241,6 +255,34 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const enListaResponsables = !!(miAgente?.correo && responsables.includes(miAgente.correo));
   const puedoMarcarCompleto = puede('expedientes.marcar_completo') || enListaResponsables;
   const puedoEnviarTitulacion = puede('expedientes.enviar_titulacion') || enListaResponsables;
+  const puedoEquipoSolicitar = puede('expedientes.equipo_adicional_solicitar');
+  const puedoEquipoDetallar = puede('expedientes.equipo_adicional_detallar');
+  const puedoEquipoAutorizar = puede('expedientes.equipo_adicional_autorizar');
+  const [detalleEquipo, setDetalleEquipo] = useState('');
+  useEffect(() => { setDetalleEquipo(movSel?.equipo_adicional_detalle || ''); }, [movSel?.id, movSel?.equipo_adicional_detalle]);
+  const actualizarEquipo = async (mov, cambios) => {
+    const { data, error } = await supabase.from('movimientos').update(cambios).eq('id', mov.id).select().single();
+    if (error) { alert('No se pudo guardar: ' + error.message); return null; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+    return data;
+  };
+  const textoUnidad = (m) => `${m.unidad_numero || ''} — ${m.desarrollo_nombre || ''}`;
+  const toggleEquipo = async (mov, valor) => {
+    const data = await actualizarEquipo(mov, { equipo_adicional: valor });
+    if (data && valor) enviarPush({ correos: await correosDeRoles(['Admin', 'Super Admin']), title: 'Equipo adicional por describir', body: `${textoUnidad(mov)}: el asesor indicó que lleva equipo adicional`, url: '/' });
+  };
+  const guardarDetalleEquipo = async (mov) => {
+    const data = await actualizarEquipo(mov, { equipo_adicional_detalle: detalleEquipo.trim() || null });
+    if (data && detalleEquipo.trim()) enviarPush({ correos: await correosDeRoles(['Super Admin']), title: 'Equipo adicional por autorizar', body: `${textoUnidad(mov)}: ${detalleEquipo.trim()}`, url: '/' });
+  };
+  const resolverEquipo = async (mov, autorizacion) => {
+    if (!window.confirm(autorizacion === 'autorizado' ? '¿Autorizar el equipo adicional? Construcción recibirá una alerta.' : '¿Rechazar el equipo adicional?')) return;
+    const data = await actualizarEquipo(mov, { equipo_adicional_autorizacion: autorizacion });
+    if (data && autorizacion === 'autorizado') {
+      enviarPush({ correos: await correosDeRoles(['Construcción']), title: 'Unidad con equipo adicional', body: `${textoUnidad(mov)}: ${data.equipo_adicional_detalle}`, url: '/' });
+    }
+  };
   const puedoArchivar = puede('expedientes.archivar') || enListaResponsables;
   const puedeRevisarDocs = puede('expedientes.revisar_documentos');
   // FIX: pestaña "Contratos" — solo Gerentes, Admin y Super Admin pueden
@@ -1078,6 +1120,41 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                 <div style={{ fontSize: '11px', color: '#888' }}>La documentación ya está lista.</div>
               </div>
             </label>
+            {(puedoEquipoSolicitar || movSel.equipo_adicional) && (() => {
+              const est = estadoEquipo(movSel);
+              return (
+                <div style={{ padding: '12px 16px', background: est ? est.fondo : '#F7F7F9', border: `1px solid ${est ? est.color + '55' : 'transparent'}`, borderRadius: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: puedoEquipoSolicitar ? 'pointer' : 'default' }}>
+                    <input type='checkbox' checked={!!movSel.equipo_adicional} disabled={!puedoEquipoSolicitar}
+                      onChange={e => toggleEquipo(movSel, e.target.checked)} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: est ? est.color : '#444' }}>
+                        Equipo adicional{est && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: '#fff', border: `1px solid ${est.color}55` }}>{est.txt}</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#888' }}>La unidad lleva equipamiento extra que depende de Construcción. El asesor lo indica, Admin lo describe y un Super Admin lo autoriza.</div>
+                    </div>
+                  </label>
+                  {movSel.equipo_adicional && (
+                    <div style={{ marginTop: '10px' }}>
+                      <textarea value={detalleEquipo} onChange={e => setDetalleEquipo(e.target.value)} disabled={!puedoEquipoDetallar} rows={3}
+                        placeholder={puedoEquipoDetallar ? 'Describe el equipo adicional (qué es, dónde va, observaciones)…' : 'Admin describirá el equipo adicional'}
+                        style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px', boxSizing: 'border-box', resize: 'vertical', background: puedoEquipoDetallar ? '#fff' : '#fafafa' }} />
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {puedoEquipoDetallar && (detalleEquipo.trim() !== (movSel.equipo_adicional_detalle || '').trim()) && (
+                          <button onClick={() => guardarDetalleEquipo(movSel)} style={{ padding: '6px 14px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Guardar descripción</button>
+                        )}
+                        {puedoEquipoAutorizar && est && (est.clave === 'por_autorizar' || est.clave === 'rechazado') && (<>
+                          <button onClick={() => resolverEquipo(movSel, 'autorizado')} style={{ padding: '6px 14px', background: '#10B981', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Autorizar</button>
+                          {est.clave === 'por_autorizar' && <button onClick={() => resolverEquipo(movSel, 'rechazado')} style={{ padding: '6px 14px', background: '#fff', color: '#C0392B', border: '0.5px solid #C0392B', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>Rechazar</button>}
+                        </>)}
+                        {est?.clave === 'autorizado' && <span style={{ fontSize: '11px', color: '#27500A' }}>Autorizado por {(movSel.equipo_adicional_autorizado_por || '').split('@')[0]}{movSel.equipo_adicional_autorizado_en ? ` el ${new Date(movSel.equipo_adicional_autorizado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}` : ''}. Construcción ya fue avisada.</span>}
+                        {est?.clave === 'por_detallar' && !puedoEquipoDetallar && <span style={{ fontSize: '11px', color: '#856404' }}>Pendiente de que Admin describa el equipo.</span>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {movSel.tipo_compra === 'Contado' ? (
               <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: movSel.enviar_titulacion ? '#FFF4E5' : '#F3F0FF', border: `1px solid ${movSel.enviar_titulacion ? '#F59E0B' : 'transparent'}`, borderRadius: '8px', cursor: puedoEnviarTitulacion ? 'pointer' : 'default' }}>
                 <input type='checkbox' checked={!!movSel.enviar_titulacion} disabled={!puedoEnviarTitulacion}
@@ -1516,6 +1593,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   ) : (
                     <>
                       {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
+                      {estadoEquipo(m) && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: estadoEquipo(m).fondo, color: estadoEquipo(m).color, fontWeight: '600' }}>➕ Equipo adicional · {estadoEquipo(m).txt}</span>}
                       {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>⏳ En Titulación · por liberar</span>}
                       {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>💬 Observaciones</span>}
                       {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}

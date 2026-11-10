@@ -49,6 +49,9 @@ export default function Construccion() {
   const [guardando, setGuardando] = useState(false);
   // Avance que marca el programa de obra: unidad_id -> { pct, frente }. Es una sugerencia; nunca se aplica solo.
   const [deObra, setDeObra] = useState({});
+  // Equipo adicional autorizado en Expedientes, por unidad: { detalle, en }
+  const [equipoPorUnidad, setEquipoPorUnidad] = useState({});
+  const [soloEquipo, setSoloEquipo] = useState(false);
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -73,14 +76,23 @@ export default function Construccion() {
       setSeguimientos(mapa);
 
       const { data: movs } = await supabase.from('movimientos')
-        .select('unidad_id, tipo_compra, created_at')
+        .select('unidad_id, tipo_compra, created_at, equipo_adicional, equipo_adicional_detalle, equipo_adicional_autorizacion, equipo_adicional_autorizado_en')
         .in('unidad_id', unidadIds)
         .in('tipo', ['Apartado', 'Vendida'])
         .order('created_at', { ascending: false });
       const mapaTipo = {};
       (movs || []).forEach(m => { if (!mapaTipo[m.unidad_id]) mapaTipo[m.unidad_id] = m.tipo_compra; });
       setTipoCompraPorUnidad(mapaTipo);
+      const mapaEq = {};
+      const vistos = {};
+      (movs || []).forEach(m => {
+        if (vistos[m.unidad_id]) return;
+        vistos[m.unidad_id] = true;
+        if (m.equipo_adicional && m.equipo_adicional_autorizacion === 'autorizado') mapaEq[m.unidad_id] = { detalle: m.equipo_adicional_detalle, en: m.equipo_adicional_autorizado_en };
+      });
+      setEquipoPorUnidad(mapaEq);
     } else {
+      setEquipoPorUnidad({});
       setSeguimientos({});
       setTipoCompraPorUnidad({});
     }
@@ -120,7 +132,9 @@ export default function Construccion() {
     } catch (e) { setDeObra({}); }
   };
 
-  const unidadesVisibles = unidades.filter(u => !desarrolloSel || u.desarrollo_nombre === desarrolloSel);
+  const esNuevoEquipo = (id) => { const e = equipoPorUnidad[id]; return !!(e && e.en && (Date.now() - new Date(e.en).getTime()) <= 7 * 86400000); };
+  const totalEquipo = unidades.filter(u => equipoPorUnidad[u.id] && (!desarrolloSel || u.desarrollo_nombre === desarrolloSel)).length;
+  const unidadesVisibles = unidades.filter(u => (!desarrolloSel || u.desarrollo_nombre === desarrolloSel) && (!soloEquipo || equipoPorUnidad[u.id]));
 
   const alternar = (clave, abierto) => setAbiertos(a => ({ ...a, [clave]: !abierto }));
 
@@ -198,6 +212,10 @@ export default function Construccion() {
           <option value=''>Todos los proyectos</option>
           {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
         </select>
+        <button onClick={() => setSoloEquipo(v => !v)}
+          style={{ padding: '8px 12px', border: `0.5px solid ${soloEquipo ? '#B45309' : '#ddd'}`, borderRadius: '8px', fontSize: '13px', background: soloEquipo ? '#FFF4E5' : '#fff', color: soloEquipo ? '#B45309' : '#555', cursor: 'pointer', fontWeight: soloEquipo ? '600' : '400' }}>
+          ➕ Con equipo adicional ({totalEquipo})
+        </button>
       </div>
 
       {cargando ? (
@@ -216,6 +234,11 @@ export default function Construccion() {
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero}</div>
                     <div style={{ fontSize: '12px', color: '#888' }}>{u.estatus}{tipoCompraPorUnidad[u.id] ? ` · ${tipoCompraPorUnidad[u.id]}` : ''}</div>
+                    {equipoPorUnidad[u.id] && (
+                      <div title={equipoPorUnidad[u.id].detalle || ''} style={{ marginTop: '4px', display: 'inline-block', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309' }}>
+                        ➕ Equipo adicional{esNuevoEquipo(u.id) ? ' · NUEVO' : ''}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {deObra[u.id] && (
@@ -300,6 +323,14 @@ export default function Construccion() {
             <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>
               {unidadAbierta.estatus}{tipoCompraPorUnidad[unidadAbierta.id] ? ` · ${tipoCompraPorUnidad[unidadAbierta.id]}` : ' · Sin tipo de compra registrado'}
             </div>
+
+            {equipoPorUnidad[unidadAbierta.id] && (
+              <div style={{ marginBottom: '16px', padding: '10px 12px', background: '#FFF4E5', border: '1px solid #B4530955', borderRadius: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#B45309' }}>➕ Esta unidad lleva equipo adicional{esNuevoEquipo(unidadAbierta.id) ? ' (autorizado recientemente)' : ''}</div>
+                <div style={{ fontSize: '12px', color: '#555', marginTop: '4px', whiteSpace: 'pre-wrap' }}>{equipoPorUnidad[unidadAbierta.id].detalle}</div>
+                {equipoPorUnidad[unidadAbierta.id].en && <div style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>Autorizado el {new Date(equipoPorUnidad[unidadAbierta.id].en).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}</div>}
+              </div>
+            )}
 
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '13px', color: '#555', display: 'block', marginBottom: '4px' }}>Avance de obra</label>
