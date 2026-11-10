@@ -59,6 +59,9 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const [equipoExternoCorreos, setEquipoExternoCorreos] = useState([]);
   const [equipoExternoNombres, setEquipoExternoNombres] = useState([]);
   const [periodo, setPeriodo] = useState('semana');
+  // Rango de fechas libre (periodo 'rango'): por ejemplo del 20 de octubre al 10 de noviembre.
+  const [rangoDesde, setRangoDesde] = useState('');
+  const [rangoHasta, setRangoHasta] = useState('');
   const [graficaData, setGraficaData] = useState([]);
   const [anioSel, setAnioSel] = useState(new Date().getFullYear());
   const [showFiltros, setShowFiltros] = useState(false);
@@ -74,7 +77,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   useEffect(() => { cargarMovimientosYDesarrollos(); cargarAgentesEquipo(); }, []);
   useEffect(() => { cargarInventario(); cargarApartados(); }, [desarrolloSel, desarrollos]);
   useEffect(() => { cargarObjetivos(); }, [anioSel]);
-  useEffect(() => { procesarGrafica(); }, [movimientos, periodo, desarrolloSel, anioSel]);
+  useEffect(() => { procesarGrafica(); }, [movimientos, periodo, desarrolloSel, anioSel, rangoDesde, rangoHasta, filtroEquipoVendedor, agentesEquipoMap]); // eslint-disable-line
 
   // FIX: resuelve correos + nombres del equipo de un Mesa de Control (él
   // mismo + sus agentes_cargo) — se usa para limitar el dashboard a "lo
@@ -211,10 +214,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   // FIX: para Mesa de Control, además se limita a movimientos de SU
   // EQUIPO (él + agentes_cargo) — cruzando por vendedor_correo (confiable)
   // y por nombre como respaldo para movimientos viejos sin ese campo.
-  const movsFiltrados = movimientos.filter(m => {
-    const f = fechaEfectiva(m);
-    const anioMov = f ? f.getFullYear() : null;
-    if (anioMov !== anioSel) return false;
+  const movsSinAnio = movimientos.filter(m => {
     if (desarrolloSel && m.desarrollo_nombre !== desarrolloSel) return false;
     if (!desarrolloSel && !nombresPermitidos.includes(m.desarrollo_nombre)) return false;
     if (miRol === 'Mesa de Control') {
@@ -229,6 +229,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     }
     return true;
   });
+  const movsFiltrados = movsSinAnio.filter(m => { const f = fechaEfectiva(m); return f && f.getFullYear() === anioSel; });
 
   const vendidas = movsFiltrados.filter(m => m.tipo === 'Vendida');
   const totalVendidas = vendidas.length;
@@ -248,18 +249,26 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const rangoConsolidado = (() => {
     const hoy = new Date(); hoy.setHours(23,59,59,999);
     if (periodo === 'semana') {
-      const inicio = new Date(); inicio.setDate(inicio.getDate() - 6); inicio.setHours(0,0,0,0);
-      return { inicio, fin: hoy };
+      // Corte de lunes a domingo (semana calendario en curso).
+      const inicio = new Date(); inicio.setHours(0,0,0,0); inicio.setDate(inicio.getDate() - ((inicio.getDay() + 6) % 7));
+      const fin = new Date(inicio); fin.setDate(fin.getDate() + 6); fin.setHours(23,59,59,999);
+      return { inicio, fin };
     }
     if (periodo === 'mes') {
-      // Mes calendario en curso (día 1 a hoy), no "últimos 30 días": esos
-      // 30 días arrastraban ventas del mes anterior.
-      const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-      return { inicio, fin: hoy };
+      // Mes calendario en curso (día 1 al último día).
+      return { inicio: new Date(hoy.getFullYear(), hoy.getMonth(), 1), fin: new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999) };
+    }
+    if (periodo === 'rango') {
+      let d = rangoDesde ? parseFechaLocal(rangoDesde) : new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+      let h = rangoHasta ? parseFechaLocal(rangoHasta) : new Date(hoy);
+      if (d > h) [d, h] = [h, d];
+      const inicio = new Date(d); inicio.setHours(0,0,0,0);
+      const fin = new Date(h); fin.setHours(23,59,59,999);
+      return { inicio, fin };
     }
     return { inicio: new Date(anioSel, 0, 1), fin: new Date(anioSel, 11, 31, 23, 59, 59, 999) };
   })();
-  const movsPeriodo = movsFiltrados.filter(m => { const f = fechaEfectiva(m); return f && f >= rangoConsolidado.inicio && f <= rangoConsolidado.fin; });
+  const movsPeriodo = (periodo === 'rango' ? movsSinAnio : movsFiltrados).filter(m => { const f = fechaEfectiva(m); return f && f >= rangoConsolidado.inicio && f <= rangoConsolidado.fin; });
 
   const vendidasP = movsPeriodo.filter(m => m.tipo === 'Vendida');
   const totalVendidasP = vendidasP.length;
@@ -271,8 +280,8 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const desarrolloPorId = new Map(desarrollos.map(d => [d.id, d.nombre]));
   const ventaPorUnidad = new Map();
   movimientos.forEach(m => { if (m.tipo === 'Vendida' && m.unidad_id) ventaPorUnidad.set(m.unidad_id, m); });
-  const hitosEnRango = (lista, campoFecha, inicio, fin) => lista.map(h => ({ mov: ventaPorUnidad.get(h.unidad_id), h, f: parseFechaLocal(h[campoFecha]) })).filter(({ mov, h, f }) => {
-    if (!f || f.getFullYear() !== anioSel || f < inicio || f > fin) return false;
+  const hitosEnRango = (lista, campoFecha, inicio, fin, cualquierAnio = false) => lista.map(h => ({ mov: ventaPorUnidad.get(h.unidad_id), h, f: parseFechaLocal(h[campoFecha]) })).filter(({ mov, h, f }) => {
+    if (!f || (!cualquierAnio && f.getFullYear() !== anioSel) || f < inicio || f > fin) return false;
     const nombre = mov?.desarrollo_nombre || desarrolloPorId.get(h.desarrollo_id);
     if (desarrolloSel && nombre !== desarrolloSel) return false;
     if (!desarrolloSel && !nombresPermitidos.includes(nombre)) return false;
@@ -286,7 +295,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     }
     return true;
   });
-  const hitosDelPeriodo = (lista, campoFecha) => hitosEnRango(lista, campoFecha, rangoConsolidado.inicio, rangoConsolidado.fin);
+  const hitosDelPeriodo = (lista, campoFecha) => hitosEnRango(lista, campoFecha, rangoConsolidado.inicio, rangoConsolidado.fin, periodo === 'rango');
   const montoDe = (lista) => lista.reduce((t, { mov }) => t + Number(mov?.monto || 0), 0);
   // Por mes del año elegido: se muestra siempre el real, haya o no meta capturada en Objetivos.
   const titAnio = hitosEnRango(hitos.tit, 'escriturado_en', new Date(anioSel, 0, 1), new Date(anioSel, 11, 31, 23, 59, 59, 999));
@@ -483,12 +492,29 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const procesarGrafica = () => {
     let labels = [];
     if (periodo === 'semana') {
-      const ahora = new Date();
+      // Lunes a domingo de la semana en curso.
+      const lunes = new Date(); lunes.setHours(0,0,0,0); lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
       labels = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(ahora); d.setDate(ahora.getDate() - 6 + i); d.setHours(0,0,0,0);
+        const d = new Date(lunes); d.setDate(lunes.getDate() + i);
         const fin = new Date(d); fin.setHours(23,59,59,999);
-        return { label: ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()], inicio: d, fin };
+        return { label: ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][i], inicio: d, fin };
       });
+    } else if (periodo === 'rango') {
+      const dias = Math.round((rangoConsolidado.fin - rangoConsolidado.inicio) / 86400000);
+      if (dias <= 45) {
+        labels = Array.from({ length: dias }, (_, i) => {
+          const d = new Date(rangoConsolidado.inicio); d.setDate(d.getDate() + i);
+          const fin = new Date(d); fin.setHours(23,59,59,999);
+          return { label: `${d.getDate()}/${d.getMonth() + 1}`, inicio: d, fin };
+        });
+      } else {
+        // Rangos largos: una barra por semana (de lunes a domingo).
+        const lunes0 = new Date(rangoConsolidado.inicio); lunes0.setDate(lunes0.getDate() - ((lunes0.getDay() + 6) % 7));
+        for (let d = new Date(lunes0); d <= rangoConsolidado.fin; d.setDate(d.getDate() + 7)) {
+          const ini = new Date(d); const fin = new Date(d); fin.setDate(fin.getDate() + 6); fin.setHours(23,59,59,999);
+          labels.push({ label: `${ini.getDate()}/${ini.getMonth() + 1}`, inicio: ini < rangoConsolidado.inicio ? rangoConsolidado.inicio : ini, fin: fin > rangoConsolidado.fin ? rangoConsolidado.fin : fin });
+        }
+      }
     } else if (periodo === 'mes') {
       const ahora = new Date();
       const diasDelMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 0).getDate();
@@ -505,7 +531,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       });
     }
     const data = labels.map(({ label, inicio, fin }) => {
-      const movs = movsFiltrados.filter(m => { const f = fechaEfectiva(m); return f && f >= inicio && f <= fin && m.tipo === 'Vendida'; });
+      const movs = (periodo === 'rango' ? movsSinAnio : movsFiltrados).filter(m => { const f = fechaEfectiva(m); return f && f >= inicio && f <= fin && m.tipo === 'Vendida'; });
       return { label, count: movs.length, monto: movs.reduce((s,m) => s + Number(m.monto||0), 0) };
     });
     setGraficaData(data);
@@ -573,7 +599,9 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     );
   };
 
-  const LABELS_P = { semana: 'Semana', mes: 'Mes', año: 'Año' };
+  const LABELS_P = { semana: 'Semana', mes: 'Mes', año: 'Año', rango: 'Fechas' };
+  const fechaCortaTxt = (d) => d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
+  const ISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const Tarjeta = ({ label, valor, meta, pctLabel, pct, color, barColor }) => (
     <div style={{ background: '#fff', border: `2px solid ${color}`, borderRadius: '12px', padding: isMobile ? '12px' : '16px', position: 'relative' }}>
@@ -673,15 +701,29 @@ export default function DashboardDireccion({ miRol, miAgente }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: '12px', color: '#888', marginRight: '2px' }}>Consolidado:</span>
-        {['semana','mes','año'].map(p => (
-          <button key={p} onClick={() => setPeriodo(p)}
+        {['semana','mes','año','rango'].map(p => (
+          <button key={p} onClick={() => {
+              setPeriodo(p);
+              if (p === 'rango') { const h = new Date(); if (!rangoDesde) setRangoDesde(ISO(new Date(h.getFullYear(), h.getMonth(), 1))); if (!rangoHasta) setRangoHasta(ISO(h)); }
+            }}
             style={{ padding: isMobile ? '8px 14px' : '4px 14px', borderRadius: '20px', border: '0.5px solid', fontSize: isMobile ? '13px' : '12px', cursor: 'pointer',
               background: periodo === p ? '#C0203A' : '#fff', color: periodo === p ? '#fff' : '#666', borderColor: periodo === p ? '#C0203A' : '#ddd' }}>
             {LABELS_P[p]}
           </button>
         ))}
+        {periodo === 'rango' && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: '6px', fontSize: '12px', color: '#666', flexWrap: 'wrap' }}>
+            Del <input type="date" value={rangoDesde} onChange={e => setRangoDesde(e.target.value)} style={{ padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px' }} />
+            al <input type="date" value={rangoHasta} onChange={e => setRangoHasta(e.target.value)} style={{ padding: '4px 6px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '12px' }} />
+          </span>
+        )}
+        {(periodo === 'semana' || periodo === 'mes' || periodo === 'rango') && (
+          <span style={{ fontSize: '11px', color: '#999', marginLeft: '6px' }}>
+            {fechaCortaTxt(rangoConsolidado.inicio)} → {fechaCortaTxt(rangoConsolidado.fin)}{periodo === 'semana' ? ' (lunes a domingo)' : ''}
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
