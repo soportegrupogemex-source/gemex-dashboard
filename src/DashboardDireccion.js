@@ -41,6 +41,9 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const puede = usePuede();
   const isMobile = useIsMobile();
   const [movimientos, setMovimientos] = useState([]);
+  // Titulación y Cobranza ya no generan movimientos: se leen de su seguimiento (escriturada = última etapa de
+  // Titulación; cobrada = liquidación final cotejada por Cobranza).
+  const [hitos, setHitos] = useState({ tit: [], cob: [] });
   const [desarrollos, setDesarrollos] = useState([]);
   const [objetivosData, setObjetivosData] = useState([]);
   const [inventario, setInventario] = useState({ libre: 0, total: 0 });
@@ -88,10 +91,13 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   }, [miRol, miAgente]);
 
   const cargarMovimientosYDesarrollos = async () => {
-    const [movs, devs] = await Promise.all([
+    const [movs, devs, tit, cob] = await Promise.all([
       supabase.from('movimientos').select('*').order('created_at', { ascending: true }),
       supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre'),
+      supabase.from('titulacion_seguimiento').select('unidad_id, desarrollo_id, escriturado_en').not('escriturado_en', 'is', null),
+      supabase.from('cobranza_seguimiento').select('unidad_id, desarrollo_id, liquidacion_final_fecha').eq('liquidacion_final_completada', true).not('liquidacion_final_fecha', 'is', null),
     ]);
+    setHitos({ tit: tit.data || [], cob: cob.data || [] });
     setMovimientos(movs.data || []);
     setDesarrollos(devs.data || []);
   };
@@ -260,13 +266,34 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const totalMontoP = vendidasP.reduce((s,m) => s + Number(m.monto||0), 0);
   const ticketPromP = totalVendidasP > 0 ? totalMontoP / totalVendidasP : 0;
 
-  const tituladasP = movsPeriodo.filter(m => m.tipo === 'Titulación');
+  // Unidades tituladas / cobradas del periodo. El monto es el de la venta de la unidad (movimiento "Vendida");
+  // una unidad sin movimiento de venta cuenta como unidad pero sin monto. Mismos filtros que las ventas.
+  const desarrolloPorId = new Map(desarrollos.map(d => [d.id, d.nombre]));
+  const ventaPorUnidad = new Map();
+  movimientos.forEach(m => { if (m.tipo === 'Vendida' && m.unidad_id) ventaPorUnidad.set(m.unidad_id, m); });
+  const hitosDelPeriodo = (lista, campoFecha) => lista.map(h => ({ mov: ventaPorUnidad.get(h.unidad_id), h, f: parseFechaLocal(h[campoFecha]) })).filter(({ mov, h, f }) => {
+    if (!f || f.getFullYear() !== anioSel || f < rangoConsolidado.inicio || f > rangoConsolidado.fin) return false;
+    const nombre = mov?.desarrollo_nombre || desarrolloPorId.get(h.desarrollo_id);
+    if (desarrolloSel && nombre !== desarrolloSel) return false;
+    if (!desarrolloSel && !nombresPermitidos.includes(nombre)) return false;
+    if (miRol === 'Mesa de Control') {
+      if (!mov || !(equipoExternoCorreos.includes(mov.vendedor_correo) || equipoExternoNombres.includes(mov.vendedor))) return false;
+    }
+    if (filtroEquipoVendedor) {
+      const equipoVendedor = mov ? (agentesEquipoMap[mov.vendedor] || 'Gemex') : 'Gemex';
+      if (filtroEquipoVendedor === 'Gemex' && equipoVendedor !== 'Gemex') return false;
+      if (filtroEquipoVendedor === 'Externos' && equipoVendedor === 'Gemex') return false;
+    }
+    return true;
+  });
+  const montoDe = (lista) => lista.reduce((t, { mov }) => t + Number(mov?.monto || 0), 0);
+  const tituladasP = hitosDelPeriodo(hitos.tit, 'escriturado_en');
   const totalTituladasP = tituladasP.length;
-  const totalMontoTitulacionP = tituladasP.reduce((s,m) => s + Number(m.monto||0), 0);
+  const totalMontoTitulacionP = montoDe(tituladasP);
 
-  const cobradasP = movsPeriodo.filter(m => m.tipo === 'Cobranza');
+  const cobradasP = hitosDelPeriodo(hitos.cob, 'liquidacion_final_fecha');
   const totalCobradasP = cobradasP.length;
-  const totalMontoCobranzaP = cobradasP.reduce((s,m) => s + Number(m.monto||0), 0);
+  const totalMontoCobranzaP = montoDe(cobradasP);
 
   // FIX: la meta contra la que se compara también depende del periodo —
   // en Año se usa la meta del año completo (ya calculada arriba); en Mes
