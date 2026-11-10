@@ -8,6 +8,8 @@ const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente O
   .filter(r => !EMPRESA.rolesOcultos.includes(r));
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
+// Filtros por área de trabajo. Cobranza = quienes operan esa pantalla (Tesorería y Mesa de Control); los administradores no se cuentan.
+const FILTROS_AREA = [['Construcción', ['Construcción']], ['Tesorería', ['Tesorería']], ['Cobranza', ['Tesorería', 'Mesa de Control']], ['Titulación', ['Titulación']]];
 const LS_KEY_PROCESADOS = 'gemex_import_agentes_procesados';
 
 function useIsMobile() {
@@ -38,6 +40,7 @@ export default function Agentes() {
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [buscar, setBuscar] = useState('');
   const [filtroEquipo, setFiltroEquipo] = useState('');
+  const [filtroArea, setFiltroArea] = useState('');
   const [filtroInmobiliariaId, setFiltroInmobiliariaId] = useState('');
   const [buscarInmoFiltro, setBuscarInmoFiltro] = useState('');
   const [showDropdownInmoFiltro, setShowDropdownInmoFiltro] = useState(false);
@@ -576,9 +579,11 @@ export default function Agentes() {
       a.inmobiliarias?.nombre?.toLowerCase().includes(buscar.toLowerCase());
     const equipoOk = !filtroEquipo || a.equipo === filtroEquipo;
     const inmoOk = !filtroInmobiliariaId || a.inmobiliaria_id === filtroInmobiliariaId;
-    return textOk && equipoOk && inmoOk;
+    const areaOk = !filtroArea || (FILTROS_AREA.find(([n]) => n === filtroArea)?.[1] || []).includes(a.rol);
+    return textOk && equipoOk && inmoOk && areaOk;
   });
 
+  const conteosArea = Object.fromEntries(FILTROS_AREA.map(([n, roles]) => [n, agentes.filter(a => roles.includes(a.rol)).length]));
   const conteos = {
     'Gemex': agentes.filter(a => a.equipo === 'Gemex').length,
     'Inmobiliaria': agentes.filter(a => a.equipo === 'Inmobiliaria').length,
@@ -630,7 +635,7 @@ export default function Agentes() {
         <div>
           <h2 style={{ fontSize: isMobile ? '17px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Agentes</h2>
           <div style={{ fontSize: '13px', color: '#888' }}>
-            {filtroEquipo ? `${agentesFiltrados.length} de ${agentes.length} agentes` : `${agentes.length} agentes registrados`}
+            {filtroEquipo || filtroArea ? `${agentesFiltrados.length} de ${agentes.length} agentes` : `${agentes.length} agentes registrados`}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -848,7 +853,7 @@ export default function Agentes() {
       )}
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
-        <button onClick={() => { setFiltroEquipo(''); setFiltroInmobiliariaId(''); }}
+        <button onClick={() => { setFiltroEquipo(''); setFiltroInmobiliariaId(''); setFiltroArea(''); }}
           style={{ padding: '6px 16px', borderRadius: '20px', border: '0.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: !filtroEquipo ? '600' : '400', background: !filtroEquipo ? '#1a1a2e' : '#fff', color: !filtroEquipo ? '#fff' : '#666', borderColor: !filtroEquipo ? '#1a1a2e' : '#ddd' }}>
           Todos ({agentes.length})
         </button>
@@ -868,6 +873,16 @@ export default function Agentes() {
           style={{ padding: '6px 16px', borderRadius: '20px', border: '0.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: filtroEquipo === 'Desarrollador' ? '600' : '400', background: filtroEquipo === 'Desarrollador' ? '#3730A3' : '#EEF2FF', color: filtroEquipo === 'Desarrollador' ? '#fff' : '#3730A3', borderColor: filtroEquipo === 'Desarrollador' ? '#3730A3' : '#C7D2FE' }}>
           Desarrollador ({conteos['Desarrollador']})
         </button>
+        <span style={{ width: 1, background: '#ddd', margin: '2px 4px' }} />
+        {FILTROS_AREA.map(([nombre]) => {
+          const activo = filtroArea === nombre;
+          return (
+            <button key={nombre} onClick={() => setFiltroArea(activo ? '' : nombre)} title={nombre === 'Cobranza' ? 'Tesorería y Mesa de Control, que operan Cobranza' : `Agentes con rol ${nombre}`}
+              style={{ padding: '6px 16px', borderRadius: '20px', border: '0.5px solid', cursor: 'pointer', fontSize: '13px', fontWeight: activo ? '600' : '400', background: activo ? '#0F766E' : '#F0FDFA', color: activo ? '#fff' : '#0F766E', borderColor: activo ? '#0F766E' : '#99F6E4' }}>
+              {nombre} ({conteosArea[nombre]})
+            </button>
+          );
+        })}
       </div>
 
       {filtroEquipo === 'Inmobiliaria' && (
