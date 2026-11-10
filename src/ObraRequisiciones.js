@@ -25,6 +25,24 @@ const letrasTorres = (cargos) => {  // Torre X o Manzana X -> X
   return nombres.map(n => (/^(?:torre|manzana)\s+([A-Za-zÁÉÍÓÚÑ]+)$/i.exec(n)?.[1] || n).toUpperCase()).join(nombres.every(n => /^(?:torre|manzana)\s+\S+$/i.test(n)) ? '' : ', ');
 };
 
+// Descarga el PDF (para imprimir) de cualquier requisición: trae líneas, reparto y quién autorizó.
+async function descargarPdfDeRequisicion(reqBase) {
+  try {
+    const [r, l, c] = await Promise.all([
+      supabase.from('obra_requisiciones').select('*, desarrollos(nombre, estructura)').eq('id', reqBase.id).single(),
+      supabase.from('obra_requisicion_lineas').select('*').eq('requisicion_id', reqBase.id).order('orden'),
+      supabase.from('obra_requisicion_cargos').select('*, obra_torres(nombre, torre)').eq('requisicion_id', reqBase.id),
+    ]);
+    const req = r.data || reqBase;
+    let autorizo = '';
+    if (req.autorizada_por) {
+      const { data } = await supabase.from('agentes').select('nombre').ilike('correo', req.autorizada_por).limit(1);
+      autorizo = data?.[0]?.nombre || req.autorizada_por.split('@')[0];
+    }
+    await descargarRequisicionPdf({ req, lineas: l.data || [], torres: letrasTorres(c.data || []), etiquetaTorres: req.desarrollos?.estructura === 'Horizontal' ? 'MANZANAS' : 'TORRES', desarrollo: req.desarrollos?.nombre, autorizo });
+  } catch (e) { alert('No se pudo generar el PDF: ' + (e.message || e)); }
+}
+
 // Encabezado con el logo de la empresa, como en el formato impreso.
 function EncabezadoLogo({ folio }) {
   return (
@@ -101,7 +119,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
     });
     if (error) { alert('No se pudo solicitar: ' + error.message); setGuardando(false); return; }
     enviarPush({ correos: await correosDeRoles(['Super Admin', 'Admin']), title: `Requisición #${data.folio} por autorizar`, body: `${data.razon_social} · ${$(data.total)} · ${data.concepto}`, url: '/' });
-    onCreada();
+    onCreada(data);
   };
 
   const celda = { ...inp, width: '100%' };
@@ -280,7 +298,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
       <EncabezadoLogo folio={req.folio} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <Chip e={req.estatus} /><span style={{ fontSize: 12, color: '#888' }}>{fechaCorta(req.fecha)} · solicita {(req.solicitante || '').split('@')[0]}</span>
-        <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto' }}>PDF</button>
+        <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto', fontWeight: 600 }}>⬇ Descargar PDF para imprimir</button>
       </div>
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
         {dato('Proyecto', req.desarrollos?.nombre)}{dato(req.desarrollos?.estructura === 'Horizontal' ? 'Manzanas' : 'Torres', letrasTorres(cargos))}{dato('Categoría', req.categoria === 'indirectos' ? 'Indirectos' : 'Edificación')}
@@ -418,12 +436,13 @@ export default function ObraRequisiciones() {
               {r.fiscal ? <span style={{ fontSize: 10, color: '#3B82F6', background: '#EFF6FF', padding: '2px 8px', borderRadius: 20 }}>Fiscal</span> : <span style={{ fontSize: 10, color: '#888', background: '#f3f3f5', padding: '2px 8px', borderRadius: 20 }}>No fiscal</span>}
               <b style={{ width: 110, textAlign: 'right', fontSize: 13 }}>{$(r.total)}</b>
               <Chip e={r.estatus} />
+              <button title="Descargar PDF para imprimir" onClick={(e) => { e.stopPropagation(); descargarPdfDeRequisicion(r); }} style={{ ...btn, padding: '3px 8px', fontSize: 11 }}>⬇ PDF</button>
             </div>
           ))}
         </div>
       )}
       {nueva && <FormRequisicion torres={catalogo.torres} conceptos={catalogo.conceptos} contratos={catalogo.contratos} contratistas={catalogo.contratistas} gastadoPorConcepto={catalogo.gastado}
-        onCerrar={() => setNueva(false)} onCreada={() => { setNueva(false); setTab('pendientes'); cargar(); }} />}
+        onCerrar={() => setNueva(false)} onCreada={(nuevaReq) => { setNueva(false); setTab('pendientes'); cargar(); if (nuevaReq?.id) descargarPdfDeRequisicion(nuevaReq); }} />}
       {abiertaActual && <DetalleRequisicion req={abiertaActual} puedeAutorizar={puedeAutorizar} puedePagar={puedePagar} miCorreo={miCorreo} onCerrar={() => setAbierta(null)} onCambio={() => { setAbierta(null); cargar(); }} />}
     </div>
   );

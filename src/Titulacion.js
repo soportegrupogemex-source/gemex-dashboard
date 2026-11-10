@@ -76,9 +76,10 @@ export default function Titulacion({ miRol, miAgente }) {
   const [tiposCompra, setTiposCompra] = useState({});
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [etapaSel, setEtapaSel] = useState('');
-  // Contado enviado a Titulación antes de poder titularse: "Por liberar" hasta que Construcción libere la unidad (DTU + lista para avalúo).
+  // Contado enviado a Titulación antes de poder titularse: "Por liberar" (falta el pago del crédito puente).
   const [porLiberar, setPorLiberar] = useState({});
-  const esPorLiberar = (id) => !!porLiberar[id] && !(seguimientos[id]?.dtu && seguimientos[id]?.lista_avaluo);
+  // Falta el pago del crédito puente: lo libera Admin/Tesorería en Expedientes. Mientras tanto Titulación lo ve pero no avanza.
+  const esPorLiberar = (id) => !!porLiberar[id];
   const [semanaSel, setSemanaSel] = useState(''); // '', 'actual' o 'anterior': solo las escrituradas en esa semana (lunes a domingo)
   const [cotejoSel, setCotejoSel] = useState('');
   const [generandoEstado, setGenerandoEstado] = useState(false);
@@ -437,14 +438,14 @@ export default function Titulacion({ miRol, miAgente }) {
             const totalItems = PASO2.length + 1; // +1 por avalúo (fechas)
             const hechos = PASO2.filter(p => s[p.campo]).length + (s.fecha_terminacion_avaluo ? 1 : 0);
             return (
-              <div key={u.id} onClick={() => abrirUnidad(u)}
-                style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div key={u.id} onClick={() => esPorLiberar(u.id) ? alert('Este contado está POR LIBERAR: falta el pago del crédito puente. Titulación no puede avanzar con este expediente hasta que Admin o Tesorería lo liberen en Expedientes.') : abrirUnidad(u)}
+                style={{ background: esPorLiberar(u.id) ? '#FFFBF3' : '#fff', opacity: esPorLiberar(u.id) ? 0.85 : 1, border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: esPorLiberar(u.id) ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {esPorLiberar(u.id) && <span title="Contado enviado a Titulación; falta que Construcción la libere (DTU y lista para avalúo)" style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '700' }}>⏳ Por liberar</span>}
+                  {esPorLiberar(u.id) && <span title="Contado enviado a Titulación; falta el pago del crédito puente. No avanza hasta que se libere." style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '700' }}>⏳ Por liberar · crédito puente</span>}
                   {liquidacionesCobranza[u.id] && <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>}
                   {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
