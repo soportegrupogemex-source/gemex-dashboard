@@ -16,6 +16,7 @@ const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 // Tipo de cada movimiento de "Enganche y pagos". "Cotejo" = ya pagó la financiera.
 const TIPOS_PAGO = ['Apartado', 'Enganche', 'Abono', 'Cotejo'];
 
+const COLOR_ETAPA = { 'Sin pagos': '#F59E0B', 'En cobranza': '#3B82F6', 'Cotejada': '#10B981' };
 const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, financiera_1_recibido: null, financiera_2_recibido: null, liberacion_monto: 0, cuotas_condominales: 0 };
 // Lo recibido en bancos: vacío = aún no capturado (distinto de 0, que es "no cayó nada").
 const recibidoNum = (v) => (v === null || v === undefined || v === '') ? null : r2(v);
@@ -49,7 +50,8 @@ export default function Cobranza({ miRol, miAgente }) {
   const [ventaPorUnidad, setVentaPorUnidad] = useState({}); // unidad_id -> {contacto_nombre, monto, tipo_compra}
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [buscar, setBuscar] = useState('');
-  const [gruposAbiertos, setGruposAbiertos] = useState({});
+  const [etapaSel, setEtapaSel] = useState('');
+  const [semanaSel, setSemanaSel] = useState(''); // '', 'actual' o 'anterior': solo las cotejadas en esa semana (lunes a domingo)
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(SEG_VACIO);
@@ -117,7 +119,9 @@ export default function Cobranza({ miRol, miAgente }) {
     setCargando(false);
   };
 
-  const unidadesVisibles = unidades.filter(u => {
+  // Unidades que cumplen proyecto y búsqueda (las tarjetas de etapa cuentan sobre estas, para que al elegir una
+  // etapa las otras tarjetas no se pongan en cero).
+  const unidadesSinEtapa = unidades.filter(u => {
     if (ROLES_GERENTE.includes(miRol) && !idsPermitidos.includes(u.desarrollo_id)) return false;
     if (desarrolloSel && u.desarrollo_nombre !== desarrolloSel) return false;
     // Búsqueda por número de unidad o nombre del cliente (sin acentos ni mayúsculas).
@@ -128,6 +132,30 @@ export default function Cobranza({ miRol, miAgente }) {
     }
     return true;
   });
+  // Etapa de cobranza: sin pagos -> en cobranza (ya hay pagos) -> cotejada (liquidación final).
+  const etapaDe = (u) => {
+    if (seguimientos[u.id]?.liquidacion_final_completada) return 'Cotejada';
+    return (pagosPorUnidad[u.id] || []).length > 0 ? 'En cobranza' : 'Sin pagos';
+  };
+  // Semana de lunes a domingo (0 = la actual, -1 = la anterior) y cuándo se cotejó cada unidad.
+  const rangoSemana = (offset) => {
+    const ini = new Date(); ini.setHours(0, 0, 0, 0); ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7) + offset * 7);
+    const fin = new Date(ini); fin.setDate(fin.getDate() + 6); fin.setHours(23, 59, 59, 999);
+    return { ini, fin };
+  };
+  const semanas = { actual: rangoSemana(0), anterior: rangoSemana(-1) };
+  const cotejadaEn = (u, r) => {
+    const sg = seguimientos[u.id];
+    if (!sg?.liquidacion_final_completada || !sg.liquidacion_final_fecha) return false;
+    const d = new Date(sg.liquidacion_final_fecha);
+    return d >= r.ini && d <= r.fin;
+  };
+  const porEtapa = etapaSel ? unidadesSinEtapa.filter(u => etapaDe(u) === etapaSel) : unidadesSinEtapa;
+  const unidadesVisibles = semanaSel ? porEtapa.filter(u => cotejadaEn(u, semanas[semanaSel])) : porEtapa;
+  const cotejadasSemana = { actual: unidadesSinEtapa.filter(u => cotejadaEn(u, semanas.actual)).length, anterior: unidadesSinEtapa.filter(u => cotejadaEn(u, semanas.anterior)).length };
+  const fechaSemana = (r) => `${r.ini.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')} – ${r.fin.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}`;
+  const conteos = { 'Sin pagos': 0, 'En cobranza': 0, 'Cotejada': 0 };
+  unidadesSinEtapa.forEach(u => { conteos[etapaDe(u)]++; });
 
   const totalPagos = (unidadId) => r2((pagosPorUnidad[unidadId] || []).reduce((s, p) => s + Number(p.monto || 0), 0));
 
@@ -314,9 +342,9 @@ export default function Cobranza({ miRol, miAgente }) {
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
       <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Cobranza</h2>
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Enganche, pagos y financieras por unidad vendida</div>
+      <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Unidades vendidas: enganche, pagos y financieras, hasta la cotejada</div>
 
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <input type="search" value={buscar} onChange={e => setBuscar(e.target.value)} placeholder="Buscar por cliente o número de unidad..."
           style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', width: isMobile ? '100%' : '300px', boxSizing: 'border-box' }} />
         <select value={desarrolloSel} onChange={e => setDesarrolloSel(e.target.value)}
@@ -324,61 +352,84 @@ export default function Cobranza({ miRol, miAgente }) {
           <option value=''>Todos los proyectos</option>
           {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
         </select>
+        <select value={etapaSel} onChange={e => setEtapaSel(e.target.value)}
+          style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
+          <option value=''>Todas las etapas</option>
+          {Object.keys(COLOR_ETAPA).map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+        <select value={semanaSel} onChange={e => setSemanaSel(e.target.value)}
+          style={{ padding: '8px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: semanaSel ? '#EEF2FF' : '#fff' }}>
+          <option value=''>Cotejadas: todas</option>
+          <option value='actual'>Cotejadas esta semana</option>
+          <option value='anterior'>Cotejadas la semana anterior</option>
+        </select>
       </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr 1fr' : 'repeat(3, 1fr)', gap: '10px', marginBottom: '1.5rem', maxWidth: isMobile ? 'none' : '600px' }}>
+        {Object.entries(conteos).map(([etapa, n]) => (
+          <div key={etapa} role="button" tabIndex={0} title={etapaSel === etapa ? 'Quitar el filtro' : `Ver solo ${etapa}`}
+            onClick={() => setEtapaSel(etapaSel === etapa ? '' : etapa)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setEtapaSel(etapaSel === etapa ? '' : etapa); }}
+            style={{ background: etapaSel === etapa ? COLOR_ETAPA[etapa] + '1A' : '#fff', border: `2px solid ${COLOR_ETAPA[etapa]}`, borderRadius: '12px', padding: '12px', cursor: 'pointer', opacity: etapaSel && etapaSel !== etapa ? 0.55 : 1, boxShadow: etapaSel === etapa ? `0 0 0 2px ${COLOR_ETAPA[etapa]}33` : 'none', transition: 'opacity .15s' }}>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: '#1a1a2e' }}>{n}</div>
+            <div style={{ fontSize: '11px', color: '#888' }}>{etapa}</div>
+          </div>
+        ))}
+      </div>
+
+      {(() => {
+        const dif = cotejadasSemana.actual - cotejadasSemana.anterior;
+        const pctDif = cotejadasSemana.anterior > 0 ? Math.round((dif / cotejadasSemana.anterior) * 100) : null;
+        const colorDif = dif > 0 ? '#10B981' : dif < 0 ? '#EF4444' : '#888';
+        const bloque = (clave, titulo) => (
+          <div role="button" tabIndex={0} onClick={() => setSemanaSel(semanaSel === clave ? '' : clave)} title={semanaSel === clave ? 'Quitar el filtro' : 'Ver estas unidades'}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setSemanaSel(semanaSel === clave ? '' : clave); }}
+            style={{ flex: '1 1 150px', background: semanaSel === clave ? '#EEF2FF' : '#fff', border: `1.5px solid ${semanaSel === clave ? '#6366F1' : '#e0e0e0'}`, borderRadius: '10px', padding: '10px 14px', cursor: 'pointer' }}>
+            <div style={{ fontSize: '11px', color: '#888' }}>{titulo} <span style={{ color: '#bbb' }}>({fechaSemana(semanas[clave])})</span></div>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#1a1a2e' }}>{cotejadasSemana[clave]}</div>
+          </div>
+        );
+        return (
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap', marginBottom: '1.25rem', maxWidth: isMobile ? 'none' : '720px' }}>
+            {bloque('anterior', 'Cotejadas semana anterior')}
+            {bloque('actual', 'Cotejadas esta semana')}
+            <div style={{ flex: '1 1 150px', background: '#fafafa', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '10px 14px' }}>
+              <div style={{ fontSize: '11px', color: '#888' }}>Comparativa (semana lunes a domingo)</div>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: colorDif }}>{dif > 0 ? '▲ +' : dif < 0 ? '▼ ' : '= '}{dif}</div>
+              <div style={{ fontSize: '11px', color: colorDif }}>{pctDif === null ? (cotejadasSemana.actual > 0 ? 'sin cotejadas la semana anterior' : 'sin cambios') : `${pctDif > 0 ? '+' : ''}${pctDif}% vs semana anterior`}</div>
+            </div>
+          </div>
+        );
+      })()}
 
       {cargando ? (
         <div style={{ color: '#888', fontSize: '13px' }}>Cargando...</div>
       ) : unidadesVisibles.length === 0 ? (
         <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades que coincidan con el filtro.</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {(() => {
-            // Agrupadas por desarrollo y plegadas de inicio; al buscar se
-            // despliegan solas los desarrollos con coincidencias.
-            const grupos = {};
-            unidadesVisibles.forEach(u => { (grupos[u.desarrollo_nombre || 'Sin desarrollo'] = grupos[u.desarrollo_nombre || 'Sin desarrollo'] || []).push(u); });
-            return Object.keys(grupos).sort((x, y) => x.localeCompare(y, 'es')).map(nombre => {
-              const lista = grupos[nombre];
-              const abierto = !!buscar.trim() || !!gruposAbiertos[nombre];
-              const saldoGrupo = r2(lista.reduce((t, u) => t + calc(u.id, seguimientos[u.id] || SEG_VACIO).saldoNeto, 0));
-              return (
-                <div key={nombre}>
-                  <div onClick={() => setGruposAbiertos(g => ({ ...g, [nombre]: !g[nombre] }))}
-                    style={{ background: '#1a1a2e', color: '#fff', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '12px', display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▶</span>
-                      <span style={{ fontSize: '14px', fontWeight: '600' }}>{nombre}</span>
-                      <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>{lista.length} {lista.length === 1 ? 'unidad' : 'unidades'}</span>
-                    </div>
-                    <div style={{ fontSize: '12px', opacity: 0.85 }}>Saldo neto del desarrollo: <b>{fmt(saldoGrupo)}</b></div>
-                  </div>
-                  {abierto && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                      {lista.map(u => {
-                        const s = seguimientos[u.id] || SEG_VACIO;
-                        const { pagado, saldoNeto } = calc(u.id, s);
-                        return (
-                          <div key={u.id} onClick={() => abrirUnidad(u)}
-                            style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                            <div>
-                              <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero}</div>
-                              <div style={{ fontSize: '12px', color: '#888' }}>{ventaPorUnidad[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                              <div style={{ fontSize: '12px', color: '#888' }}>Pagado: <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(pagado)}</span></div>
-                              <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: saldoNeto <= 0 ? '#10B981' : '#F59E0B', borderRadius: '20px', padding: '4px 12px' }}>
-                                Saldo neto: {fmt(saldoNeto)}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {unidadesVisibles.map(u => {
+            const s = seguimientos[u.id] || SEG_VACIO;
+            const { pagado, saldoNeto, cotejada } = calc(u.id, s);
+            const etapa = etapaDe(u);
+            return (
+              <div key={u.id} onClick={() => abrirUnidad(u)}
+                style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>{ventaPorUnidad[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
                 </div>
-              );
-            });
-          })()}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {ventaPorUnidad[u.id]?.tipo_compra && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{ventaPorUnidad[u.id].tipo_compra}</span>}
+                  <div style={{ fontSize: '12px', color: '#888' }}>Pagado: <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(pagado)}</span></div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: saldoNeto <= 0 ? '#10B981' : '#B45309', background: saldoNeto <= 0 ? '#EAF3DE' : '#FFF4E5', borderRadius: '20px', padding: '4px 12px' }}>
+                    Saldo neto: {fmt(saldoNeto)}
+                  </div>
+                  {cotejada && s.liquidacion_final_fecha && <div style={{ fontSize: '11px', color: '#888' }}>Cotejada el {new Date(s.liquidacion_final_fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')}</div>}
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: COLOR_ETAPA[etapa], borderRadius: '20px', padding: '4px 12px' }}>{etapa}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
