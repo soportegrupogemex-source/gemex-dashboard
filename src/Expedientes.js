@@ -840,25 +840,49 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       const JSZip = (await import('jszip')).default;
       const zip = new JSZip();
       const docs = docsDe(movimiento.id);
+      const otraPersona = hayOtraPersona(movimiento);
+      const carpetaOtra = movimiento.tiene_conyugal ? 'Conyuge' : 'Coacreditado';
+      // Titular y coacreditado/cónyuge comparten los mismos nombres de documento (INE, acta, CURP...): cada quien va en
+      // su carpeta; si no, el segundo pisaba al primero y el ZIP salía incompleto.
+      const vistos = new Set();
+      const lista = [];
+      docsRequeridosCompletos(movimiento).forEach(t => { vistos.add(t.id); lista.push(t); });
+      // También lo subido que ya no está en la lista requerida (p. ej. "Documento adicional", o el tipo de compra cambió).
+      Object.keys(docs).filter(id => !vistos.has(id) && getArchivosDoc(docs[id]).length > 0)
+        .forEach(id => lista.push({ id, label: id.replace(/^coac_/, '').replace(/_/g, ' ') }));
+      const nombresUsados = new Set();
       let algunoAgregado = false;
-      for (const tipo of docsRequeridosCompletos(movimiento)) {
+      for (const tipo of lista) {
         const doc = docs[tipo.id];
         const archivos = getArchivosDoc(doc);
+        const carpeta = tipo.id === 'orden_contrato' ? '' : (tipo.id.startsWith('coac_') ? `${carpetaOtra}/` : (otraPersona ? 'Titular/' : ''));
         for (let i = 0; i < archivos.length; i++) {
           const a = archivos[i];
           const { data: urlData } = await supabase.storage.from('expedientes').createSignedUrl(a.path, 300);
-          if (urlData?.signedUrl) {
-            const res = await fetch(urlData.signedUrl);
-            const blob = await res.blob();
-            const ext = a.path.split('.').pop();
-            const nombreBase = tipo.label.replace(/[^\w\s]/g, '');
-            const nombreArchivo = archivos.length > 1 ? `${nombreBase}_${i + 1}.${ext}` : `${nombreBase}.${ext}`;
-            zip.file(nombreArchivo, blob);
-            algunoAgregado = true;
-          }
+          if (!urlData?.signedUrl) continue;
+          const res = await fetch(urlData.signedUrl);
+          if (!res.ok) continue;
+          const blob = await res.blob();
+          const ext = a.path.split('.').pop();
+          const nombreBase = tipo.label.replace(/[^\w\s]/g, '').trim();
+          let nombreArchivo = `${carpeta}${nombreBase}${archivos.length > 1 ? `_${i + 1}` : ''}.${ext}`;
+          for (let n = 2; nombresUsados.has(nombreArchivo); n++) nombreArchivo = `${carpeta}${nombreBase}_${n}.${ext}`;
+          nombresUsados.add(nombreArchivo);
+          zip.file(nombreArchivo, blob);
+          algunoAgregado = true;
         }
       }
       if (!algunoAgregado) { alert('Este expediente todavía no tiene documentos subidos'); setGenerandoZip(null); return; }
+      // Datos del expediente en texto (cónyuge/coacreditado y referencias personales no son archivos).
+      const datos = [
+        `Cliente: ${movimiento.contacto_nombre || ''}`,
+        `Unidad: ${movimiento.desarrollo_nombre || ''} — ${movimiento.unidad_numero || ''}`,
+        `Tipo de compra: ${etiquetaCredito(movimiento)}`,
+        otraPersona ? `${movimiento.tiene_conyugal ? 'Cónyuge' : 'Coacreditado'}: ${movimiento.coacreditado_nombre || ''}` : null,
+        movimiento.referencia1_nombre ? `Referencia 1: ${movimiento.referencia1_nombre} — ${movimiento.referencia1_telefono || ''}` : null,
+        movimiento.referencia2_nombre ? `Referencia 2: ${movimiento.referencia2_nombre} — ${movimiento.referencia2_telefono || ''}` : null,
+      ].filter(Boolean).join('\n');
+      zip.file('Datos del expediente.txt', datos);
       const contenido = await zip.generateAsync({ type: 'blob' });
       const url = URL.createObjectURL(contenido);
       const a = document.createElement('a');
