@@ -864,7 +864,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           if (!res.ok) continue;
           const blob = await res.blob();
           const ext = a.path.split('.').pop();
-          const nombreBase = tipo.label.replace(/[^\w\s]/g, '').trim();
+          const nombreBase = tipo.label.replace(/[^\p{L}\p{N}\s]/gu, '').trim();
           let nombreArchivo = `${carpeta}${nombreBase}${archivos.length > 1 ? `_${i + 1}` : ''}.${ext}`;
           for (let n = 2; nombresUsados.has(nombreArchivo); n++) nombreArchivo = `${carpeta}${nombreBase}_${n}.${ext}`;
           nombresUsados.add(nombreArchivo);
