@@ -190,6 +190,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   const [desarrollos, setDesarrollos] = useState([]);
   const [filtroDesarrollo, setFiltroDesarrollo] = useState('');
   const [filtroTipoCompra, setFiltroTipoCompra] = useState('');
+  const [filtroCompleto, setFiltroCompleto] = useState(''); // '', 'completos' o 'incompletos'
   const [movSel, setMovSel] = useState(null);
   const [subiendoTipo, setSubiendoTipo] = useState(null);
   const [generandoZip, setGenerandoZip] = useState(null);
@@ -358,7 +359,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
   // solo ven los suyos (desarrollos_cargo), igual que ya limita el resto
   // de la pantalla; Admin/Super Admin/Agente/Mesa de Control ven todos.
   const cargarDesarrollos = async () => {
-    let query = supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
+    let query = supabase.from('desarrollos').select('id, nombre, ciudad').eq('activo', true).order('nombre');
     if (esGerente) {
       if (misProyectos.length === 0) { setDesarrollos([]); return; }
       query = query.in('nombre', misProyectos);
@@ -912,7 +913,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
     (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo) &&
-    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra || etiquetaCredito(m) === filtroTipoCompra)
+    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra || etiquetaCredito(m) === filtroTipoCompra) &&
+    (!filtroCompleto || (filtroCompleto === 'completos' ? m.expediente_completo === true : m.expediente_completo !== true))
   );
 
   const rechazados = misDocumentosRechazados();
@@ -1570,6 +1572,12 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           <option value=''>Todos los tipos de crédito</option>
           {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
+        <select value={filtroCompleto} onChange={e => setFiltroCompleto(e.target.value)}
+          style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: filtroCompleto ? '#EAF3DE' : '#fff', boxSizing: 'border-box' }}>
+          <option value=''>Todos los expedientes</option>
+          <option value='completos'>✅ Solo completos</option>
+          <option value='incompletos'>Solo incompletos</option>
+        </select>
       </div>
 
       {loading ? (
@@ -1578,7 +1586,8 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <div style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>Sin apartados{tab === 'cargar' ? ' a tu nombre' : ''}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {listaActual.map(m => {
+          {(() => {
+          const renderFila = (m, num) => {
             const aprobados = contarAprobados(m);
             const total = docsRequeridosCompletos(m).length;
             const archivado = expedienteArchivado(m.id);
@@ -1594,7 +1603,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
               <div key={m.id} onClick={() => setMovSel(m)}
                 style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '200px' }}>
-                  <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e' }}>{m.contacto_nombre}</div>
+                  <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e' }}>
+                    {num != null && <span style={{ display: 'inline-block', minWidth: '26px', marginRight: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#fff', background: '#1a1a2e', borderRadius: '20px', padding: '2px 8px' }}>{num}</span>}
+                    {m.contacto_nombre}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
                     {m.desarrollo_nombre} — Unidad {m.unidad_numero}{!soyElVendedor && ` — ${m.vendedor}`}
                   </div>
@@ -1636,7 +1648,35 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                 </div>
               </div>
             );
-          })}
+          };
+          // Solo completos: enumerados y acomodados por ubicación (ciudad del desarrollo), como en Titulación.
+          if (filtroCompleto === 'completos') {
+            const ciudadDe = (m) => desarrollos.find(d => d.nombre === m.desarrollo_nombre)?.ciudad || m.desarrollo_nombre || 'Sin ubicación';
+            const natural = (x, y) => String(x || '').localeCompare(String(y || ''), 'es', { numeric: true });
+            const grupos = {};
+            listaActual.forEach(m => { (grupos[ciudadDe(m)] = grupos[ciudadDe(m)] || []).push(m); });
+            return (<>
+              <div style={{ fontSize: '12px', color: '#888' }}>{listaActual.length} {listaActual.length === 1 ? 'expediente completo' : 'expedientes completos'}</div>
+              {Object.keys(grupos).sort(natural).map(ciudad => {
+                const lista = grupos[ciudad].slice().sort((a, b) => natural(a.desarrollo_nombre, b.desarrollo_nombre) || natural(a.unidad_numero, b.unidad_numero));
+                const desarrollosDe = [...new Set(lista.map(m => m.desarrollo_nombre))];
+                return (
+                  <div key={ciudad} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                    <div style={{ background: '#1a1a2e', color: '#fff', borderRadius: '10px', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600' }}>📍 {ciudad}</span>
+                        <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>{lista.length} {lista.length === 1 ? 'expediente' : 'expedientes'}</span>
+                      </div>
+                      <div style={{ fontSize: '12px', opacity: 0.85 }}>{desarrollosDe.join(' · ')}</div>
+                    </div>
+                    {lista.map((m, i) => renderFila(m, i + 1))}
+                  </div>
+                );
+              })}
+            </>);
+          }
+          return listaActual.map(m => renderFila(m));
+          })()}
         </div>
       )}
     </div>
