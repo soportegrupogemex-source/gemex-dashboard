@@ -77,7 +77,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
   const [idsPorUnidad, setIdsPorUnidad] = useState(null);
   const [buscandoPorUnidad, setBuscandoPorUnidad] = useState(false);
   // FIX: en móvil, los filtros van escondidos detrás de un botón
-  // "Filtros" (igual que en Contactos/Inventario), en vez de mostrarse
+  // "⚙️ Filtros" (igual que en Contactos/Inventario), en vez de mostrarse
   // siempre en línea junto al buscador — se veía apretado en pantallas chicas.
   const [showFiltrosDesarrollos, setShowFiltrosDesarrollos] = useState(false);
 
@@ -437,9 +437,9 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
         </div>
         <div>
           <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Brochure — {nombreTorreActual}</label>
-          {datosTorre.brochure_url && <a href={datosTorre.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '12px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>Ver brochure actual</a>}
+          {datosTorre.brochure_url && <a href={datosTorre.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '12px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>📄 Ver brochure actual</a>}
           <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '12px' }}>
-            {subiendoBrochureTorre ? 'Subiendo...' : 'Subir brochure'}
+            {subiendoBrochureTorre ? 'Subiendo...' : '📎 Subir brochure'}
             <input type='file' accept='application/pdf' onChange={e => handleSubirBrochureTorre(e, nombreTorreActual)} style={{ display: 'none' }} />
           </label>
         </div>
@@ -482,7 +482,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
       </div>
 
       {/* FIX: filtros de precio y entrega — panel colapsable en móvil
-          (buscador + botón "Filtros"), fila en línea en escritorio. */}
+          (buscador + botón "⚙️ Filtros"), fila en línea en escritorio. */}
       {isMobile ? (
         <div style={{ marginBottom: '1.5rem' }}>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
@@ -490,7 +490,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
               style={{ flex: 1, padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px' }} />
             <button onClick={() => setShowFiltrosDesarrollos(f => !f)}
               style={{ padding: '10px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltrosDesarrollos ? '#C0203A' : '#fff', color: showFiltrosDesarrollos ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-              Filtros
+              ⚙️ Filtros
             </button>
           </div>
           {showFiltrosDesarrollos && (
@@ -569,7 +569,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                 {d.portada_url ? (
                   <img src={d.portada_url} alt={d.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <span style={{ fontSize: '40px' }}></span>
+                  <span style={{ fontSize: '40px' }}>🏢</span>
                 )}
               </div>
               <div style={{ padding: isMobile ? '12px' : '16px' }}>
@@ -578,10 +578,10 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e', marginBottom: '4px' }}>{d.nombre}</div>
                     {d.precio_desde > 0 && <div style={{ fontSize: '12px', color: '#666' }}>Desde: {fmtDinero(d.precio_desde)}</div>}
                     {d.fecha_entrega && <div style={{ fontSize: '12px', color: '#666' }}>Entrega: {d.fecha_entrega}</div>}
-                    {d.ciudad && <div style={{ fontSize: '12px', color: '#666' }}>{d.ciudad}</div>}
+                    {d.ciudad && <div style={{ fontSize: '12px', color: '#666' }}>📍 {d.ciudad}</div>}
                     {d.mostrar_web && (
                       <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '500' }}>
-                        En la web
+                        🌐 En la web
                       </span>
                     )}
                     {d.tiene_etapas && (
@@ -600,12 +600,12 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                         {puede('desarrollos.ver_planes') && (
                           <button onClick={() => { setVistaPlanes(d); setShowMenu(null); }}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
-                            Planes
+                            💳 Planes
                           </button>
                         )}
                         <button onClick={() => { setVistaInventario(d); setShowMenu(null); }}
                           style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
-                          Inventario
+                          📦 Inventario
                         </button>
                         {/* FIX: si el desarrollo tiene torres/etapas, se listan los
                             brochures de CADA una (desarrollo_estructuras) en vez de
@@ -619,30 +619,30 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                             estructurasMenu[d.id].map(e => (
                               <button key={e.nombre} onClick={() => { if (e.brochure_url) window.open(e.brochure_url, '_blank'); setShowMenu(null); }}
                                 style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: e.brochure_url ? '#333' : '#ccc' }}>
-                                Brochure {e.nombre}
+                                📄 Brochure {e.nombre}
                               </button>
                             ))
                           )
                         ) : (
                           <button onClick={() => { if (d.brochure_url) window.open(d.brochure_url, '_blank'); setShowMenu(null); }}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: d.brochure_url ? '#333' : '#ccc' }}>
-                            Brochure
+                            📄 Brochure
                           </button>
                         )}
                         <button onClick={() => { if (d.recorrido_virtual) window.open(d.recorrido_virtual, '_blank', 'noopener,noreferrer'); setShowMenu(null); }}
                           style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: d.recorrido_virtual ? 'pointer' : 'default', fontSize: '14px', textAlign: 'left', color: d.recorrido_virtual ? '#333' : '#ccc' }}>
-                          Recorrido virtual
+                          🥽 Recorrido virtual
                         </button>
                         {puedeEditar(d) && (
                           <button onClick={() => handleEditar(d)}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
-                            Editar
+                            ✏️ Editar
                           </button>
                         )}
                         {puede('desarrollos.eliminar') && (
                           <button onClick={() => handleEliminar(d.id)}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#e53935' }}>
-                            Eliminar
+                            🗑 Eliminar
                           </button>
                         )}
                       </div>
@@ -650,9 +650,9 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '12px', color: '#888' }}>
-                  {d.recamaras && <span>Rec. {d.recamaras}</span>}
-                  {d.banos && <span>Baños {d.banos}</span>}
-                  {d.estacionamiento && <span>Est. {d.estacionamiento}</span>}
+                  {d.recamaras && <span>🛏 {d.recamaras}</span>}
+                  {d.banos && <span>🚿 {d.banos}</span>}
+                  {d.estacionamiento && <span>🚗 {d.estacionamiento}</span>}
                 </div>
               </div>
             </div>
@@ -806,7 +806,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Logo del desarrollo</label>
                       {form.logo_url && <img src={form.logo_url} alt="logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '8px', display: 'block' }} />}
                       <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '14px', padding: '10px 16px' }}>
-                        {subiendoLogo ? 'Subiendo...' : 'Subir logo'}
+                        {subiendoLogo ? 'Subiendo...' : '📷 Subir logo'}
                         <input type='file' accept='image/*' onChange={e => handleSubirArchivo(e, 'logo')} style={{ display: 'none' }} />
                       </label>
                     </div>
@@ -814,15 +814,15 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Imagen de portada</label>
                       {form.portada_url && <img src={form.portada_url} alt="portada" style={{ width: '100%', height: '140px', objectFit: 'cover', marginBottom: '8px', borderRadius: '6px' }} />}
                       <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '14px', padding: '10px 16px' }}>
-                        {subiendoPortada ? 'Subiendo...' : 'Subir portada'}
+                        {subiendoPortada ? 'Subiendo...' : '🖼 Subir portada'}
                         <input type='file' accept='image/*' onChange={e => handleSubirArchivo(e, 'portada')} style={{ display: 'none' }} />
                       </label>
                     </div>
                     <div style={{ marginBottom: '16px' }}>
                       <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Brochure general (PDF)</label>
-                      {form.brochure_url && <a href={form.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '13px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>Ver brochure actual</a>}
+                      {form.brochure_url && <a href={form.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '13px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>📄 Ver brochure actual</a>}
                       <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '14px', padding: '10px 16px' }}>
-                        {subiendoBrochure ? 'Subiendo...' : 'Subir brochure'}
+                        {subiendoBrochure ? 'Subiendo...' : '📎 Subir brochure'}
                         <input type='file' accept='application/pdf' onChange={e => handleSubirArchivo(e, 'brochure')} style={{ display: 'none' }} />
                       </label>
                     </div>
@@ -901,7 +901,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Logo del desarrollo</label>
                     {form.logo_url && <img src={form.logo_url} alt="logo" style={{ height: '60px', objectFit: 'contain', marginBottom: '8px', display: 'block' }} />}
                     <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '12px' }}>
-                      {subiendoLogo ? 'Subiendo...' : 'Subir logo'}
+                      {subiendoLogo ? 'Subiendo...' : '📷 Subir logo'}
                       <input type='file' accept='image/*' onChange={e => handleSubirArchivo(e, 'logo')} style={{ display: 'none' }} />
                     </label>
                   </div>
@@ -909,15 +909,15 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Imagen de portada</label>
                     {form.portada_url && <img src={form.portada_url} alt="portada" style={{ width: '100%', height: '100px', objectFit: 'cover', marginBottom: '8px', borderRadius: '6px' }} />}
                     <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '12px' }}>
-                      {subiendoPortada ? 'Subiendo...' : 'Subir portada'}
+                      {subiendoPortada ? 'Subiendo...' : '🖼 Subir portada'}
                       <input type='file' accept='image/*' onChange={e => handleSubirArchivo(e, 'portada')} style={{ display: 'none' }} />
                     </label>
                   </div>
                   <div style={{ marginBottom: '16px' }}>
                     <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Brochure general (PDF)</label>
-                    {form.brochure_url && <a href={form.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '12px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>Ver brochure actual</a>}
+                    {form.brochure_url && <a href={form.brochure_url} target='_blank' rel='noreferrer' style={{ fontSize: '12px', color: '#C0203A', display: 'block', marginBottom: '8px' }}>📄 Ver brochure actual</a>}
                     <label style={{ ...btnOutline, display: 'inline-block', cursor: 'pointer', fontSize: '12px' }}>
-                      {subiendoBrochure ? 'Subiendo...' : 'Subir brochure'}
+                      {subiendoBrochure ? 'Subiendo...' : '📎 Subir brochure'}
                       <input type='file' accept='application/pdf' onChange={e => handleSubirArchivo(e, 'brochure')} style={{ display: 'none' }} />
                     </label>
                   </div>
