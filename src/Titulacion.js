@@ -434,7 +434,8 @@ export default function Titulacion({ miRol, miAgente }) {
         <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades con expediente completo que coincidan con el filtro.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {unidadesVisibles.map(u => {
+          <div style={{ fontSize: '12px', color: '#888' }}>{unidadesVisibles.length} {unidadesVisibles.length === 1 ? 'unidad' : 'unidades'}</div>
+          {unidadesVisibles.map((u, idx) => {
             const s = seguimientos[u.id] || VACIO;
             const etapa = calcularEtapa(s);
             const totalItems = PASO2.length + 1; // +1 por avalúo (fechas)
@@ -443,7 +444,10 @@ export default function Titulacion({ miRol, miAgente }) {
               <div key={u.id} onClick={() => abrirUnidad(u)}
                 style={{ background: esPorLiberar(u.id) ? '#FFFBF3' : '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>
+                    <span style={{ display: 'inline-block', minWidth: '26px', marginRight: '8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: '#fff', background: '#1a1a2e', borderRadius: '20px', padding: '2px 8px' }}>{idx + 1}</span>
+                    {u.numero} — {u.desarrollo_nombre}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

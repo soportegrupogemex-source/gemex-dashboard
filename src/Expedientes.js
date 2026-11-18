@@ -1699,7 +1699,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
               })}
             </>);
           }
-          return listaActual.map(m => renderFila(m));
+          return (<>
+            <div style={{ fontSize: '12px', color: '#888' }}>{listaActual.length} {listaActual.length === 1 ? 'expediente' : 'expedientes'}</div>
+            {listaActual.map((m, i) => renderFila(m, i + 1))}
+          </>);
           })()}
         </div>
       )}
