@@ -283,8 +283,8 @@ function FilaAvance({ p, progMap, arr, hoy, puedeCapturar, onRegistrar, ruta = '
             <button onClick={() => guardar()} disabled={!cambiado || guardando} style={{ ...btn, background: cambiado ? '#1a1a2e' : '#fff', color: cambiado ? '#fff' : '#bbb' }}>{guardando ? '...' : 'Guardar'}</button>
             {!p.terminada_en && <button onClick={() => guardar('100')} disabled={guardando} style={{ ...btn, color: '#27500A', borderColor: '#27500A' }} title="Marcar al 100%">100%</button>}
           </>) : <b style={{ fontSize: 13, width: 50, textAlign: 'right' }}>{pct1(p.avance_pct)}</b>}
-          <button onClick={verHistorial} style={{ ...btn, padding: '6px 8px' }} title="Historial de avances">⏱</button>
-          <button onClick={() => setFotosAbiertas(v => !v)} style={{ ...btn, padding: '6px 8px', color: numFotos > 0 ? '#2a78d6' : '#888' }} title="Evidencia fotográfica">📷{numFotos > 0 ? ` ${numFotos}` : ''}</button>
+          <button onClick={verHistorial} style={{ ...btn, padding: '6px 8px' }} title="Historial de avances">Historial</button>
+          <button onClick={() => setFotosAbiertas(v => !v)} style={{ ...btn, padding: '6px 8px', color: numFotos > 0 ? '#2a78d6' : '#888' }} title="Evidencia fotográfica">Fotos{numFotos > 0 ? ` ${numFotos}` : ''}</button>
         </div>
       </div>
       {fotosAbiertas && <PanelFotos partida={p} puedeSubir={puedeCapturar} onCambio={() => onFotos && onFotos()} onCerrar={() => setFotosAbiertas(false)} />}
@@ -1139,7 +1139,7 @@ function TabCostos({ torre, partidas, progMap, contratistas, contratos, pagos, e
                   <div key={pg.id} style={{ display: 'flex', gap: 12, fontSize: 12, padding: '4px 0', borderBottom: '0.5px solid #f5f5f5', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span style={{ width: 70 }}>{fechaCorta(pg.fecha)}</span><b style={{ width: 110 }}>{$(pg.monto)}</b><span style={{ flex: 1, color: '#555' }}>{pg.concepto || ''}</span>
                     <span style={{ color: '#aaa' }}>{pg.registrado_por || ''}</span>
-                    {pg.comprobante_path && <button onClick={() => verComprobante(pg.comprobante_path)} style={{ ...btn, padding: '2px 8px', color: '#3B82F6' }}>📎 Comprobante</button>}
+                    {pg.comprobante_path && <button onClick={() => verComprobante(pg.comprobante_path)} style={{ ...btn, padding: '2px 8px', color: '#3B82F6' }}>Comprobante</button>}
                     {permisos.pagos && <button onClick={() => eliminarPago(pg)} style={{ ...btn, padding: '2px 8px', color: '#C0392B' }}>Eliminar</button>}
                   </div>
                 ))}
@@ -1946,7 +1946,7 @@ function TabPrograma({ torre, etapas, hijos, progMap, arr, hoy, puedeEditar, fil
           {etapas.map(e => <option key={e.nombre} value={e.nombre}>{e.nombre}</option>)}
         </select>
         {puedeEditar && <button onClick={() => setNueva({ padre: null, etapa: filtroEtapa || '' })} style={{ ...btn, background: '#1a1a2e', color: '#fff', border: 'none' }}>+ Partida</button>}
-        <span style={{ fontSize: 11, color: '#888' }}>Cada cuadro es un día (L a D). {puedeEditar ? 'Clic para programar o quitar un día, o 📅 para programar un rango.' : ''} Las partidas con subpartidas muestran el conjunto de sus hijas.</span>
+        <span style={{ fontSize: 11, color: '#888' }}>Cada cuadro es un día (L a D). {puedeEditar ? 'Clic para programar o quitar un día, o el botón Fechas para programar un rango.' : ''} Las partidas con subpartidas muestran el conjunto de sus hijas.</span>
       </div>
       <div style={{ overflow: 'auto', maxHeight: '70vh', border: '0.5px solid #e0e0e0', borderRadius: 12, background: '#fff' }}>
         <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
@@ -1977,7 +1977,7 @@ function TabPrograma({ torre, etapas, hijos, progMap, arr, hoy, puedeEditar, fil
                           {!hoja ? <span onClick={() => alternarCierre(p.id)} style={{ cursor: 'pointer', fontSize: 9, display: 'inline-block', width: 10, transform: cerrados.has(p.id) ? 'none' : 'rotate(90deg)' }}>▶</span> : <span style={{ width: 10 }} />}
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }} title={p.descripcion}>{hoja && p.terminada_en ? '✓ ' : ''}{p.descripcion}</span>
                           {puedeEditar && <button onClick={() => setNueva({ padre: p, etapa: p.etapa })} title="Agregar subpartida" style={{ ...btn, padding: '0 6px', fontSize: 10, marginLeft: 4 }}>+</button>}
-                          {puedeEditar && hoja && <button onClick={() => setRango(p)} title="Programar un rango de días" style={{ ...btn, padding: '0 5px', fontSize: 10 }}>📅</button>}
+                          {puedeEditar && hoja && <button onClick={() => setRango(p)} title="Programar un rango de días" style={{ ...btn, padding: '0 5px', fontSize: 10 }}>Fechas</button>}
                         </span>
                       </td>
                       {semanas.map(s => (

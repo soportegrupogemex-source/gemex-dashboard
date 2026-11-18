@@ -413,9 +413,9 @@ export default function Negocios() {
                   <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: (etapa?.color || '#ccc') + '20', color: etapa?.color }}>{n.etapa}</span>
                   {n.desarrollo && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '20px', background: '#f0f0f0', color: '#555' }}>{n.desarrollo}{n.unidad_numero ? ` · ${n.unidad_numero}` : ''}</span>}
                 </div>
-                {n.contactos && <div style={{ fontSize: '12px', color: '#888' }}>👤 {n.contactos.nombres} {n.contactos.apellidos}</div>}
-                {n.fuente_medio && <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>📣 {n.fuente_medio}</div>}
-                {n.asesor_ventas && <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>👔 {n.asesor_ventas}</div>}
+                {n.contactos && <div style={{ fontSize: '12px', color: '#888' }}>{n.contactos.nombres} {n.contactos.apellidos}</div>}
+                {n.fuente_medio && <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>Fuente: {n.fuente_medio}</div>}
+                {n.asesor_ventas && <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>Asesor: {n.asesor_ventas}</div>}
               </div>
             );
           })}
@@ -454,12 +454,12 @@ export default function Negocios() {
                       onClick={() => { setNegocioDetalle(n); setShowForm(false); }}
                       style={{ background: '#fff', borderRadius: '8px', padding: '12px', marginBottom: '8px', cursor: 'grab', border: '0.5px solid #e0e0e0', boxShadow: '0 1px 4px rgba(0,0,0,0.05)', userSelect: 'none' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '4px' }}>{n.nombre}</div>
-                      {n.contactos && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>👤 {n.contactos.nombres} {n.contactos.apellidos}</div>}
-                      {n.desarrollo && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>🏢 {n.desarrollo}{n.unidad_numero ? ` · Unidad ${n.unidad_numero}` : ''}</div>}
-                      {n.fuente_medio && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>📣 {n.fuente_medio}</div>}
+                      {n.contactos && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{n.contactos.nombres} {n.contactos.apellidos}</div>}
+                      {n.desarrollo && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>{n.desarrollo}{n.unidad_numero ? ` · Unidad ${n.unidad_numero}` : ''}</div>}
+                      {n.fuente_medio && <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Fuente: {n.fuente_medio}</div>}
                       <div style={{ fontSize: '12px', fontWeight: '600', color: etapa.color }}>{fmt(n.valor)}</div>
-                      {n.fecha_cierre && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>📅 {n.fecha_cierre}</div>}
-                      {n.asesor_ventas && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>👔 {n.asesor_ventas}</div>}
+                      {n.fecha_cierre && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{n.fecha_cierre}</div>}
+                      {n.asesor_ventas && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>Asesor: {n.asesor_ventas}</div>}
                     </div>
                   ))}
                 </div>

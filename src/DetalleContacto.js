@@ -24,50 +24,50 @@ const ETAPAS = [
 ];
 
 const LADAS = [
-  { code: '+52', flag: '🇲🇽', abbr: 'MX', country: 'México' },
-  { code: '+1', flag: '🇺🇸', abbr: 'US', country: 'Estados Unidos' },
-  { code: '+1CA', flag: '🇨🇦', abbr: 'CA', country: 'Canadá' },
-  { code: '+54', flag: '🇦🇷', abbr: 'AR', country: 'Argentina' },
-  { code: '+55', flag: '🇧🇷', abbr: 'BR', country: 'Brasil' },
-  { code: '+56', flag: '🇨🇱', abbr: 'CL', country: 'Chile' },
-  { code: '+57', flag: '🇨🇴', abbr: 'CO', country: 'Colombia' },
-  { code: '+51', flag: '🇵🇪', abbr: 'PE', country: 'Perú' },
-  { code: '+58', flag: '🇻🇪', abbr: 'VE', country: 'Venezuela' },
-  { code: '+502', flag: '🇬🇹', abbr: 'GT', country: 'Guatemala' },
-  { code: '+503', flag: '🇸🇻', abbr: 'SV', country: 'El Salvador' },
-  { code: '+504', flag: '🇭🇳', abbr: 'HN', country: 'Honduras' },
-  { code: '+505', flag: '🇳🇮', abbr: 'NI', country: 'Nicaragua' },
-  { code: '+506', flag: '🇨🇷', abbr: 'CR', country: 'Costa Rica' },
-  { code: '+507', flag: '🇵🇦', abbr: 'PA', country: 'Panamá' },
-  { code: '+53', flag: '🇨🇺', abbr: 'CU', country: 'Cuba' },
-  { code: '+1809', flag: '🇩🇴', abbr: 'DO', country: 'Rep. Dominicana' },
-  { code: '+598', flag: '🇺🇾', abbr: 'UY', country: 'Uruguay' },
-  { code: '+591', flag: '🇧🇴', abbr: 'BO', country: 'Bolivia' },
-  { code: '+593', flag: '🇪🇨', abbr: 'EC', country: 'Ecuador' },
-  { code: '+595', flag: '🇵🇾', abbr: 'PY', country: 'Paraguay' },
-  { code: '+34', flag: '🇪🇸', abbr: 'ES', country: 'España' },
-  { code: '+44', flag: '🇬🇧', abbr: 'GB', country: 'Reino Unido' },
-  { code: '+33', flag: '🇫🇷', abbr: 'FR', country: 'Francia' },
-  { code: '+49', flag: '🇩🇪', abbr: 'DE', country: 'Alemania' },
-  { code: '+39', flag: '🇮🇹', abbr: 'IT', country: 'Italia' },
-  { code: '+31', flag: '🇳🇱', abbr: 'NL', country: 'Países Bajos' },
-  { code: '+32', flag: '🇧🇪', abbr: 'BE', country: 'Bélgica' },
-  { code: '+41', flag: '🇨🇭', abbr: 'CH', country: 'Suiza' },
-  { code: '+43', flag: '🇦🇹', abbr: 'AT', country: 'Austria' },
-  { code: '+351', flag: '🇵🇹', abbr: 'PT', country: 'Portugal' },
-  { code: '+7', flag: '🇷🇺', abbr: 'RU', country: 'Rusia' },
-  { code: '+81', flag: '🇯🇵', abbr: 'JP', country: 'Japón' },
-  { code: '+82', flag: '🇰🇷', abbr: 'KR', country: 'Corea del Sur' },
-  { code: '+86', flag: '🇨🇳', abbr: 'CN', country: 'China' },
-  { code: '+91', flag: '🇮🇳', abbr: 'IN', country: 'India' },
-  { code: '+61', flag: '🇦🇺', abbr: 'AU', country: 'Australia' },
-  { code: '+64', flag: '🇳🇿', abbr: 'NZ', country: 'Nueva Zelanda' },
-  { code: '+27', flag: '🇿🇦', abbr: 'ZA', country: 'Sudáfrica' },
-  { code: '+20', flag: '🇪🇬', abbr: 'EG', country: 'Egipto' },
-  { code: '+971', flag: '🇦🇪', abbr: 'AE', country: 'Emiratos Árabes' },
-  { code: '+966', flag: '🇸🇦', abbr: 'SA', country: 'Arabia Saudita' },
-  { code: '+972', flag: '🇮🇱', abbr: 'IL', country: 'Israel' },
-  { code: '+90', flag: '🇹🇷', abbr: 'TR', country: 'Turquía' },
+  { code: '+52', abbr: 'MX', country: 'México' },
+  { code: '+1', abbr: 'US', country: 'Estados Unidos' },
+  { code: '+1CA', abbr: 'CA', country: 'Canadá' },
+  { code: '+54', abbr: 'AR', country: 'Argentina' },
+  { code: '+55', abbr: 'BR', country: 'Brasil' },
+  { code: '+56', abbr: 'CL', country: 'Chile' },
+  { code: '+57', abbr: 'CO', country: 'Colombia' },
+  { code: '+51', abbr: 'PE', country: 'Perú' },
+  { code: '+58', abbr: 'VE', country: 'Venezuela' },
+  { code: '+502', abbr: 'GT', country: 'Guatemala' },
+  { code: '+503', abbr: 'SV', country: 'El Salvador' },
+  { code: '+504', abbr: 'HN', country: 'Honduras' },
+  { code: '+505', abbr: 'NI', country: 'Nicaragua' },
+  { code: '+506', abbr: 'CR', country: 'Costa Rica' },
+  { code: '+507', abbr: 'PA', country: 'Panamá' },
+  { code: '+53', abbr: 'CU', country: 'Cuba' },
+  { code: '+1809', abbr: 'DO', country: 'Rep. Dominicana' },
+  { code: '+598', abbr: 'UY', country: 'Uruguay' },
+  { code: '+591', abbr: 'BO', country: 'Bolivia' },
+  { code: '+593', abbr: 'EC', country: 'Ecuador' },
+  { code: '+595', abbr: 'PY', country: 'Paraguay' },
+  { code: '+34', abbr: 'ES', country: 'España' },
+  { code: '+44', abbr: 'GB', country: 'Reino Unido' },
+  { code: '+33', abbr: 'FR', country: 'Francia' },
+  { code: '+49', abbr: 'DE', country: 'Alemania' },
+  { code: '+39', abbr: 'IT', country: 'Italia' },
+  { code: '+31', abbr: 'NL', country: 'Países Bajos' },
+  { code: '+32', abbr: 'BE', country: 'Bélgica' },
+  { code: '+41', abbr: 'CH', country: 'Suiza' },
+  { code: '+43', abbr: 'AT', country: 'Austria' },
+  { code: '+351', abbr: 'PT', country: 'Portugal' },
+  { code: '+7', abbr: 'RU', country: 'Rusia' },
+  { code: '+81', abbr: 'JP', country: 'Japón' },
+  { code: '+82', abbr: 'KR', country: 'Corea del Sur' },
+  { code: '+86', abbr: 'CN', country: 'China' },
+  { code: '+91', abbr: 'IN', country: 'India' },
+  { code: '+61', abbr: 'AU', country: 'Australia' },
+  { code: '+64', abbr: 'NZ', country: 'Nueva Zelanda' },
+  { code: '+27', abbr: 'ZA', country: 'Sudáfrica' },
+  { code: '+20', abbr: 'EG', country: 'Egipto' },
+  { code: '+971', abbr: 'AE', country: 'Emiratos Árabes' },
+  { code: '+966', abbr: 'SA', country: 'Arabia Saudita' },
+  { code: '+972', abbr: 'IL', country: 'Israel' },
+  { code: '+90', abbr: 'TR', country: 'Turquía' },
 ];
 
 function useIsMobile() {
@@ -104,7 +104,7 @@ function LadaDropdown({ value, onChange }) {
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: '20px', lineHeight: 1 }}>{selected.flag}</span>
+        <span style={{ fontSize: '20px', lineHeight: 1 }}>{selected.abbr}</span>
         <span style={{ color: '#444', fontWeight: '500' }}>{selected.abbr}</span>
         <span style={{ color: '#bbb', fontSize: '10px' }}>▾</span>
       </button>
@@ -113,7 +113,7 @@ function LadaDropdown({ value, onChange }) {
           {LADAS.map(l => (
             <button key={l.code} type="button" onClick={() => { onChange(l.code); setOpen(false); }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', border: 'none', background: l.code === value ? '#f5f5f5' : 'transparent', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-              <span style={{ fontSize: '18px' }}>{l.flag}</span>
+              <span style={{ fontSize: '18px' }}>{l.abbr}</span>
               <span style={{ fontWeight: '500', color: '#333', width: '28px' }}>{l.abbr}</span>
               <span style={{ color: '#aaa', fontSize: '12px', width: '38px' }}>{l.code === '+1CA' ? '+1' : l.code}</span>
               <span style={{ color: '#888', fontSize: '12px' }}>{l.country}</span>
@@ -229,7 +229,7 @@ function PanelActividad({
                   </div>
                   <div style={{ fontSize: '11px', color: vencida ? '#A32D2D' : '#aaa', marginTop: '6px', paddingLeft: '28px' }}>
                     {t.fecha_hora ? (
-                      <>{vencida ? '⚠️ Vencida — ' : '🔔 '}{new Date(t.fecha_hora).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
+                      <>{vencida ? 'Vencida — ' : ''}{new Date(t.fecha_hora).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</>
                     ) : fmtFechaCorta(t.created_at)}
                   </div>
                 </div>

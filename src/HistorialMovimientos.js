@@ -509,7 +509,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
         </button>
         {puedeEliminar && <button onClick={() => { handleEliminar(editando); setEditando(null); }}
           style={{ padding: '14px 18px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
-          🗑
+          Eliminar
         </button>}
       </div>
     </div>
@@ -566,7 +566,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
             Editar
           </button>}
           {puedeEliminar && <button onClick={() => handleEliminar(m.id)} style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
-            🗑
+            Eliminar
           </button>}
         </div>
       )}
@@ -585,13 +585,13 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           {puede('historial.exportar') && <button onClick={handleExportarPorProyecto}
             style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}
             title="Descarga el historial filtrado, con una hoja por proyecto">
-            ⬇ Exportar por proyecto
+            Exportar por proyecto
           </button>}
           {puede('historial.configurar_ventana') && (
             <button onClick={() => setShowConfigVentana(true)}
               style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}
               title="Configurar hasta qué hora del lunes pueden cargar/editar los Gerentes">
-              ⏱ Cierre lunes {horaCierre}
+              Cierre lunes {horaCierre}
             </button>
           )}
           <div style={{ background: '#EAF3DE', borderRadius: '8px', padding: isMobile ? '6px 10px' : '8px 16px', textAlign: 'center' }}>
@@ -608,7 +608,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       {/* FIX: aviso a los Gerentes cuando la ventana de edición está cerrada */}
       {!sinVentana && !dentroDeVentana() && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1rem' }}>
-          🔒 La ventana de carga/edición está cerrada por hoy (lunes después de las {horaCierre}). Puedes seguir viendo el historial, pero no editar ni cargar movimientos nuevos hasta el martes.
+          La ventana de carga/edición está cerrada por hoy (lunes después de las {horaCierre}). Puedes seguir viendo el historial, pero no editar ni cargar movimientos nuevos hasta el martes.
         </div>
       )}
 
@@ -643,7 +643,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
               style={{ flex: 1, padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px' }} />
             <button onClick={() => setShowFiltros(f => !f)}
               style={{ padding: '10px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-              ⚙️
+              Filtros
             </button>
           </div>
           {showFiltros && (
@@ -755,12 +755,12 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', fontSize: '12px', color: '#888' }}>
-                {m.desarrollo_nombre && <span>🏢 {m.desarrollo_nombre}</span>}
-                {estructurasPorUnidad[m.unidad_id] && <span>🏗 {estructurasPorUnidad[m.unidad_id]}</span>}
-                {m.unidad_numero && <span>📋 #{m.unidad_numero}</span>}
-                {m.vendedor && <span>👔 {m.vendedor}</span>}
+                {m.desarrollo_nombre && <span>{m.desarrollo_nombre}</span>}
+                {estructurasPorUnidad[m.unidad_id] && <span>{estructurasPorUnidad[m.unidad_id]}</span>}
+                {m.unidad_numero && <span>Unidad #{m.unidad_numero}</span>}
+                {m.vendedor && <span>Asesor: {m.vendedor}</span>}
               </div>
-              {m.fecha_apartado && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>📅 {fmtFecha(m.fecha_apartado)}</div>}
+              {m.fecha_apartado && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>{fmtFecha(m.fecha_apartado)}</div>}
             </div>
           ))}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', padding: '1rem', fontSize: '13px', color: '#666' }}>
@@ -841,7 +841,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                         </button>}
                         {puedeEliminar && <button onClick={() => handleEliminar(m.id)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>
-                          🗑
+                          Eliminar
                         </button>}
                       </div>
                     </td>

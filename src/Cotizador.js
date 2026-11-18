@@ -556,7 +556,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={handleDescargar} disabled={generando || compartiendo}
               style={{ padding: isMobile ? '12px 16px' : '8px 16px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '14px' : '13px' }}>
-              {generando ? 'Generando...' : '⬇ Descargar PDF'}
+              {generando ? 'Generando...' : 'Descargar PDF'}
             </button>
             <button onClick={handleCompartir} disabled={generando || compartiendo}
               style={{ padding: isMobile ? '12px 16px' : '8px 16px', background: '#2E7D4F', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: isMobile ? '14px' : '13px' }}>

@@ -638,7 +638,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
             (
               <button onClick={() => setShowFiltros(f => !f)}
                 style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-                ⚙️ Filtros
+                Filtros
               </button>
             )
           ) : (
@@ -665,7 +665,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
               )}
               {puede('dashboard.descargar_reporte') && <button onClick={handleDescargarPDF} disabled={generandoPDF}
                 style={{ padding: '8px 16px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                {generandoPDF ? 'Generando...' : '⬇ Descargar Reporte'}
+                {generandoPDF ? 'Generando...' : 'Descargar Reporte'}
               </button>}
             </div>
           )}
@@ -695,7 +695,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
             )}
             {puede('dashboard.descargar_reporte') && <button onClick={handleDescargarPDF} disabled={generandoPDF}
               style={{ padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
-              {generandoPDF ? 'Generando...' : '⬇ Descargar Reporte PDF'}
+              {generandoPDF ? 'Generando...' : 'Descargar Reporte PDF'}
             </button>}
           </div>
         )}

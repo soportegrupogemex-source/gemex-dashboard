@@ -214,7 +214,7 @@ export default function Construccion() {
         </select>
         <button onClick={() => setSoloEquipo(v => !v)}
           style={{ padding: '8px 12px', border: `0.5px solid ${soloEquipo ? '#B45309' : '#ddd'}`, borderRadius: '8px', fontSize: '13px', background: soloEquipo ? '#FFF4E5' : '#fff', color: soloEquipo ? '#B45309' : '#555', cursor: 'pointer', fontWeight: soloEquipo ? '600' : '400' }}>
-          ➕ Con equipo adicional ({totalEquipo})
+          Con equipo adicional ({totalEquipo})
         </button>
       </div>
 
@@ -236,7 +236,7 @@ export default function Construccion() {
                     <div style={{ fontSize: '12px', color: '#888' }}>{u.estatus}{tipoCompraPorUnidad[u.id] ? ` · ${tipoCompraPorUnidad[u.id]}` : ''}</div>
                     {equipoPorUnidad[u.id] && (
                       <div title={equipoPorUnidad[u.id].detalle || ''} style={{ marginTop: '4px', display: 'inline-block', fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309' }}>
-                        ➕ Equipo adicional{esNuevoEquipo(u.id) ? ' · NUEVO' : ''}
+                        Equipo adicional{esNuevoEquipo(u.id) ? ' · NUEVO' : ''}
                       </div>
                     )}
                   </div>
@@ -326,7 +326,7 @@ export default function Construccion() {
 
             {equipoPorUnidad[unidadAbierta.id] && (
               <div style={{ marginBottom: '16px', padding: '10px 12px', background: '#FFF4E5', border: '1px solid #B4530955', borderRadius: '8px' }}>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: '#B45309' }}>➕ Esta unidad lleva equipo adicional{esNuevoEquipo(unidadAbierta.id) ? ' (autorizado recientemente)' : ''}</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#B45309' }}>Esta unidad lleva equipo adicional{esNuevoEquipo(unidadAbierta.id) ? ' (autorizado recientemente)' : ''}</div>
                 <div style={{ fontSize: '12px', color: '#555', marginTop: '4px', whiteSpace: 'pre-wrap' }}>{equipoPorUnidad[unidadAbierta.id].detalle}</div>
                 {equipoPorUnidad[unidadAbierta.id].en && <div style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>Autorizado el {new Date(equipoPorUnidad[unidadAbierta.id].en).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}</div>}
               </div>

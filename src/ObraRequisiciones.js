@@ -202,7 +202,7 @@ function FormRequisicion({ torres, conceptos, contratos, contratistas, gastadoPo
                   {cargos.length > 1 && <button onClick={() => setCargos(cs2 => cs2.filter((_, j) => j !== i))} style={{ ...btn, padding: '0 6px', color: '#C0392B' }}>×</button>}
                 </div>
                 {c.torre_id && ks.length === 0 && cs.length === 0 && <div style={{ fontSize: 11, color: '#B45309' }}>Esta torre aún no tiene conceptos ni contratos: créalos en Programa → Presupuesto o Costos.</div>}
-                {av && <div style={{ fontSize: 11, color: '#B45309' }}>⚠ {av}. Se puede solicitar igual; quien autoriza lo verá.</div>}
+                {av && <div style={{ fontSize: 11, color: '#B45309' }}>{av}. Se puede solicitar igual; quien autoriza lo verá.</div>}
               </div>
             );
           })}
@@ -298,7 +298,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
       <EncabezadoLogo folio={req.folio} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
         <Chip e={req.estatus} /><span style={{ fontSize: 12, color: '#888' }}>{fechaCorta(req.fecha)} · solicita {(req.solicitante || '').split('@')[0]}</span>
-        <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto', fontWeight: 600 }}>⬇ Descargar PDF para imprimir</button>
+        <button onClick={pdf} disabled={!lineas} style={{ ...btn, marginLeft: 'auto', fontWeight: 600 }}>Descargar PDF para imprimir</button>
       </div>
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 12 }}>
         {dato('Proyecto', req.desarrollos?.nombre)}{dato(req.desarrollos?.estructura === 'Horizontal' ? 'Manzanas' : 'Torres', letrasTorres(cargos))}{dato('Categoría', req.categoria === 'indirectos' ? 'Indirectos' : 'Edificación')}
@@ -330,7 +330,7 @@ function DetalleRequisicion({ req, puedeAutorizar, puedePagar, miCorreo, onCerra
       {req.estatus === 'rechazada' && <div style={{ fontSize: 12, color: '#C0392B', marginTop: 8 }}><b>Rechazada por {(req.autorizada_por || '').split('@')[0]}:</b> {req.rechazo_motivo}</div>}
       {req.autorizada_por && req.estatus !== 'rechazada' && <div style={{ fontSize: 11, color: '#888', marginTop: 8 }}>Autorizada por {req.autorizada_por}</div>}
       {req.estatus === 'pagada' && (
-        <div style={{ fontSize: 12, marginTop: 6 }}>Pagada el {fechaCorta(req.fecha_pago)} por {(req.pagada_por || '').split('@')[0]}. <button onClick={verComprobante} style={{ ...btn, padding: '2px 8px', color: '#3B82F6' }}>📎 Comprobante</button></div>
+        <div style={{ fontSize: 12, marginTop: 6 }}>Pagada el {fechaCorta(req.fecha_pago)} por {(req.pagada_por || '').split('@')[0]}. <button onClick={verComprobante} style={{ ...btn, padding: '2px 8px', color: '#3B82F6' }}>Comprobante</button></div>
       )}
 
       {req.estatus === 'solicitada' && puedeAutorizar && (
@@ -436,7 +436,7 @@ export default function ObraRequisiciones() {
               {r.fiscal ? <span style={{ fontSize: 10, color: '#3B82F6', background: '#EFF6FF', padding: '2px 8px', borderRadius: 20 }}>Fiscal</span> : <span style={{ fontSize: 10, color: '#888', background: '#f3f3f5', padding: '2px 8px', borderRadius: 20 }}>No fiscal</span>}
               <b style={{ width: 110, textAlign: 'right', fontSize: 13 }}>{$(r.total)}</b>
               <Chip e={r.estatus} />
-              <button title="Descargar PDF para imprimir" onClick={(e) => { e.stopPropagation(); descargarPdfDeRequisicion(r); }} style={{ ...btn, padding: '3px 8px', fontSize: 11 }}>⬇ PDF</button>
+              <button title="Descargar PDF para imprimir" onClick={(e) => { e.stopPropagation(); descargarPdfDeRequisicion(r); }} style={{ ...btn, padding: '3px 8px', fontSize: 11 }}>PDF</button>
             </div>
           ))}
         </div>

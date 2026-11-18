@@ -215,7 +215,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
         <div style={{ marginBottom: '1.25rem' }}>
           <button onClick={() => setShowFiltros(f => !f)}
             style={{ padding: '10px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-            ⚙️ Filtros {hayFiltros ? '(activos)' : ''}
+            Filtros {hayFiltros ? '(activos)' : ''}
           </button>
           {showFiltros && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: '#f9f9f9', borderRadius: '8px', marginTop: '8px' }}>
@@ -263,7 +263,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
           {/* Calientes por unidad */}
           <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f0f0f0', fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>
-              🔥 Unidades con más engagement <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '400' }}>(agentes distintos + veces cotizada)</span>
+              Unidades con más engagement <span style={{ fontSize: '11px', color: '#aaa', fontWeight: '400' }}>(agentes distintos + veces cotizada)</span>
             </div>
             {rankingUnidades.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>Sin datos en este período</div>
@@ -287,7 +287,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
                         <button onClick={() => handleEliminarUnidad(u.unidad_id, u.unidad_numero)} disabled={eliminando === u.unidad_id}
                           title="Eliminar registros de esta unidad (limpiar prueba)"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '15px' }}>
-                          {eliminando === u.unidad_id ? '...' : '🗑'}
+                          {eliminando === u.unidad_id ? '...' : 'Eliminar'}
                         </button>
                       )}
                     </div>
@@ -323,7 +323,7 @@ export default function TendenciasProducto({ miRol, miAgente }) {
           {/* Frías */}
           <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', overflow: 'hidden', gridColumn: isMobile ? 'auto' : '1 / -1' }}>
             <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #f0f0f0', fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>
-              🧊 Unidades libres sin ninguna cotización en el período ({unidadesFrias.length})
+              Unidades libres sin ninguna cotización en el período ({unidadesFrias.length})
             </div>
             {unidadesFrias.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#aaa', fontSize: '13px' }}>

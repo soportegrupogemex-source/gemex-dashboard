@@ -407,7 +407,7 @@ const { data } = await query.limit(5000);
     if (error) {
       setMsgMasivo('Error al guardar: ' + error.message);
     } else {
-      setMsgMasivo(`✅ ${registros.length} unidades cargadas correctamente`);
+      setMsgMasivo(`${registros.length} unidades cargadas correctamente`);
       setTimeout(() => { setShowMasiva(false); cargarUnidades(); }, 1500);
     }
   };
@@ -588,8 +588,8 @@ const { data } = await query.limit(5000);
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.5rem', flexWrap: 'wrap', gap: '12px' }}>
           {msgMasivo && (
             <div style={{ padding: '10px 16px', borderRadius: '8px', fontSize: '13px',
-              background: msgMasivo.startsWith('✅') ? '#EAF3DE' : '#FCEBEB',
-              color: msgMasivo.startsWith('✅') ? '#27500A' : '#A32D2D' }}>
+              background: msgMasivo.includes('cargadas correctamente') ? '#EAF3DE' : '#FCEBEB',
+              color: msgMasivo.includes('cargadas correctamente') ? '#27500A' : '#A32D2D' }}>
               {msgMasivo}
             </div>
           )}
@@ -622,7 +622,7 @@ const { data } = await query.limit(5000);
           )}
           {!isMobile && puedeCargaMasiva && puedeCrearUnidades && (
             <button onClick={handleAbrirMasiva} style={btnOutline}>
-              ⬆ Carga masiva
+              Carga masiva
             </button>
           )}
           {/* FIX: candado de rol — antes este botón era visible y funcional
@@ -676,7 +676,7 @@ const { data } = await query.limit(5000);
               style={{ flex: 1, padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px' }} />
             <button onClick={() => setShowFiltros(f => !f)}
               style={{ padding: '10px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-              ⚙️
+              Filtros
             </button>
           </div>
           {!seleccionModoMobile && (
@@ -754,10 +754,10 @@ const { data } = await query.limit(5000);
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#888' }}>
-                  {u.m2_total > 0 && <span>📐 {u.m2_total} m²</span>}
-                  {u.recamaras && <span>🛏 {u.recamaras}</span>}
-                  {u.banos && <span>🚿 {u.banos}</span>}
-                  {u.estacionamiento && <span>🚗 {u.estacionamiento}</span>}
+                  {u.m2_total > 0 && <span>{u.m2_total} m²</span>}
+                  {u.recamaras && <span>Rec. {u.recamaras}</span>}
+                  {u.banos && <span>Baños {u.banos}</span>}
+                  {u.estacionamiento && <span>Est. {u.estacionamiento}</span>}
                 </div>
               </div>
             );
@@ -885,7 +885,7 @@ const { data } = await query.limit(5000);
                           style={{ cursor: puedeCambiarPrecio ? 'pointer' : 'default', padding: '2px 6px', borderRadius: '4px', display: 'inline-block' }}
                           title={puedeCambiarPrecio ? 'Click para editar precio' : ''}>
                           {fmt(u.precio_lista)}
-                          {puedeCambiarPrecio && <span style={{ marginLeft: '4px', fontSize: '11px', color: '#bbb' }}>✏️</span>}
+                          {puedeCambiarPrecio && <span style={{ marginLeft: '4px', fontSize: '11px', color: '#bbb' }}></span>}
                         </span>
                       )}
                     </td>
@@ -915,9 +915,9 @@ const { data } = await query.limit(5000);
                     </td>
                     <td style={{ padding: '12px 14px', color: '#888', whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
-                        {u.recamaras && <span>🛏 {u.recamaras}</span>}
-                        {u.banos && <span>🚿 {u.banos}</span>}
-                        {u.estacionamiento && <span>🚗 {u.estacionamiento}</span>}
+                        {u.recamaras && <span>Rec. {u.recamaras}</span>}
+                        {u.banos && <span>Baños {u.banos}</span>}
+                        {u.estacionamiento && <span>Est. {u.estacionamiento}</span>}
                       </div>
                     </td>
                     {planes.map(plan => {
@@ -968,11 +968,11 @@ const { data } = await query.limit(5000);
                             <div style={{ position: 'absolute', right: 0, top: '36px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 1000, minWidth: '130px' }}>
                               {puedeEditarUnidades && <button onClick={() => handleEditar(u)}
                                 style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', textAlign: 'left', color: '#333' }}>
-                                ✏️ Editar
+                                Editar
                               </button>}
                               {puedeEliminarUnidades && <button onClick={() => handleEliminar(u.id)}
                                 style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', textAlign: 'left', color: '#e53935' }}>
-                                🗑 Eliminar
+                                Eliminar
                               </button>}
                             </div>
                           )}
@@ -1101,7 +1101,7 @@ const { data } = await query.limit(5000);
                 </button>}
                 {puedeEliminarUnidades && <button onClick={() => handleEliminar(unidadDetalle.id)}
                   style={{ padding: '12px 16px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' }}>
-                  🗑
+                  Eliminar
                 </button>}
               </>
             )}

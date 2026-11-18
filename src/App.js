@@ -264,9 +264,9 @@ function Dashboard() {
   const COLORES_RANKING = ['#10B981','#3B82F6','#F59E0B','#8B5CF6','#EF4444','#EC4899','#14B8A6','#F97316'];
 
   const medallaIcon = (i) => {
-    if (i === 0) return '🥇';
-    if (i === 1) return '🥈';
-    if (i === 2) return '🥉';
+    if (i === 0) return '1°';
+    if (i === 1) return '2°';
+    if (i === 2) return '3°';
     return `${i + 1}°`;
   };
 
@@ -303,7 +303,7 @@ function Dashboard() {
             <div style={{ display: 'flex', gap: '12px', marginBottom: '1.5rem', alignItems: 'flex-end' }}>
               {ranking[1] ? (
                 <div style={{ flex: 1, background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', borderTop: '3px solid #C0C0C0' }}>
-                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>🥈</div>
+                  <div style={{ fontSize: '28px', marginBottom: '8px', fontWeight: 700, color: '#888' }}>2°</div>
                   <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e0e0e0', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontWeight: '700', color: '#666', fontSize: '13px' }}>{ranking[1].codigo}</span>
                   </div>
@@ -314,7 +314,7 @@ function Dashboard() {
               ) : <div style={{ flex: 1 }} />}
 
               <div style={{ flex: 1, background: '#1a1a2e', borderRadius: '12px', padding: '2rem', textAlign: 'center', borderTop: '3px solid #FFD700', transform: 'scale(1.05)', boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-                <div style={{ fontSize: '36px', marginBottom: '8px' }}>🥇</div>
+                <div style={{ fontSize: '36px', marginBottom: '8px', fontWeight: 700, color: '#FFD700' }}>1°</div>
                 <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#333', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontWeight: '700', color: '#fff', fontSize: '14px' }}>{ranking[0].codigo}</span>
                 </div>
@@ -325,7 +325,7 @@ function Dashboard() {
 
               {ranking[2] ? (
                 <div style={{ flex: 1, background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '1.5rem', textAlign: 'center', borderTop: '3px solid #CD7F32' }}>
-                  <div style={{ fontSize: '28px', marginBottom: '8px' }}>🥉</div>
+                  <div style={{ fontSize: '28px', marginBottom: '8px', fontWeight: 700, color: '#CD7F32' }}>3°</div>
                   <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#e0e0e0', margin: '0 auto 12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontWeight: '700', color: '#666', fontSize: '13px' }}>{ranking[2].codigo}</span>
                   </div>

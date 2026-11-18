@@ -112,7 +112,7 @@ export default function PanelPermisos({ miAgente }) {
           <span style={{ position: 'absolute', top: '2px', left: on ? '17px' : '2px', width: '15px', height: '15px', borderRadius: '50%', background: '#fff', transition: 'left 0.15s' }} />
         </button>
         <span style={{ fontSize: '9px', height: '10px', color: alerta ? '#B45309' : '#C0203A' }} title={alerta ? 'Este rol no tenía esta sección por defecto: verá los datos tal como la sección los muestra (puede ser toda la empresa).' : 'Distinto al valor de fábrica'}>
-          {alerta ? '⚠' : cambiado ? '●' : ''}
+          {alerta ? '!' : cambiado ? '●' : ''}
         </span>
       </div>
     );
@@ -158,8 +158,8 @@ export default function PanelPermisos({ miAgente }) {
       </div>
       <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', fontSize: '12px', color: '#555', marginBottom: '8px' }}>
         <span><span style={{ color: '#C0203A' }}>●</span> Distinto al valor de fábrica</span>
-        <span><span style={{ color: '#B45309' }}>⚠</span> Sección que ese rol no tenía: verá los datos como esa sección los muestra</span>
-        <span>🔄 Los cambios se aplican cuando la persona recarga o vuelve a entrar</span>
+        <span><span style={{ color: '#B45309', fontWeight: 700 }}>!</span> Sección que ese rol no tenía: verá los datos como esa sección los muestra</span>
+        <span>Los cambios se aplican cuando la persona recarga o vuelve a entrar</span>
       </div>
       <details style={{ marginBottom: '1rem', fontSize: '12px', color: '#666' }}>
         <summary style={{ cursor: 'pointer', color: '#3B82F6', fontWeight: '500' }}>Ver notas importantes</summary>

@@ -19,8 +19,8 @@ export default function PushNotificaciones({ miAgente }) {
     setCargando(true); setMsg('');
     const res = await activarNotificaciones(supabase, miAgente?.correo);
     setCargando(false);
-    if (res.ok) { setSuscrito(true); setMsg('✅ Notificaciones activadas en este dispositivo'); }
-    else setMsg('❌ ' + res.error);
+    if (res.ok) { setSuscrito(true); setMsg('Notificaciones activadas en este dispositivo'); }
+    else setMsg('Error: ' + res.error);
   };
 
   const handleDesactivar = async () => {
@@ -45,7 +45,7 @@ export default function PushNotificaciones({ miAgente }) {
           {cargando ? 'Un momento...' : suscrito ? 'Desactivar en este dispositivo' : 'Activar notificaciones'}
         </button>
       )}
-      {msg && <div style={{ fontSize: '12px', marginTop: '10px', color: msg.startsWith('❌') ? '#A32D2D' : '#27500A' }}>{msg}</div>}
+      {msg && <div style={{ fontSize: '12px', marginTop: '10px', color: msg.startsWith('Error') ? '#A32D2D' : '#27500A' }}>{msg}</div>}
     </div>
   );
 }

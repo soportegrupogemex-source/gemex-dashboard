@@ -447,7 +447,7 @@ export default function Titulacion({ miRol, miAgente }) {
                   <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id] || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  {esPorLiberar(u.id) && <span title="Contado enviado a Titulación. Se pueden cargar documentos; no se cierra como Escriturado hasta que se libere." style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '700' }}>⏳ Por liberar</span>}
+                  {esPorLiberar(u.id) && <span title="Contado enviado a Titulación. Se pueden cargar documentos; no se cierra como Escriturado hasta que se libere." style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '700' }}>Por liberar</span>}
                   {liquidacionesCobranza[u.id] && <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#3B6D11', fontWeight: '700' }}>✓ Unidad cotejada</span>}
                   {tiposCompra[u.id] && <span style={{ fontSize: '13px', padding: '4px 12px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '600' }}>{tiposCompra[u.id]}</span>}
                   <div style={{ fontSize: '11px', color: '#888' }}>Paso 2: {hechos}/{totalItems}</div>
@@ -497,11 +497,11 @@ export default function Titulacion({ miRol, miAgente }) {
               {form.avaluo_path && (
                 <button type="button" onClick={() => verArchivoTramite(form.avaluo_path)}
                   style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                  📄 Ver avalúo
+                  Ver avalúo
                 </button>
               )}
               {puedeArchivos && <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                {subiendoTramite === 'avaluo_path' ? 'Subiendo...' : (form.avaluo_path ? 'Reemplazar avalúo' : '📎 Cargar avalúo')}
+                {subiendoTramite === 'avaluo_path' ? 'Subiendo...' : (form.avaluo_path ? 'Reemplazar avalúo' : 'Cargar avalúo')}
                 <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === 'avaluo_path'}
                   onChange={e => handleSubirTramite('avaluo_path', e.target.files[0])} />
               </label>}
@@ -544,11 +544,11 @@ export default function Titulacion({ miRol, miAgente }) {
                     {puedeVerLiquidacion && <>
                       <button type="button" onClick={() => verLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id])}
                         style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                        📄 Ver liquidación final
+                        Ver liquidación final
                       </button>
                       <button type="button" onClick={() => descargarLiquidacionFinal(liquidacionesCobranza[unidadAbierta.id], unidadAbierta)}
                         style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                        ⬇ Descargar
+                        Descargar
                       </button>
                     </>}
                   </>
@@ -558,11 +558,11 @@ export default function Titulacion({ miRol, miAgente }) {
                     {puedeVerLiquidacion && <>
                       <button type="button" disabled={generandoEstado} onClick={() => generarEstadoDeCuenta(unidadAbierta, 'ver')}
                         style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                        📄 {generandoEstado ? 'Generando...' : 'Ver estado de cuenta'}
+                        {generandoEstado ? 'Generando...' : 'Ver estado de cuenta'}
                       </button>
                       <button type="button" disabled={generandoEstado} onClick={() => generarEstadoDeCuenta(unidadAbierta, 'descargar')}
                         style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                        ⬇ Descargar
+                        Descargar
                       </button>
                     </>}
                   </>
@@ -570,12 +570,12 @@ export default function Titulacion({ miRol, miAgente }) {
                 {p.campoPath && (form[p.campoPath] ? (
                   <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
                     style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                    📄 Ver archivo
+                    Ver archivo
                   </button>
                 ) : null)}
                 {p.campoPath && puedeArchivos && (
                   <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                    {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
+                    {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : 'Cargar archivo')}
                     <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
                       onChange={e => handleSubirTramite(p.campoPath, e.target.files[0])} />
                   </label>
@@ -593,12 +593,12 @@ export default function Titulacion({ miRol, miAgente }) {
                 {form[p.campoPath] ? (
                   <button type="button" onClick={() => verArchivoTramite(form[p.campoPath])}
                     style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                    📄 Ver archivo
+                    Ver archivo
                   </button>
                 ) : null}
                 {puedeArchivos && (
                 <label style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                  {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : '📎 Cargar archivo')}
+                  {subiendoTramite === p.campoPath ? 'Subiendo...' : (form[p.campoPath] ? 'Reemplazar archivo' : 'Cargar archivo')}
                   <input type="file" style={{ display: 'none' }} disabled={subiendoTramite === p.campoPath}
                     onChange={e => handleSubirTramite(p.campoPath, e.target.files[0])} />
                 </label>

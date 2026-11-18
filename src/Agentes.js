@@ -507,7 +507,7 @@ export default function Agentes() {
 
     setImportando(false);
     if (!pausarRef.current) {
-      setMsgImport(`✅ Importación terminada: ${exitosos} creados, ${saltados} ya existían, ${errores} con error`);
+      setMsgImport(`Importación terminada: ${exitosos} creados, ${saltados} ya existían, ${errores} con error`);
       cargarAgentes(); cargarInmobiliarias();
     }
   };
@@ -562,7 +562,7 @@ export default function Agentes() {
     );
     if (dias <= 7) return (
       <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#FFF3CD', color: '#856404', fontWeight: '500' }}>
-        ⚠️ {dias}d
+        {dias}d
       </span>
     );
     return (
@@ -642,13 +642,13 @@ export default function Agentes() {
           {puede('agentes.configurar_inactividad') && (
             <button onClick={() => setShowConfigInactividad(true)}
               style={{ ...btnOutline, fontSize: isMobile ? '12px' : '13px' }}>
-              ⏱ {diasInactividad}d inactividad
+              {diasInactividad}d inactividad
             </button>
           )}
           {puede('agentes.importar') && !isMobile && (
             <button onClick={() => { setShowImportModal(true); setFilasImport([]); setNombreArchivoImport(''); setErroresImport([]); setMsgImport(''); setProgresoImport({ procesados: 0, total: 0, exitosos: 0, errores: 0, saltados: 0 }); }}
               style={{ ...btnOutline, fontSize: '13px' }}>
-              ⬆ Importar agentes
+              Importar agentes
             </button>
           )}
           {puedeCrear && (
@@ -701,13 +701,13 @@ export default function Agentes() {
 
             {filasImport.length === 0 ? (
               <label style={{ display: 'block', padding: '24px', border: '2px dashed #ddd', borderRadius: '10px', textAlign: 'center', cursor: 'pointer', color: '#888', fontSize: '13px' }}>
-                📄 Haz click para elegir el archivo Excel
+                Haz click para elegir el archivo Excel
                 <input ref={importInputRef} type='file' accept='.xlsx,.xls' onChange={handleArchivoImport} style={{ display: 'none' }} />
               </label>
             ) : (
               <>
                 <div style={{ padding: '10px 14px', background: '#f9f9f9', borderRadius: '8px', fontSize: '13px', marginBottom: '14px' }}>
-                  📄 <strong>{nombreArchivoImport}</strong> — {filasImport.length} agentes detectados (ya deduplicados por correo)
+                  <strong>{nombreArchivoImport}</strong> — {filasImport.length} agentes detectados (ya deduplicados por correo)
                 </div>
 
                 {(importando || progresoImport.procesados > 0) && (
@@ -718,7 +718,7 @@ export default function Agentes() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', flexWrap: 'wrap', gap: '6px' }}>
                       <span>{progresoImport.procesados} / {progresoImport.total}</span>
                       <span style={{ color: '#27500A' }}>✓ {progresoImport.exitosos} creados</span>
-                      <span style={{ color: '#7A5900' }}>⏭ {progresoImport.saltados} ya existían</span>
+                      <span style={{ color: '#7A5900' }}>{progresoImport.saltados} ya existían</span>
                       <span style={{ color: '#A32D2D' }}>✕ {progresoImport.errores} errores</span>
                     </div>
                   </div>
@@ -730,7 +730,7 @@ export default function Agentes() {
 
                 {erroresImport.length > 0 && (
                   <button onClick={handleDescargarErrores} style={{ ...btnOutline, width: '100%', marginBottom: '14px', fontSize: '13px' }}>
-                    ⬇ Descargar reporte de errores ({erroresImport.length})
+                    Descargar reporte de errores ({erroresImport.length})
                   </button>
                 )}
 
@@ -743,7 +743,7 @@ export default function Agentes() {
                   )}
                   {importando && (
                     <button onClick={handlePausar} style={{ ...btnOutline, flex: 1, padding: '12px' }}>
-                      ⏸ Pausar
+                      Pausar
                     </button>
                   )}
                   {!importando && (
@@ -807,7 +807,7 @@ export default function Agentes() {
                       ) : (
                         <button onClick={() => { setEditandoInmoId(inm.id); setNombreInmoEditado(inm.nombre); }}
                           style={{ padding: '5px 10px', background: '#fff', color: '#C0203A', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', flexShrink: 0 }}>
-                          ✏️ Editar
+                          Editar
                         </button>
                       )}
                     </div>
@@ -832,8 +832,8 @@ export default function Agentes() {
               <div style={{ fontSize: '12px', color: '#888', marginTop: '1px' }}>{miAgente.rol_personalizado || miAgente.rol} · {miAgente.equipo}</div>
               {!isMobile && (
                 <div style={{ display: 'flex', gap: '16px', marginTop: '4px', fontSize: '12px', color: '#888' }}>
-                  {miAgente.correo && <span>✉ {miAgente.correo}</span>}
-                  {miAgente.telefono && <span>📞 {miAgente.telefono}</span>}
+                  {miAgente.correo && <span>{miAgente.correo}</span>}
+                  {miAgente.telefono && <span>Tel. {miAgente.telefono}</span>}
                 </div>
               )}
             </div>
@@ -915,7 +915,7 @@ export default function Agentes() {
           </div>
           <button onClick={() => { setShowGestionInmobiliarias(true); setBuscarGestionInmo(''); }}
             style={{ ...btnOutline, fontSize: '13px' }}>
-            ⚙️ Gestionar inmobiliarias
+            Gestionar inmobiliarias
           </button>
         </div>
       )}
@@ -1179,10 +1179,10 @@ export default function Agentes() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '1.25rem 1.5rem' }}>
             <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {form.foto_url ? <img src={form.foto_url} alt="foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '24px', color: '#bbb' }}>👤</span>}
+                {form.foto_url ? <img src={form.foto_url} alt="foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: '24px', color: '#bbb' }}></span>}
               </div>
               <label style={{ ...btnOutline, cursor: 'pointer', fontSize: '13px', padding: '10px 16px' }}>
-                {subiendoFoto ? 'Subiendo...' : '📷 Subir foto'}
+                {subiendoFoto ? 'Subiendo...' : 'Subir foto'}
                 <input type='file' accept='image/*' onChange={handleSubirFoto} style={{ display: 'none' }} />
               </label>
             </div>
@@ -1277,7 +1277,7 @@ export default function Agentes() {
               </div>
               {form.desarrollos_todos && (
                 <div style={{ fontSize: '11px', color: '#27500A', background: '#EAF3DE', padding: '6px 10px', borderRadius: '6px', marginBottom: '8px' }}>
-                  🔄 Los desarrollos nuevos que crees se le agregan automáticamente — se apaga solo si quitas alguno a mano.
+                  Los desarrollos nuevos que crees se le agregan automáticamente — se apaga solo si quitas alguno a mano.
                 </div>
               )}
               {desarrollos.length === 0 ? (

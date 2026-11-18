@@ -167,7 +167,7 @@ export default function Comisiones({ miRol, miAgente }) {
         <span style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {archivos.map((a, i) => (
             <button key={i} onClick={() => verArchivo(a)} style={{ border: 'none', background: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: '12px', padding: 0 }}>
-              📄 {archivos.length > 1 ? `Ver ${i + 1}` : 'Ver'}
+              {archivos.length > 1 ? `Ver ${i + 1}` : 'Ver'}
             </button>
           ))}
         </span>

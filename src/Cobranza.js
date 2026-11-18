@@ -605,7 +605,7 @@ export default function Cobranza({ miRol, miAgente }) {
               </div>
               {puedeDescargarLiquidacion && <button onClick={descargarPDF}
                 style={{ width: '100%', padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                ⬇ Descargar liquidación final (PDF)
+                Descargar liquidación final (PDF)
               </button>}
             </div>
           </div>

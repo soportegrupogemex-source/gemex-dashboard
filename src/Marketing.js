@@ -182,14 +182,14 @@ function LeadsTab({ miAgente, esAdmin, esGerente, misDesarrollos, desarrollos, a
                 <div style={{ minWidth: '220px' }}>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{`${l.nombres || ''} ${l.apellidos || ''}`.trim() || 'Sin nombre'}</div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
-                    {l.telefono && <a href={`tel:${tel}`} style={{ color: '#3B82F6', textDecoration: 'none', marginRight: '10px' }}>📞 {l.telefono}</a>}
+                    {l.telefono && <a href={`tel:${tel}`} style={{ color: '#3B82F6', textDecoration: 'none', marginRight: '10px' }}>Tel. {l.telefono}</a>}
                     {tel && <a href={`https://wa.me/52${tel.slice(-10)}`} target="_blank" rel="noreferrer" style={{ color: '#2E7D4F', textDecoration: 'none', marginRight: '10px' }}>WhatsApp</a>}
                     {l.correo && <span>{l.correo}</span>}
                   </div>
                   <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>
                     {[l.desarrollo_nombre, l.formulario, l.campana].filter(Boolean).join(' · ') || '—'} · {hace(l.created_at)}
                   </div>
-                  {l.error_proceso && <div style={{ fontSize: '11px', color: '#C0392B', marginTop: '2px' }}>⚠ {l.error_proceso}</div>}
+                  {l.error_proceso && <div style={{ fontSize: '11px', color: '#C0392B', marginTop: '2px' }}>{l.error_proceso}</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <div style={{ fontSize: '12px', color: '#555', textAlign: 'right' }}>

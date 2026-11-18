@@ -210,12 +210,12 @@ export default function Movimientos() {
     // FIX: los Gerentes no pueden cargar movimientos fuera de la ventana
     // martes-a-lunes (hasta la hora configurada por Super Admin)
     if (ventanaCerrada) {
-      setMsg(`🔒 La ventana de carga está cerrada por hoy (lunes después de las ${horaCierre}). Podrás cargar de nuevo el martes.`);
+      setMsg(`La ventana de carga está cerrada por hoy (lunes después de las ${horaCierre}). Podrás cargar de nuevo el martes.`);
       return;
     }
-    if (!contactoSel) { setMsg('❌ Debes seleccionar un contacto registrado'); return; }
-    if (!form.desarrollo_id) { setMsg('❌ Selecciona un desarrollo'); return; }
-    if (!form.unidad_id) { setMsg('❌ Selecciona una unidad'); return; }
+    if (!contactoSel) { setMsg('Debes seleccionar un contacto registrado'); return; }
+    if (!form.desarrollo_id) { setMsg('Selecciona un desarrollo'); return; }
+    if (!form.unidad_id) { setMsg('Selecciona una unidad'); return; }
 
     setGuardando(true);
     setMsg('');
@@ -228,7 +228,7 @@ export default function Movimientos() {
       const { data: existentes } = await supabase.from('movimientos').select('id, tipo, contacto_nombre').eq('unidad_id', form.unidad_id).neq('tipo', 'Cancelación');
       if (existentes && existentes.length > 0) {
         const e = existentes[0];
-        setMsg(`❌ La unidad ${form.unidad_numero} ya tiene un registro activo (${e.tipo} — ${e.contacto_nombre}).`);
+        setMsg(`La unidad ${form.unidad_numero} ya tiene un registro activo (${e.tipo} — ${e.contacto_nombre}).`);
         setGuardando(false);
         return;
       }
@@ -261,9 +261,9 @@ export default function Movimientos() {
 
     setGuardando(false);
     if (error) {
-      setMsg('❌ Error al registrar el movimiento');
+      setMsg('Error al registrar el movimiento');
     } else {
-      setMsg('✅ Movimiento registrado correctamente');
+      setMsg('Movimiento registrado correctamente');
       setContactoSel(null); setBuscarContacto(''); setEstructuraSel('');
       setForm({
         desarrollo_id: '', desarrollo_nombre: '', unidad_id: '', unidad_numero: '',
@@ -321,7 +321,7 @@ export default function Movimientos() {
       {/* FIX: aviso a los Gerentes cuando la ventana de carga está cerrada */}
       {ventanaCerrada && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
-          🔒 La ventana de carga está cerrada por hoy (lunes después de las {horaCierre}). Podrás volver a cargar movimientos el martes.
+          La ventana de carga está cerrada por hoy (lunes después de las {horaCierre}). Podrás volver a cargar movimientos el martes.
         </div>
       )}
 
@@ -529,15 +529,15 @@ export default function Movimientos() {
 
         {msg && (
           <div style={{ marginBottom: '16px', padding: '12px 14px', borderRadius: '8px', fontSize: '13px',
-            background: msg.startsWith('✅') ? '#EAF3DE' : msg.startsWith('🔒') ? '#FFF8E1' : '#FCEBEB',
-            color: msg.startsWith('✅') ? '#27500A' : msg.startsWith('🔒') ? '#856404' : '#A32D2D' }}>
+            background: msg.startsWith('Movimiento registrado') ? '#EAF3DE' : msg.startsWith('La ventana') ? '#FFF8E1' : '#FCEBEB',
+            color: msg.startsWith('Movimiento registrado') ? '#27500A' : msg.startsWith('La ventana') ? '#856404' : '#A32D2D' }}>
             {msg}
           </div>
         )}
 
         <button onClick={handleGuardar} disabled={guardando || ventanaCerrada}
           style={{ width: '100%', padding: isMobile ? '16px' : '12px', background: ventanaCerrada ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: isMobile ? '16px' : '14px', fontWeight: '600', cursor: ventanaCerrada ? 'not-allowed' : 'pointer' }}>
-          {guardando ? 'Registrando...' : ventanaCerrada ? '🔒 Ventana cerrada' : `Registrar ${tipo}`}
+          {guardando ? 'Registrando...' : ventanaCerrada ? 'Ventana cerrada' : `Registrar ${tipo}`}
         </button>
       </div>
     </div>

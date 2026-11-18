@@ -433,9 +433,9 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       ocupacion_clave: formBP.ocupacion_clave || null, ocupacion_texto: formBP.ocupacion_texto || null, ocupacion_categoria: formBP.ocupacion_categoria || null,
     }).eq('id', movSel.contacto_id).select('id, genero, estado_civil, edad, ocupacion_clave, ocupacion_texto, ocupacion_categoria').single();
     setGuardandoBP(false);
-    if (error) { setMsgBP('❌ Error al guardar: ' + error.message); return; }
+    if (error) { setMsgBP('Error al guardar: ' + error.message); return; }
     setContactoBuyerPersona(data);
-    setMsgBP('✅ Guardado correctamente');
+    setMsgBP('Guardado correctamente');
     setTimeout(() => setMsgBP(''), 3000);
   };
 
@@ -451,10 +451,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       genero: null, estado_civil: null, edad: null, ocupacion_clave: null, ocupacion_texto: null, ocupacion_categoria: null,
     }).eq('id', movSel.contacto_id).select('id, genero, estado_civil, edad, ocupacion_clave, ocupacion_texto, ocupacion_categoria').single();
     setGuardandoBP(false);
-    if (error) { setMsgBP('❌ Error al borrar: ' + error.message); return; }
+    if (error) { setMsgBP('Error al borrar: ' + error.message); return; }
     setContactoBuyerPersona(data);
     setFormBP({ genero: '', estado_civil: '', edad: '', ocupacion_clave: null, ocupacion_texto: '', ocupacion_categoria: '' });
-    setMsgBP('✅ Datos borrados');
+    setMsgBP('Datos borrados');
     setTimeout(() => setMsgBP(''), 3000);
   };
 
@@ -487,10 +487,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       coacreditado_nombre: formCoacreditado.coacreditado_nombre || null,
     }).eq('id', movSel.id).select().single();
     setGuardandoExtra(false);
-    if (error) { setMsgExtra('❌ Error al guardar: ' + error.message); return; }
+    if (error) { setMsgExtra('Error al guardar: ' + error.message); return; }
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
-    setMsgExtra('✅ Guardado correctamente');
+    setMsgExtra('Guardado correctamente');
     setTimeout(() => setMsgExtra(''), 3000);
   };
 
@@ -504,10 +504,10 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       referencia2_nombre: formReferencias.referencia2_nombre || null, referencia2_telefono: formReferencias.referencia2_telefono || null,
     }).eq('id', movSel.id).select().single();
     setGuardandoExtra(false);
-    if (error) { setMsgExtra('❌ Error al guardar: ' + error.message); return; }
+    if (error) { setMsgExtra('Error al guardar: ' + error.message); return; }
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
-    setMsgExtra('✅ Guardado correctamente');
+    setMsgExtra('Guardado correctamente');
     setTimeout(() => setMsgExtra(''), 3000);
   };
 
@@ -520,11 +520,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     const texto = formObservaciones.trim();
     const { data, error } = await supabase.from('movimientos').update({ observaciones_expediente: texto || null }).eq('id', movSel.id).select().single();
     setGuardandoObs(false);
-    if (error) { setMsgObs('❌ Error al guardar: ' + error.message); return; }
+    if (error) { setMsgObs('Error al guardar: ' + error.message); return; }
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
     setFormObservaciones(data.observaciones_expediente || '');
-    setMsgObs('✅ Guardado correctamente');
+    setMsgObs('Guardado correctamente');
     setTimeout(() => setMsgObs(''), 3000);
   };
 
@@ -1062,7 +1062,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {archivosMultiples.map((a, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#888' }}>
-                        <span>📄 {a.nombre}</span>
+                        <span>{a.nombre}</span>
                         <button onClick={() => handleVerDocumento(a.path)} style={{ background: 'none', border: 'none', color: '#C0203A', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px', padding: 0 }}>Ver</button>
                         {puedeSubirEste && (
                           <button onClick={() => handleQuitarArchivoComprobante(movSel.id, tipo.id, i)} style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer', fontSize: '11px', padding: 0 }}>✕ Quitar</button>
@@ -1072,7 +1072,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   </div>
                 )
               ) : (
-                doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>📄 {doc.nombre_archivo}</div>
+                doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{doc.nombre_archivo}</div>
               )}
 
               {doc?.no_aplica && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Marcado como "No aplica"</div>}
@@ -1092,7 +1092,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
               {!tipo.multiple && doc?.archivo_path && (
                 <button onClick={() => handleVerDocumento(doc.archivo_path)}
                   style={{ padding: '6px 12px', background: '#f5f5f5', color: '#333', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                  👁 Ver
+                  Ver
                 </button>
               )}
               {puedeSubirEste && (!tipo.multiple || archivosMultiples.length < (tipo.maxArchivos || 10)) && (
@@ -1142,13 +1142,13 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             {puede('expedientes.descargar_zip') && (!esGerente || esDeMiProyecto(movSel)) && (
               <button onClick={() => handleDescargarZip(movSel)} disabled={generandoZip === movSel.id}
                 style={{ padding: '8px 16px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                {generandoZip === movSel.id ? 'Generando ZIP...' : '⬇ Descargar todo (ZIP)'}
+                {generandoZip === movSel.id ? 'Generando ZIP...' : 'Descargar todo (ZIP)'}
               </button>
             )}
             {puedoArchivar && !archivado && tab === 'descargar' && (
               <button onClick={() => handleArchivar(movSel)} disabled={archivandoId === movSel.id}
                 style={{ padding: '8px 16px', background: '#FFF8E1', color: '#856404', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                {archivandoId === movSel.id ? 'Archivando...' : '📦 Archivar (ya respaldado)'}
+                {archivandoId === movSel.id ? 'Archivando...' : 'Archivar (ya respaldado)'}
               </button>
             )}
           </div>
@@ -1162,7 +1162,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
 
         {archivado && (
           <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.5rem' }}>
-            📦 Este expediente ya fue archivado y respaldado fuera de Supabase.
+            Este expediente ya fue archivado y respaldado fuera de Supabase.
           </div>
         )}
 
@@ -1172,7 +1172,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
             no ocupa espacio. */}
         {((esMio && !archivado) || movSel.observaciones_expediente) && (
           <div style={{ background: movSel.observaciones_expediente ? '#FFF8E1' : '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px', marginBottom: '1.5rem' }}>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>💬 Observaciones</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '6px' }}>Observaciones</div>
             <textarea rows={3} placeholder={esMio && !archivado ? 'Si este expediente tiene alguna observación, escríbela aquí (Mesa de Control y Titulación la verán)' : ''}
               disabled={!esMio || archivado} value={formObservaciones}
               onChange={e => setFormObservaciones(e.target.value)}
@@ -1183,7 +1183,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   style={{ padding: '8px 18px', background: (guardandoObs || formObservaciones.trim() === (movSel.observaciones_expediente || '').trim()) ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoObs ? 'default' : 'pointer' }}>
                   {guardandoObs ? 'Guardando...' : 'Guardar'}
                 </button>
-                {msgObs && <span style={{ fontSize: '12px', color: msgObs.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgObs}</span>}
+                {msgObs && <span style={{ fontSize: '12px', color: !msgObs.startsWith('Error') ? '#27500A' : '#A32D2D' }}>{msgObs}</span>}
               </div>
             )}
           </div>
@@ -1269,7 +1269,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                     style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
                     {guardandoExtra ? 'Guardando...' : 'Guardar'}
                   </button>
-                  {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
+                  {msgExtra && <span style={{ fontSize: '12px', color: !msgExtra.startsWith('Error') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
                 </div>
               )}
             </div>
@@ -1305,7 +1305,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                         style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
                         {guardandoExtra ? 'Guardando...' : 'Guardar nombre'}
                       </button>
-                      {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
+                      {msgExtra && <span style={{ fontSize: '12px', color: !msgExtra.startsWith('Error') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
                     </div>
                   )}
                 </>
@@ -1392,11 +1392,11 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                     <button onClick={handleBorrarBuyerPersona} disabled={guardandoBP}
                       title="Quita estos datos del contacto y del dashboard de Buyer Persona"
                       style={{ padding: '8px 18px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoBP ? 'default' : 'pointer' }}>
-                      🗑 Borrar datos
+                      Borrar datos
                     </button>
                   )}
                   {msgBP && (
-                    <span style={{ fontSize: '12px', color: msgBP.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgBP}</span>
+                    <span style={{ fontSize: '12px', color: !msgBP.startsWith('Error') ? '#27500A' : '#A32D2D' }}>{msgBP}</span>
                   )}
                 </div>
               )}
@@ -1414,7 +1414,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, minWidth: '200px' }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{DOC_ORDEN_CONTRATO.label}</div>
-                      {doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>📄 {doc.nombre_archivo}</div>}
+                      {doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{doc.nombre_archivo}</div>}
                       {estado && (
                         <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', padding: '2px 10px', borderRadius: '20px', background: ESTADO_COLOR[estado].bg, color: ESTADO_COLOR[estado].color, fontWeight: '500' }}>
                           {ESTADO_COLOR[estado].label}
@@ -1436,7 +1436,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                       {doc?.archivo_path && (
                         <button onClick={() => handleVerDocumento(doc.archivo_path)}
                           style={{ padding: '6px 12px', background: '#f5f5f5', color: '#333', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                          👁 Ver
+                          Ver
                         </button>
                       )}
                       {puedoSubirOrden && !archivado && (
@@ -1514,14 +1514,14 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
           <button onClick={() => setShowConfigResponsable(true)}
             style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '12px', cursor: 'pointer', color: '#333' }}>
-            ⚙️ Responsables: {responsables.length > 0 ? responsables.map(c => superAdmins.find(a => a.correo === c)?.nombre || c).join(', ') : 'Sin asignar'}
+            Responsables: {responsables.length > 0 ? responsables.map(c => superAdmins.find(a => a.correo === c)?.nombre || c).join(', ') : 'Sin asignar'}
           </button>
         </div>
       )}
 
       {tab === 'descargar' && !soloEnviadosATitulacion && puedoArchivar && pendientesDeArchivar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#FFF8E1', color: '#856404', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
-          ⚠️ Tienes {pendientesDeArchivar.length} expediente{pendientesDeArchivar.length !== 1 ? 's' : ''} con más de {MESES_PARA_ARCHIVAR} meses sin archivar.
+          Tienes {pendientesDeArchivar.length} expediente{pendientesDeArchivar.length !== 1 ? 's' : ''} con más de {MESES_PARA_ARCHIVAR} meses sin archivar.
         </div>
       )}
 
@@ -1530,14 +1530,14 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
           documentos subidos esperando revisión. */}
       {tab === 'descargar' && !soloEnviadosATitulacion && puedeRevisarDocs && expedientesPorRevisar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
-          📋 Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos por revisar.
+          Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos por revisar.
         </div>
       )}
 
       {showAlertaPendientes && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '440px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>📋</div>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}></div>
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Expedientes por revisar</div>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '1rem' }}>
               Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos subidos esperando tu revisión:
@@ -1599,7 +1599,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <select value={filtroCompleto} onChange={e => setFiltroCompleto(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: filtroCompleto ? '#EAF3DE' : '#fff', boxSizing: 'border-box' }}>
           <option value=''>Todos los expedientes</option>
-          <option value='completos'>✅ Solo completos</option>
+          <option value='completos'>Solo completos</option>
           <option value='incompletos'>Solo incompletos</option>
         </select>
       </div>
@@ -1642,13 +1642,13 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                       {m.contrato_firmado_path && (
                         <button type="button" onClick={e => { e.stopPropagation(); verContrato(m.contrato_firmado_path); }}
                           style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#3B82F6', cursor: 'pointer' }}>
-                          📄 Ver contrato
+                          Ver contrato
                         </button>
                       )}
                       {puedeCargarContrato ? (
                         <label onClick={e => e.stopPropagation()}
                           style={{ fontSize: '12px', padding: '4px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', color: '#555', cursor: 'pointer' }}>
-                          {subiendoContrato === m.id ? 'Subiendo...' : (m.contrato_firmado_path ? 'Reemplazar' : '📎 Cargar contrato')}
+                          {subiendoContrato === m.id ? 'Subiendo...' : (m.contrato_firmado_path ? 'Reemplazar' : 'Cargar contrato')}
                           <input type="file" style={{ display: 'none' }} disabled={subiendoContrato === m.id}
                             onChange={e => handleSubirContrato(m, e.target.files[0])} />
                         </label>
@@ -1658,14 +1658,14 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                     </>
                   ) : (
                     <>
-                      {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>✅ Completo</span>}
-                      {estadoEquipo(m) && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: estadoEquipo(m).fondo, color: estadoEquipo(m).color, fontWeight: '600' }}>➕ Equipo adicional · {estadoEquipo(m).txt}</span>}
-                      {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>⏳ En Titulación · por liberar</span>}
-                      {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>💬 Observaciones</span>}
-                      {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>🔎 Por revisar</span>}
+                      {m.expediente_completo && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A', fontWeight: '600' }}>Completo</span>}
+                      {estadoEquipo(m) && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: estadoEquipo(m).fondo, color: estadoEquipo(m).color, fontWeight: '600' }}>Equipo adicional · {estadoEquipo(m).txt}</span>}
+                      {m.tipo_compra === 'Contado' && m.enviar_titulacion && m.titulacion_por_liberar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF4E5', color: '#B45309', fontWeight: '600' }}>En Titulación · por liberar</span>}
+                      {m.observaciones_expediente && <span title={m.observaciones_expediente} style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404', fontWeight: '600' }}>Observaciones</span>}
+                      {porRevisar && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FDECEC', color: '#C0392B', fontWeight: '600' }}>Por revisar</span>}
                       {soyElVendedor && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6' }}>Mío</span>}
-                      {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>📦 Archivado</span>}
-                      {!archivado && pendiente && puedoArchivar && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>⚠️ Archivar</span>}
+                      {archivado && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#EAF3DE', color: '#27500A' }}>Archivado</span>}
+                      {!archivado && pendiente && puedoArchivar && tab === 'descargar' && <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#FFF3CD', color: '#856404' }}>Archivar</span>}
                       <span style={{ fontSize: '12px', fontWeight: '600', color: aprobados === total ? '#2E7D4F' : '#888' }}>{aprobados}/{total}</span>
                     </>
                   )}
@@ -1688,7 +1688,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                   <div key={ciudad} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
                     <div style={{ background: '#1a1a2e', color: '#fff', borderRadius: '10px', padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600' }}>📍 {ciudad}</span>
+                        <span style={{ fontSize: '14px', fontWeight: '600' }}>{ciudad}</span>
                         <span style={{ fontSize: '11px', background: 'rgba(255,255,255,0.18)', borderRadius: '20px', padding: '2px 10px' }}>{lista.length} {lista.length === 1 ? 'expediente' : 'expedientes'}</span>
                       </div>
                       <div style={{ fontSize: '12px', opacity: 0.85 }}>{desarrollosDe.join(' · ')}</div>

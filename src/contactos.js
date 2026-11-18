@@ -15,50 +15,50 @@ const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 // el requisito es más estricto que ROLES_VER_TODOS — excluye a Sub Admin.
 
 const LADAS = [
-  { code: '+52', flag: '🇲🇽', abbr: 'MX', country: 'México' },
-  { code: '+1', flag: '🇺🇸', abbr: 'US', country: 'Estados Unidos' },
-  { code: '+1CA', flag: '🇨🇦', abbr: 'CA', country: 'Canadá' },
-  { code: '+54', flag: '🇦🇷', abbr: 'AR', country: 'Argentina' },
-  { code: '+55', flag: '🇧🇷', abbr: 'BR', country: 'Brasil' },
-  { code: '+56', flag: '🇨🇱', abbr: 'CL', country: 'Chile' },
-  { code: '+57', flag: '🇨🇴', abbr: 'CO', country: 'Colombia' },
-  { code: '+51', flag: '🇵🇪', abbr: 'PE', country: 'Perú' },
-  { code: '+58', flag: '🇻🇪', abbr: 'VE', country: 'Venezuela' },
-  { code: '+502', flag: '🇬🇹', abbr: 'GT', country: 'Guatemala' },
-  { code: '+503', flag: '🇸🇻', abbr: 'SV', country: 'El Salvador' },
-  { code: '+504', flag: '🇭🇳', abbr: 'HN', country: 'Honduras' },
-  { code: '+505', flag: '🇳🇮', abbr: 'NI', country: 'Nicaragua' },
-  { code: '+506', flag: '🇨🇷', abbr: 'CR', country: 'Costa Rica' },
-  { code: '+507', flag: '🇵🇦', abbr: 'PA', country: 'Panamá' },
-  { code: '+53', flag: '🇨🇺', abbr: 'CU', country: 'Cuba' },
-  { code: '+1809', flag: '🇩🇴', abbr: 'DO', country: 'Rep. Dominicana' },
-  { code: '+598', flag: '🇺🇾', abbr: 'UY', country: 'Uruguay' },
-  { code: '+591', flag: '🇧🇴', abbr: 'BO', country: 'Bolivia' },
-  { code: '+593', flag: '🇪🇨', abbr: 'EC', country: 'Ecuador' },
-  { code: '+595', flag: '🇵🇾', abbr: 'PY', country: 'Paraguay' },
-  { code: '+34', flag: '🇪🇸', abbr: 'ES', country: 'España' },
-  { code: '+44', flag: '🇬🇧', abbr: 'GB', country: 'Reino Unido' },
-  { code: '+33', flag: '🇫🇷', abbr: 'FR', country: 'Francia' },
-  { code: '+49', flag: '🇩🇪', abbr: 'DE', country: 'Alemania' },
-  { code: '+39', flag: '🇮🇹', abbr: 'IT', country: 'Italia' },
-  { code: '+31', flag: '🇳🇱', abbr: 'NL', country: 'Países Bajos' },
-  { code: '+32', flag: '🇧🇪', abbr: 'BE', country: 'Bélgica' },
-  { code: '+41', flag: '🇨🇭', abbr: 'CH', country: 'Suiza' },
-  { code: '+43', flag: '🇦🇹', abbr: 'AT', country: 'Austria' },
-  { code: '+351', flag: '🇵🇹', abbr: 'PT', country: 'Portugal' },
-  { code: '+7', flag: '🇷🇺', abbr: 'RU', country: 'Rusia' },
-  { code: '+81', flag: '🇯🇵', abbr: 'JP', country: 'Japón' },
-  { code: '+82', flag: '🇰🇷', abbr: 'KR', country: 'Corea del Sur' },
-  { code: '+86', flag: '🇨🇳', abbr: 'CN', country: 'China' },
-  { code: '+91', flag: '🇮🇳', abbr: 'IN', country: 'India' },
-  { code: '+61', flag: '🇦🇺', abbr: 'AU', country: 'Australia' },
-  { code: '+64', flag: '🇳🇿', abbr: 'NZ', country: 'Nueva Zelanda' },
-  { code: '+27', flag: '🇿🇦', abbr: 'ZA', country: 'Sudáfrica' },
-  { code: '+20', flag: '🇪🇬', abbr: 'EG', country: 'Egipto' },
-  { code: '+971', flag: '🇦🇪', abbr: 'AE', country: 'Emiratos Árabes' },
-  { code: '+966', flag: '🇸🇦', abbr: 'SA', country: 'Arabia Saudita' },
-  { code: '+972', flag: '🇮🇱', abbr: 'IL', country: 'Israel' },
-  { code: '+90', flag: '🇹🇷', abbr: 'TR', country: 'Turquía' },
+  { code: '+52', abbr: 'MX', country: 'México' },
+  { code: '+1', abbr: 'US', country: 'Estados Unidos' },
+  { code: '+1CA', abbr: 'CA', country: 'Canadá' },
+  { code: '+54', abbr: 'AR', country: 'Argentina' },
+  { code: '+55', abbr: 'BR', country: 'Brasil' },
+  { code: '+56', abbr: 'CL', country: 'Chile' },
+  { code: '+57', abbr: 'CO', country: 'Colombia' },
+  { code: '+51', abbr: 'PE', country: 'Perú' },
+  { code: '+58', abbr: 'VE', country: 'Venezuela' },
+  { code: '+502', abbr: 'GT', country: 'Guatemala' },
+  { code: '+503', abbr: 'SV', country: 'El Salvador' },
+  { code: '+504', abbr: 'HN', country: 'Honduras' },
+  { code: '+505', abbr: 'NI', country: 'Nicaragua' },
+  { code: '+506', abbr: 'CR', country: 'Costa Rica' },
+  { code: '+507', abbr: 'PA', country: 'Panamá' },
+  { code: '+53', abbr: 'CU', country: 'Cuba' },
+  { code: '+1809', abbr: 'DO', country: 'Rep. Dominicana' },
+  { code: '+598', abbr: 'UY', country: 'Uruguay' },
+  { code: '+591', abbr: 'BO', country: 'Bolivia' },
+  { code: '+593', abbr: 'EC', country: 'Ecuador' },
+  { code: '+595', abbr: 'PY', country: 'Paraguay' },
+  { code: '+34', abbr: 'ES', country: 'España' },
+  { code: '+44', abbr: 'GB', country: 'Reino Unido' },
+  { code: '+33', abbr: 'FR', country: 'Francia' },
+  { code: '+49', abbr: 'DE', country: 'Alemania' },
+  { code: '+39', abbr: 'IT', country: 'Italia' },
+  { code: '+31', abbr: 'NL', country: 'Países Bajos' },
+  { code: '+32', abbr: 'BE', country: 'Bélgica' },
+  { code: '+41', abbr: 'CH', country: 'Suiza' },
+  { code: '+43', abbr: 'AT', country: 'Austria' },
+  { code: '+351', abbr: 'PT', country: 'Portugal' },
+  { code: '+7', abbr: 'RU', country: 'Rusia' },
+  { code: '+81', abbr: 'JP', country: 'Japón' },
+  { code: '+82', abbr: 'KR', country: 'Corea del Sur' },
+  { code: '+86', abbr: 'CN', country: 'China' },
+  { code: '+91', abbr: 'IN', country: 'India' },
+  { code: '+61', abbr: 'AU', country: 'Australia' },
+  { code: '+64', abbr: 'NZ', country: 'Nueva Zelanda' },
+  { code: '+27', abbr: 'ZA', country: 'Sudáfrica' },
+  { code: '+20', abbr: 'EG', country: 'Egipto' },
+  { code: '+971', abbr: 'AE', country: 'Emiratos Árabes' },
+  { code: '+966', abbr: 'SA', country: 'Arabia Saudita' },
+  { code: '+972', abbr: 'IL', country: 'Israel' },
+  { code: '+90', abbr: 'TR', country: 'Turquía' },
 ];
 
 const CAMPOS_REQUERIDOS = [
@@ -90,7 +90,7 @@ function LadaDropdown({ value, onChange }) {
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button type="button" onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '6px', background: '#fff', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}>
-        <span style={{ fontSize: '20px', lineHeight: 1 }}>{selected.flag}</span>
+        <span style={{ fontSize: '20px', lineHeight: 1 }}>{selected.abbr}</span>
         <span style={{ color: '#444', fontWeight: '500' }}>{selected.abbr}</span>
         <span style={{ color: '#999', fontSize: '11px' }}>{selected.code === '+1CA' ? '+1' : selected.code}</span>
         <span style={{ color: '#bbb', fontSize: '10px', marginLeft: '2px' }}>▾</span>
@@ -100,7 +100,7 @@ function LadaDropdown({ value, onChange }) {
           {LADAS.map(l => (
             <button key={l.code} type="button" onClick={() => { onChange(l.code); setOpen(false); }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', border: 'none', background: l.code === value ? '#f5f5f5' : 'transparent', cursor: 'pointer', fontSize: '13px', textAlign: 'left' }}>
-              <span style={{ fontSize: '18px' }}>{l.flag}</span>
+              <span style={{ fontSize: '18px' }}>{l.abbr}</span>
               <span style={{ fontWeight: '500', color: '#333', width: '28px' }}>{l.abbr}</span>
               <span style={{ color: '#aaa', fontSize: '12px', width: '38px' }}>{l.code === '+1CA' ? '+1' : l.code}</span>
               <span style={{ color: '#888', fontSize: '12px' }}>{l.country}</span>
@@ -124,7 +124,7 @@ function BadgeVigencia({ dias, alertaDias, vigenciaActiva, estatus }) {
   // (ese sigue en rojo). Tiene prioridad sobre el resto de los cálculos.
   if (estatus === 'No interesado') return <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#F0F0F0', color: '#888', fontWeight: '500' }}>No interesado</span>;
   if (vigenciaActiva === false || dias <= 0) return <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#FCEBEB', color: '#A32D2D', fontWeight: '500' }}>Expirado</span>;
-  if (dias <= alertaDias) return <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#FFF3CD', color: '#856404', fontWeight: '500' }}>⚠️ {dias}d</span>;
+  if (dias <= alertaDias) return <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#FFF3CD', color: '#856404', fontWeight: '500' }}>{dias}d</span>;
   return <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', background: '#EAF3DE', color: '#27500A' }}>{dias}d</span>;
 }
 
@@ -580,7 +580,7 @@ export default function Contactos() {
 
     setImportandoHistorico(false);
     if (!pausarHistoricoRef.current) {
-      setMsgHistorico(`✅ Importación terminada: ${exitosos} creados, ${saltados} ya existían, ${errores} con error`);
+      setMsgHistorico(`Importación terminada: ${exitosos} creados, ${saltados} ya existían, ${errores} con error`);
       cargarContactos();
     }
   };
@@ -728,7 +728,7 @@ export default function Contactos() {
       {showAlertaVigencia && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '440px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>⚠️</div>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}></div>
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Contactos próximos a vencer</div>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '1rem' }}>
               Tienes {contactosAlerta.length} contacto{contactosAlerta.length > 1 ? 's' : ''} sin seguimiento que {contactosAlerta.length > 1 ? 'vencen' : 'vence'} pronto:
@@ -755,7 +755,7 @@ export default function Contactos() {
       {showAlertaCruzada && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '440px', width: '100%', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-            <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔔</div>
+            <div style={{ fontSize: '24px', marginBottom: '8px' }}></div>
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Interés en otro desarrollo</div>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '1rem' }}>
               {alertasCruzadas.length === 1
@@ -831,13 +831,13 @@ export default function Contactos() {
 
             {filasHistorico.length === 0 ? (
               <label style={{ display: 'block', padding: '24px', border: '2px dashed #ddd', borderRadius: '10px', textAlign: 'center', cursor: 'pointer', color: '#888', fontSize: '13px' }}>
-                📄 Haz click para elegir el archivo Excel
+                Haz click para elegir el archivo Excel
                 <input ref={importHistoricoInputRef} type='file' accept='.xlsx,.xls' onChange={handleArchivoHistorico} style={{ display: 'none' }} />
               </label>
             ) : (
               <>
                 <div style={{ padding: '10px 14px', background: '#f9f9f9', borderRadius: '8px', fontSize: '13px', marginBottom: '14px' }}>
-                  📄 <strong>{nombreArchivoHistorico}</strong> — {filasHistorico.length} contactos detectados
+                  <strong>{nombreArchivoHistorico}</strong> — {filasHistorico.length} contactos detectados
                 </div>
 
                 {(importandoHistorico || progresoHistorico.procesados > 0) && (
@@ -848,7 +848,7 @@ export default function Contactos() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#666', flexWrap: 'wrap', gap: '6px' }}>
                       <span>{progresoHistorico.procesados} / {progresoHistorico.total}</span>
                       <span style={{ color: '#27500A' }}>✓ {progresoHistorico.exitosos} creados</span>
-                      <span style={{ color: '#7A5900' }}>⏭ {progresoHistorico.saltados} ya existían</span>
+                      <span style={{ color: '#7A5900' }}>{progresoHistorico.saltados} ya existían</span>
                       <span style={{ color: '#A32D2D' }}>✕ {progresoHistorico.errores} errores</span>
                     </div>
                   </div>
@@ -860,7 +860,7 @@ export default function Contactos() {
 
                 {erroresHistorico.length > 0 && (
                   <button onClick={handleDescargarErroresHistorico} style={{ ...btnOutline, width: '100%', marginBottom: '14px', fontSize: '13px' }}>
-                    ⬇ Descargar reporte ({erroresHistorico.length} saltados/con error)
+                    Descargar reporte ({erroresHistorico.length} saltados/con error)
                   </button>
                 )}
 
@@ -872,7 +872,7 @@ export default function Contactos() {
                     </button>
                   )}
                   {importandoHistorico && (
-                    <button onClick={handlePausarHistorico} style={{ ...btnOutline, flex: 1, padding: '12px' }}>⏸ Pausar</button>
+                    <button onClick={handlePausarHistorico} style={{ ...btnOutline, flex: 1, padding: '12px' }}>Pausar</button>
                   )}
                   {!importandoHistorico && (
                     <button onClick={() => { setFilasHistorico([]); setNombreArchivoHistorico(''); }} style={{ ...btnOutline, padding: '12px' }}>
@@ -897,17 +897,17 @@ export default function Contactos() {
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           {puede('contactos.configurar_vigencia') && !isMobile && (
-            <button onClick={() => setShowVigenciaModal(true)} style={btnOutline} title="Días de vigencia total">⏱ {vigenciaDias}d</button>
+            <button onClick={() => setShowVigenciaModal(true)} style={btnOutline} title="Días de vigencia total">{vigenciaDias}d</button>
           )}
           {puede('contactos.configurar_vigencia') && !isMobile && (
-            <button onClick={() => setShowAlertaDiasModal(true)} style={btnOutline} title="Días de anticipación de la alerta">⚠️ {alertaDias}d</button>
+            <button onClick={() => setShowAlertaDiasModal(true)} style={btnOutline} title="Días de anticipación de la alerta">{alertaDias}d</button>
           )}
           {!isMobile && (
             <>
               {puede('contactos.exportar') && <button onClick={handleExportar} style={btnOutline}>Exportar</button>}
               {puede('contactos.importar_historico') && <button onClick={() => { setShowImportHistorico(true); setFilasHistorico([]); setNombreArchivoHistorico(''); setErroresHistorico([]); setMsgHistorico(''); setProgresoHistorico({ procesados: 0, total: 0, exitosos: 0, saltados: 0, errores: 0 }); }}
                 style={btnOutline}>
-                ⬆ Importar histórico
+                Importar histórico
               </button>}
             </>
           )}
@@ -930,7 +930,7 @@ export default function Contactos() {
               style={{ flex: 1, padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px' }} />
             <button onClick={() => setShowFiltros(f => !f)}
               style={{ padding: '10px 14px', border: '0.5px solid #ddd', borderRadius: '8px', background: showFiltros ? '#C0203A' : '#fff', color: showFiltros ? '#fff' : '#333', fontSize: '13px', cursor: 'pointer' }}>
-              ⚙️ Filtros
+              Filtros
             </button>
           </div>
           {showFiltros && (
@@ -1074,7 +1074,7 @@ export default function Contactos() {
                     )}
                     <td style={{ padding: '12px 14px' }}>
                       {puede('contactos.eliminar') && (
-                        <button onClick={() => handleEliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '16px' }}>🗑</button>
+                        <button onClick={() => handleEliminar(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', fontSize: '16px' }}>Eliminar</button>
                       )}
                     </td>
                   </tr>
