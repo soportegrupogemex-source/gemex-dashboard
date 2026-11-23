@@ -27,7 +27,6 @@ const TODOS_LOS_MODULOS = [
     { id: 'obra_dashboard', label: 'Dashboard de obra', icon: 'obra_dashboard' },
     { id: 'construccion', label: 'Avance por unidad', icon: 'construccion' },
     { id: 'programa_obra', label: 'Programa', icon: 'obra_torres' },
-    { id: 'obra_torres', label: 'Programa anterior', icon: 'obra_torres' },
     { id: 'obra_requisiciones', label: 'Requisiciones', icon: 'obra_requisiciones' },
   ]},
   { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
