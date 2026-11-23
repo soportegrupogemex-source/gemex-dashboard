@@ -43,17 +43,18 @@ function Chip({ estatus }) {
 
 // Celda editable: guarda al salir del campo (o con Enter). Si la base rechaza el cambio, regresa al valor anterior.
 function Celda({ valor, onGuardar, numero = false, disabled = false, ancho = 74, placeholder = '', alinear = 'right', title }) {
-  const [t, setT] = useState(valor ?? '');
-  useEffect(() => { setT(valor ?? ''); }, [valor]);
+  const mostrar = (v) => (numero && v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? String(Math.round(Number(v) * 10000) / 10000) : (v ?? ''));
+  const [t, setT] = useState(mostrar(valor));
+  useEffect(() => { setT(mostrar(valor)); }, [valor]); // eslint-disable-line react-hooks/exhaustive-deps
   const confirmar = async () => {
     const limpio = String(t).trim();
     if (numero) {
       const n = limpio === '' ? null : Number(limpio.replace(/,/g, ''));
-      if (limpio !== '' && !Number.isFinite(n)) { setT(valor ?? ''); return; }
+      if (limpio !== '' && !Number.isFinite(n)) { setT(mostrar(valor)); return; }
       const antes = valor === null || valor === undefined || valor === '' ? null : Number(valor);
-      if (n === antes) return;
+      if (n === antes || (n !== null && antes !== null && Math.abs(n - antes) < 0.00005)) return;
       const ok = await onGuardar(n);
-      if (ok === false) setT(valor ?? '');
+      if (ok === false) setT(mostrar(valor));
     } else {
       if (limpio === String(valor ?? '')) return;
       const ok = await onGuardar(limpio);
@@ -64,7 +65,7 @@ function Celda({ valor, onGuardar, numero = false, disabled = false, ancho = 74,
     <input value={t} disabled={disabled} placeholder={placeholder} title={title}
       inputMode={numero ? 'decimal' : undefined}
       onChange={e => setT(e.target.value)} onBlur={confirmar}
-      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { setT(valor ?? ''); e.target.blur(); } }}
+      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { setT(mostrar(valor)); e.target.blur(); } }}
       style={{ ...inp, width: ancho, textAlign: alinear, padding: '4px 6px', background: disabled ? 'transparent' : '#FFFBEA', border: disabled ? '0.5px solid transparent' : '0.5px solid #E5DDB0' }} />
   );
 }
