@@ -4,12 +4,12 @@ import * as XLSX from 'xlsx';
 import { supabase, tokenSesion } from './supabase';
 import { usePuede } from './PermisosContext';
 
-const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación']
+const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Gerente de Construcción', 'Tesorería', 'Titulación']
   .filter(r => !EMPRESA.rolesOcultos.includes(r));
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
 // Filtros por área de trabajo. Cobranza = quienes operan esa pantalla (Tesorería y Mesa de Control); los administradores no se cuentan.
-const FILTROS_AREA = [['Construcción', ['Construcción']], ['Tesorería', ['Tesorería']], ['Cobranza', ['Tesorería', 'Mesa de Control']], ['Titulación', ['Titulación']]];
+const FILTROS_AREA = [['Construcción', ['Construcción', 'Gerente de Construcción']], ['Tesorería', ['Tesorería']], ['Cobranza', ['Tesorería', 'Mesa de Control']], ['Titulación', ['Titulación']]];
 const LS_KEY_PROCESADOS = 'gemex_import_agentes_procesados';
 
 function useIsMobile() {

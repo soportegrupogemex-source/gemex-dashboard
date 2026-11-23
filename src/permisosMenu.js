@@ -26,7 +26,8 @@ const TODOS_LOS_MODULOS = [
   { id: 'mod_construccion', label: 'Construcción', icon: 'construccion', submenu: [
     { id: 'obra_dashboard', label: 'Dashboard de obra', icon: 'obra_dashboard' },
     { id: 'construccion', label: 'Avance por unidad', icon: 'construccion' },
-    { id: 'obra_torres', label: 'Programa', icon: 'obra_torres' },
+    { id: 'programa_obra', label: 'Programa', icon: 'obra_torres' },
+    { id: 'obra_torres', label: 'Programa anterior', icon: 'obra_torres' },
     { id: 'obra_requisiciones', label: 'Requisiciones', icon: 'obra_requisiciones' },
   ]},
   { id: 'mod_titulacion', label: 'Titulación', icon: 'titulacion', submenu: [
@@ -47,7 +48,7 @@ export const MENU_MODULOS = TODOS_LOS_MODULOS
 
 // Pantallas que antes vivían dentro de "Dirección": su acceso se sigue
 // decidiendo con el permiso 'direccion' + el filtro por rol de abajo.
-export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'obra_torres', 'obra_dashboard', 'obra_requisiciones', 'objetivos', 'tendencias_producto', 'buyer_persona'];
+export const HOJAS_DIRECCION = ['dashboard_dir', 'movimientos', 'historial', 'titulacion', 'cobranza', 'comisiones', 'ajustes_admin', 'construccion', 'programa_obra', 'obra_torres', 'obra_dashboard', 'obra_requisiciones', 'objetivos', 'tendencias_producto', 'buyer_persona'];
 
 export const MENU_POR_ROL = {
   'Super Admin': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
@@ -66,12 +67,13 @@ export const MENU_POR_ROL = {
   'Asesor Premium': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
   // Roles de un solo módulo — solo entran a su propia pantalla.
   'Construcción': ['direccion'],
+  'Gerente de Construcción': ['direccion'],
   'Tesorería': ['direccion'],
   'Titulación': ['direccion'],
 };
 
 // Roles que se pueden configurar en el panel (Super Admin siempre tiene todo).
-export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Tesorería', 'Titulación']
+export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Gerente de Construcción', 'Tesorería', 'Titulación']
   .filter(r => !EMPRESA.rolesOcultos.includes(r));
 
 // Pantallas que se pueden encender/apagar por rol ("Ajustes de administración"
@@ -101,8 +103,8 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   // Mesa de Control revisa Movimientos, Historial y Titulación.
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
-  if (miRol === 'Construcción') return id === 'construccion' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
-  if (miRol === 'Tesorería') return id === 'cobranza' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
+  if (miRol === 'Construcción' || miRol === 'Gerente de Construcción') return id === 'construccion' || id === 'programa_obra' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
+  if (miRol === 'Tesorería') return id === 'cobranza' || id === 'programa_obra' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
   if (miRol === 'Titulación') return id === 'titulacion';
   // Gerente Operador — Dashboard (de sus desarrollos), Movimientos, Historial,
   // Titulación (solo ver) y Tendencias.
@@ -242,6 +244,11 @@ export const ACCIONES = [
   { id: 'construccion.registrar_pagos_obra', seccion: 'Construcción', label: 'Programa: registrar pagos a contratistas', defecto: roles('Super Admin', 'Admin', 'Tesorería') },
   { id: 'construccion.fijar_tope_obra', seccion: 'Construcción', label: 'Programa: fijar el tope de presupuesto', defecto: roles('Super Admin', 'Admin') },
   { id: 'construccion.autorizar_estimaciones_obra', seccion: 'Construcción', label: 'Programa: autorizar estimaciones a contratistas', defecto: roles('Super Admin', 'Admin') },
+  { id: 'construccion.programa_cargar', seccion: 'Construcción', label: 'Programa: crear frentes y etapas, cargar y editar partidas (presupuesto)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
+  { id: 'construccion.programa_ejecucion', seccion: 'Construcción', label: 'Programa: capturar la ejecución semanal', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
+  { id: 'construccion.programa_abrir_etapa', seccion: 'Construcción', label: 'Programa: abrir y cerrar etapas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
+  { id: 'construccion.programa_ampliar_solicitar', seccion: 'Construcción', label: 'Programa: pedir más presupuesto para una etapa abierta', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
+  { id: 'construccion.programa_ampliar_autorizar', seccion: 'Construcción', label: 'Programa: autorizar ampliaciones de presupuesto y reabrir etapas', defecto: roles('Super Admin', 'Gerente de Construcción') },
   { id: 'construccion.solicitar_requisiciones', seccion: 'Construcción', label: 'Requisiciones de pago: solicitar', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
   { id: 'construccion.autorizar_requisiciones', seccion: 'Construcción', label: 'Requisiciones de pago: autorizar o rechazar', defecto: roles('Super Admin', 'Admin') },
 

@@ -23,6 +23,7 @@ import { EMPRESA } from './empresa';
 import { MENU_MODULOS, HOJAS_CONFIGURABLES, hojaVisible as hojaVisibleDe, puedeAccion } from './permisosMenu';
 import Construccion from './Construccion';
 import ObraTorres from './ObraTorres';
+import Programa from './Programa';
 import ObraDashboard from './ObraDashboard';
 import ObraRequisiciones from './ObraRequisiciones';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
@@ -87,6 +88,7 @@ const MENU_ICONS = {
   marketing: <Megaphone size={18} />,
   construccion: <HardHat size={18} />,
   obra_torres: <Layers size={18} />,
+  programa_obra: <Layers size={18} />,
   obra_dashboard: <BarChart3 size={18} />,
   obra_requisiciones: <Receipt size={18} />,
   objetivos: <Target size={18} />,
@@ -697,7 +699,7 @@ function App() {
     setMiRol(data?.rol || 'Agente');
     cargarExpedientesRechazados(data?.correo);
     if (esPrimerLogin) {
-      if (data?.rol === 'Construcción') {
+      if (data?.rol === 'Construcción' || data?.rol === 'Gerente de Construcción') {
         setActivePage('construccion');
       } else if (data?.rol === 'Tesorería') {
         setActivePage('cobranza');
@@ -763,6 +765,7 @@ function App() {
       case 'marketing': return <Marketing miRol={miRol} miAgente={miAgente} />;
       case 'ajustes_admin': return miRol === 'Super Admin' ? <AjustesAdministracion /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'construccion': return <Construccion />;
+      case 'programa_obra': return <Programa />;
       case 'obra_torres': return <ObraTorres />;
       case 'obra_dashboard': return <ObraDashboard />;
       case 'obra_requisiciones': return <ObraRequisiciones />;
