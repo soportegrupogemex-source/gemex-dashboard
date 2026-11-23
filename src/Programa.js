@@ -9,7 +9,7 @@ import { traerTodo, useIsMobile, $, btn, inp } from './ObraTorres';
 //  - Cada etapa tiene partidas en 5 categorías (hojas del Excel): mano de obra, materiales,
 //    subcontratos, maquinaria e indirectos, con unidad, precio y cantidad (= presupuesto).
 //  - La ejecución se captura por semana (unidades y, si cambió, el precio real).
-//  - La etapa pasa de "cargando presupuesto" a "abierta" (se congela su tope) y luego "cerrada".
+//  - La etapa pasa de "por abrir" a "abierta" (se congela su tope) y luego "cerrada".
 //    Con la etapa abierta no se puede pasar del tope: más presupuesto es una ampliación que
 //    solo autoriza el Gerente de Construcción (reglas en la base de datos: scripts/programa_obra.sql).
 
@@ -21,7 +21,7 @@ const CATEGORIAS = [
   { id: 'indirectos', label: 'Indirectos' },
 ];
 const ESTATUS = {
-  presupuesto: { txt: 'Cargando presupuesto', color: '#B45309', fondo: '#FFF4E5' },
+  presupuesto: { txt: 'Por abrir', color: '#B45309', fondo: '#FFF4E5' },
   abierta: { txt: 'Abierta', color: '#27500A', fondo: '#EAF3DE' },
   cerrada: { txt: 'Cerrada', color: '#475569', fondo: '#EEF2F6' },
 };
@@ -494,7 +494,6 @@ function DetalleFrente({ frente, onVolver }) {
               </div>
               {!plegada && (
                 <div>
-                  {e.estatus === 'presupuesto' && <div style={{ fontSize: 11, color: '#B45309', background: '#FFF9EE', padding: '6px 14px' }}>Cargando presupuesto: la ejecución se captura cuando la etapa esté abierta.</div>}
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ borderCollapse: 'collapse', minWidth: 640 + semanas.length * (colsSem * 78) }}>
                       <thead>
