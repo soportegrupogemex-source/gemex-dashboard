@@ -701,6 +701,8 @@ function App() {
     if (esPrimerLogin) {
       if (data?.rol === 'Construcción' || data?.rol === 'Gerente de Construcción') {
         setActivePage('construccion');
+      } else if (data?.rol === 'Compras') {
+        setActivePage('obra_requisiciones');
       } else if (data?.rol === 'Tesorería') {
         setActivePage('cobranza');
       } else if (data?.rol === 'Titulación') {

@@ -29,7 +29,7 @@ const EMPRESAS = {
     colorMenu: '#113747',
     hojas: ['dashboard_dir', 'contactos', 'desarrollos', 'negocios', 'expedientes', 'movimientos', 'historial', 'comisiones', 'agentes'],
     // Roles de módulos que GMF no usa.
-    rolesOcultos: ['Construcción', 'Gerente de Construcción', 'Titulación'],
+    rolesOcultos: ['Construcción', 'Gerente de Construcción', 'Compras', 'Titulación'],
     // Secciones del panel Permisos que sí aplican a GMF.
     seccionesAcciones: ['Inventario', 'Desarrollos', 'Planes', 'Expedientes', 'Comisiones', 'Movimientos', 'Historial', 'Contactos', 'Negocios', 'Dashboard', 'Agentes'],
   },

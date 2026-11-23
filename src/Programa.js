@@ -217,6 +217,7 @@ function DetalleFrente({ frente, onVolver }) {
   const puedeAbrir = puede('construccion.programa_abrir_etapa');
   const puedePedir = puede('construccion.programa_ampliar_solicitar');
   const puedeAutorizar = puede('construccion.programa_ampliar_autorizar');
+  const puedeCompras = puede('construccion.solicitar_requisiciones');
 
   const [tab, setTab] = useState('resumen');
   const [etapas, setEtapas] = useState([]);
@@ -224,6 +225,8 @@ function DetalleFrente({ frente, onVolver }) {
   const [partidas, setPartidas] = useState([]);
   const [ejec, setEjec] = useState([]);
   const [amp, setAmp] = useState([]);
+  const [provs, setProvs] = useState([]);
+  const [cargosP, setCargosP] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
   const [modalAmp, setModalAmp] = useState(null);
@@ -241,14 +244,18 @@ function DetalleFrente({ frente, onVolver }) {
       ]);
       if (et.error) throw et.error; if (se.error) throw se.error;
       const ids = et.data.map(e => e.id);
-      let ps = [], am = [], ej = [];
+      let ps = [], am = [], ej = [], cg = [];
+      const pr = await supabase.from('obra_proveedores').select('id, nombre, activo').order('nombre');
       if (ids.length) {
         ps = await traerTodo(() => supabase.from('prog_partidas').select('*').in('etapa_id', ids).order('orden').order('created_at'));
         const a = await supabase.from('prog_ampliaciones').select('*').in('etapa_id', ids).order('solicitada_en', { ascending: false });
         if (a.error) throw a.error; am = a.data || [];
-        for (const lote of trozos(ps.map(p => p.id), 120)) ej = ej.concat(await traerTodo(() => supabase.from('prog_ejecucion').select('*').in('partida_id', lote).order('id')));
+        for (const lote of trozos(ps.map(p => p.id), 120)) {
+          ej = ej.concat(await traerTodo(() => supabase.from('prog_ejecucion').select('*').in('partida_id', lote).order('id')));
+          cg = cg.concat(await traerTodo(() => supabase.from('obra_requisicion_cargos').select('prog_partida_id, monto, obra_requisiciones!inner(estatus)').in('prog_partida_id', lote).order('id')));
+        }
       }
-      setEtapas(et.data); setSemanas(se.data); setPartidas(ps); setAmp(am); setEjec(ej); setError('');
+      setEtapas(et.data); setSemanas(se.data); setPartidas(ps); setAmp(am); setEjec(ej); setProvs(pr.data || []); setCargosP(cg); setError('');
     } catch (e) { setError(e.message || String(e)); } finally { setCargando(false); }
   }, [frente.id]);
   useEffect(() => { cargar(); }, [cargar]);
@@ -260,13 +267,25 @@ function DetalleFrente({ frente, onVolver }) {
     return m;
   }, [ejec]);
   const valor = useCallback((p, sid) => { const r = ejPor.get(p.id)?.get(sid); return r ? Number(r.unidades || 0) * Number(r.precio ?? p.precio ?? 0) : 0; }, [ejPor]);
-  const presP = (p) => Number(p.cantidad || 0) * Number(p.precio || 0);
+  const presP = (p) => Number(p.cantidad || 0) * Number(p.precio || 0) + Number(p.ampliado || 0);
+  const pagos = useMemo(() => {
+    const m = new Map();
+    cargosP.forEach(k => {
+      const est = k.obra_requisiciones?.estatus;
+      const v = m.get(k.prog_partida_id) || { pagado: 0, porPagar: 0 };
+      if (est === 'pagada') v.pagado += Number(k.monto || 0); else if (est === 'solicitada' || est === 'autorizada') v.porPagar += Number(k.monto || 0);
+      m.set(k.prog_partida_id, v);
+    });
+    return m;
+  }, [cargosP]);
+  const pagadoP = (p) => pagos.get(p.id)?.pagado || 0;
+  const porPagarP = (p) => pagos.get(p.id)?.porPagar || 0;
   const ejecP = useCallback((p) => semanas.reduce((s, w) => s + valor(p, w.id), 0), [semanas, valor]);
   const porEtapa = useMemo(() => etapas.map(e => {
     const ps = partidas.filter(p => p.etapa_id === e.id);
     const ampliado = amp.filter(a => a.etapa_id === e.id && a.estatus === 'autorizada').reduce((s, a) => s + Number(a.monto), 0);
-    return { ...e, ps, pres: ps.reduce((s, p) => s + presP(p), 0), ejc: ps.reduce((s, p) => s + ejecP(p), 0), ampliado, tope: e.estatus === 'presupuesto' ? null : Number(e.tope || 0) + ampliado };
-  }), [etapas, partidas, amp, ejecP]);
+    return { ...e, ps, pres: ps.reduce((s, p) => s + presP(p), 0), ejc: ps.reduce((s, p) => s + ejecP(p), 0), pagado: ps.reduce((s, p) => s + pagadoP(p), 0), ampliado, tope: e.estatus === 'presupuesto' ? null : Number(e.tope || 0) + ampliado };
+  }), [etapas, partidas, amp, ejecP, pagos]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = useMemo(() => ({ pres: porEtapa.reduce((s, e) => s + e.pres, 0), ejc: porEtapa.reduce((s, e) => s + e.ejc, 0) }), [porEtapa]);
 
   // ---- acciones
@@ -321,6 +340,11 @@ function DetalleFrente({ frente, onVolver }) {
     if (er) { alert(er.message); return false; }
     setPartidas(prev => prev.map(x => (x.id === p.id ? { ...x, [campo]: campo === 'cantidad' || campo === 'precio' ? (v ?? 0) : v } : x)));
     return true;
+  };
+  const asignarProveedor = async (p, provId) => {
+    const { error: er } = await supabase.rpc('prog_asignar_proveedor', { p_partidas: [p.id], p_proveedor: provId || null });
+    if (er) { alert(er.message); return; }
+    setPartidas(prev => prev.map(x => (x.id === p.id ? { ...x, proveedor_id: provId || null } : x)));
   };
   const agregarPartida = async (e, cat) => {
     const previas = partidas.filter(p => p.etapa_id === e.id && p.categoria === cat);
@@ -387,7 +411,7 @@ function DetalleFrente({ frente, onVolver }) {
       <div style={{ overflowX: 'auto', border: '0.5px solid #e0e0e0', borderRadius: 10, background: '#fff', marginBottom: 10 }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 760 }}>
           <thead><tr>
-            <th style={{ ...th, textAlign: 'left' }}>Etapa</th><th style={{ ...th, textAlign: 'left' }}>Estado</th><th style={th}>Presupuesto</th><th style={th}>Tope</th><th style={th}>Ejecutado</th><th style={th}>Disponible</th><th style={th}>Avance</th><th style={th}></th>
+            <th style={{ ...th, textAlign: 'left' }}>Etapa</th><th style={{ ...th, textAlign: 'left' }}>Estado</th><th style={th}>Presupuesto</th><th style={th}>Tope</th><th style={th}>Ejecutado</th><th style={th}>Pagado</th><th style={th}>Disponible</th><th style={th}>Avance</th><th style={th}></th>
           </tr></thead>
           <tbody>
             {porEtapa.map(e => {
@@ -400,6 +424,7 @@ function DetalleFrente({ frente, onVolver }) {
                   <td style={td}>{$(e.pres)}</td>
                   <td style={td}>{e.tope === null ? '—' : $(e.tope)}{e.ampliado > 0 && <div style={{ fontSize: 10, color: '#888' }}>incluye {$(e.ampliado)} de ampliación</div>}</td>
                   <td style={td}>{$(e.ejc)}</td>
+                  <td style={td}>{$(e.pagado)}</td>
                   <td style={td}>{$(base - e.ejc)}</td>
                   <td style={td}>{pct(e.ejc, base)}%</td>
                   <td style={{ ...td, textAlign: 'right' }}>
@@ -414,7 +439,7 @@ function DetalleFrente({ frente, onVolver }) {
                 </tr>
               );
             })}
-            {porEtapa.length === 0 && <tr><td colSpan={8} style={{ ...td, textAlign: 'left', color: '#888', padding: 14 }}>Sin etapas. Agrega la primera abajo.</td></tr>}
+            {porEtapa.length === 0 && <tr><td colSpan={9} style={{ ...td, textAlign: 'left', color: '#888', padding: 14 }}>Sin etapas. Agrega la primera abajo.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -427,9 +452,9 @@ function DetalleFrente({ frente, onVolver }) {
 
       <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>Presupuesto y ejecución por categoría</div>
       <div style={{ overflowX: 'auto', border: '0.5px solid #e0e0e0', borderRadius: 10, background: '#fff', marginBottom: 10 }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: 560 + semanas.length * 100 }}>
+        <table style={{ borderCollapse: 'collapse', minWidth: 640 + semanas.length * 100 }}>
           <thead><tr>
-            <th style={{ ...th, ...sticky, background: '#f6f6f6', minWidth: 140 }}>Categoría</th><th style={th}>Presupuesto</th><th style={th}>%</th><th style={th}>Ejecutado</th>
+            <th style={{ ...th, ...sticky, background: '#f6f6f6', minWidth: 140 }}>Categoría</th><th style={th}>Presupuesto</th><th style={th}>%</th><th style={th}>Ejecutado</th><th style={th}>Pagado</th>
             {semanas.map(s => <th key={s.id} style={th}>{s.etiqueta}<div style={{ fontWeight: 400, color: '#999' }}>{fechaCorta(s.fecha)}</div></th>)}
           </tr></thead>
           <tbody>
@@ -439,14 +464,14 @@ function DetalleFrente({ frente, onVolver }) {
               return (
                 <tr key={c.id}>
                   <td style={{ ...td, ...sticky }}>{c.label}</td>
-                  <td style={td}>{$(pres)}</td><td style={td}>{pct(pres, total.pres)}%</td><td style={td}>{$(ps.reduce((s, p) => s + ejecP(p), 0))}</td>
+                  <td style={td}>{$(pres)}</td><td style={td}>{pct(pres, total.pres)}%</td><td style={td}>{$(ps.reduce((s, p) => s + ejecP(p), 0))}</td><td style={td}>{$(ps.reduce((s, p) => s + pagadoP(p), 0))}</td>
                   {semanas.map(s => <td key={s.id} style={td}>{$(ps.reduce((a, p) => a + valor(p, s.id), 0))}</td>)}
                 </tr>
               );
             })}
             <tr>
               <td style={{ ...td, ...sticky, fontWeight: 700 }}>Total</td>
-              <td style={{ ...td, fontWeight: 700 }}>{$(total.pres)}</td><td style={td}>100%</td><td style={{ ...td, fontWeight: 700 }}>{$(total.ejc)}</td>
+              <td style={{ ...td, fontWeight: 700 }}>{$(total.pres)}</td><td style={td}>100%</td><td style={{ ...td, fontWeight: 700 }}>{$(total.ejc)}</td><td style={{ ...td, fontWeight: 700 }}>{$(partidas.reduce((a, p) => a + pagadoP(p), 0))}</td>
               {semanas.map(s => <td key={s.id} style={{ ...td, fontWeight: 700 }}>{$(partidas.reduce((a, p) => a + valor(p, s.id), 0))}</td>)}
             </tr>
           </tbody>
@@ -495,11 +520,11 @@ function DetalleFrente({ frente, onVolver }) {
               {!plegada && (
                 <div>
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ borderCollapse: 'collapse', minWidth: 640 + semanas.length * (colsSem * 78) }}>
+                    <table style={{ borderCollapse: 'collapse', minWidth: 900 + semanas.length * (colsSem * 78) }}>
                       <thead>
                         <tr>
                           <th style={{ ...th, ...sticky, background: '#f6f6f6', minWidth: 230 }} rowSpan={2}>Descripción</th>
-                          <th style={th} rowSpan={2}>Unidad</th><th style={th} rowSpan={2}>Precio</th><th style={th} rowSpan={2}>Cantidad</th><th style={th} rowSpan={2}>Presupuesto</th>
+                          <th style={th} rowSpan={2}>Unidad</th><th style={th} rowSpan={2}>Precio</th><th style={th} rowSpan={2}>Cantidad</th><th style={th} rowSpan={2}>Presupuesto</th><th style={{ ...th, textAlign: 'left' }} rowSpan={2}>Proveedor</th><th style={th} rowSpan={2}>Pagado</th>
                           {semanas.map(s => <th key={s.id} style={{ ...th, textAlign: 'center', borderLeft: '0.5px solid #e0e0e0' }} colSpan={colsSem}>{s.etiqueta} <span style={{ fontWeight: 400, color: '#999' }}>{fechaCorta(s.fecha)}</span></th>)}
                           <th style={th} rowSpan={2}>Ejecutado</th>
                         </tr>
@@ -511,7 +536,7 @@ function DetalleFrente({ frente, onVolver }) {
                       </thead>
                       <tbody>
                         {ps.map(p => {
-                          const filaGrupo = p.grupo && p.grupo !== grupoPrev ? <tr key={`g-${p.id}`}><td colSpan={6 + semanas.length * colsSem} style={{ ...td, textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#888', background: '#fafafa' }}>{p.grupo}</td></tr> : null;
+                          const filaGrupo = p.grupo && p.grupo !== grupoPrev ? <tr key={`g-${p.id}`}><td colSpan={8 + semanas.length * colsSem} style={{ ...td, textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#888', background: '#fafafa' }}>{p.grupo}</td></tr> : null;
                           grupoPrev = p.grupo || '__';
                           return (
                             <React.Fragment key={p.id}>
@@ -526,7 +551,15 @@ function DetalleFrente({ frente, onVolver }) {
                                 <td style={td}><Celda valor={p.unidad} onGuardar={v => guardarPartida(p, 'unidad', v)} disabled={!editaPres} ancho={60} alinear="left" /></td>
                                 <td style={td}><Celda valor={p.precio} numero onGuardar={v => guardarPartida(p, 'precio', v)} disabled={!editaPres} ancho={80} /></td>
                                 <td style={td}><Celda valor={p.cantidad} numero onGuardar={v => guardarPartida(p, 'cantidad', v)} disabled={!editaPres} ancho={80} /></td>
-                                <td style={{ ...td, fontWeight: 600 }}>{$(presP(p))}</td>
+                                <td style={{ ...td, fontWeight: 600 }}>{$(presP(p))}{Number(p.ampliado) > 0 && <div style={{ fontSize: 10, color: '#B45309', fontWeight: 400 }} title="Presupuesto extra autorizado por una requisición que rebasó">+{$(p.ampliado)}</div>}</td>
+                                <td style={{ ...td, textAlign: 'left' }}>
+                                  {puedeCompras && e.estatus !== 'cerrada'
+                                    ? <select value={p.proveedor_id || ''} onChange={ev => asignarProveedor(p, ev.target.value)} style={{ ...inp, width: 140, padding: '3px 4px' }}>
+                                        <option value="">Sin proveedor</option>{provs.filter(x => x.activo || x.id === p.proveedor_id).map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}
+                                      </select>
+                                    : <span style={{ fontSize: 11, color: '#555' }}>{provs.find(x => x.id === p.proveedor_id)?.nombre || '—'}</span>}
+                                </td>
+                                <td style={td} title={porPagarP(p) > 0 ? `Por pagar: ${$(porPagarP(p))}` : ''}>{pagadoP(p) ? $(pagadoP(p)) : '-'}{porPagarP(p) > 0 && <div style={{ fontSize: 10, color: '#1D4ED8' }}>por pagar {$(porPagarP(p))}</div>}</td>
                                 {semanas.map(s => {
                                   const r = ejPor.get(p.id)?.get(s.id);
                                   return (
@@ -542,9 +575,9 @@ function DetalleFrente({ frente, onVolver }) {
                             </React.Fragment>
                           );
                         })}
-                        {ps.length === 0 && <tr><td colSpan={6 + semanas.length * colsSem} style={{ ...td, textAlign: 'left', color: '#888', padding: 12 }}>Sin partidas en esta categoría.</td></tr>}
+                        {ps.length === 0 && <tr><td colSpan={8 + semanas.length * colsSem} style={{ ...td, textAlign: 'left', color: '#888', padding: 12 }}>Sin partidas en esta categoría.</td></tr>}
                         <tr>
-                          <td style={{ ...td, ...sticky, fontWeight: 700 }}>Total</td><td style={td}></td><td style={td}></td><td style={td}></td><td style={{ ...td, fontWeight: 700 }}>{$(pres)}</td>
+                          <td style={{ ...td, ...sticky, fontWeight: 700 }}>Total</td><td style={td}></td><td style={td}></td><td style={td}></td><td style={{ ...td, fontWeight: 700 }}>{$(pres)}</td><td style={td}></td><td style={{ ...td, fontWeight: 700 }}>{$(ps.reduce((a, p) => a + pagadoP(p), 0))}</td>
                           {semanas.map(s => (
                             <React.Fragment key={s.id}><td style={td}></td>{conPrecioSemana && <td style={td}></td>}<td style={{ ...td, fontWeight: 700 }}>{$(ps.reduce((a, p) => a + valor(p, s.id), 0))}</td></React.Fragment>
                           ))}

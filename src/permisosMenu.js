@@ -67,12 +67,13 @@ export const MENU_POR_ROL = {
   // Roles de un solo módulo — solo entran a su propia pantalla.
   'Construcción': ['direccion'],
   'Gerente de Construcción': ['direccion'],
+  'Compras': ['direccion'],
   'Tesorería': ['direccion'],
   'Titulación': ['direccion'],
 };
 
 // Roles que se pueden configurar en el panel (Super Admin siempre tiene todo).
-export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Gerente de Construcción', 'Tesorería', 'Titulación']
+export const ROLES_CONFIGURABLES = ['Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente', 'Asesor Premium', 'Construcción', 'Gerente de Construcción', 'Compras', 'Tesorería', 'Titulación']
   .filter(r => !EMPRESA.rolesOcultos.includes(r));
 
 // Pantallas que se pueden encender/apagar por rol ("Ajustes de administración"
@@ -103,6 +104,7 @@ export const reglaPorDefecto = (miRol, id, ctx = {}) => {
   if (miRol === 'Mesa de Control') return id === 'movimientos' || id === 'historial' || id === 'titulacion';
   // Construcción y Tesorería son roles de un solo módulo.
   if (miRol === 'Construcción' || miRol === 'Gerente de Construcción') return id === 'construccion' || id === 'programa_obra' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
+  if (miRol === 'Compras') return id === 'programa_obra' || id === 'obra_requisiciones';
   if (miRol === 'Tesorería') return id === 'cobranza' || id === 'programa_obra' || id === 'obra_torres' || id === 'obra_dashboard' || id === 'obra_requisiciones';
   if (miRol === 'Titulación') return id === 'titulacion';
   // Gerente Operador — Dashboard (de sus desarrollos), Movimientos, Historial,
@@ -248,7 +250,9 @@ export const ACCIONES = [
   { id: 'construccion.programa_abrir_etapa', seccion: 'Construcción', label: 'Programa: abrir y cerrar etapas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
   { id: 'construccion.programa_ampliar_solicitar', seccion: 'Construcción', label: 'Programa: pedir más presupuesto para una etapa abierta', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
   { id: 'construccion.programa_ampliar_autorizar', seccion: 'Construcción', label: 'Programa: autorizar ampliaciones de presupuesto y reabrir etapas', defecto: roles('Super Admin', 'Gerente de Construcción') },
-  { id: 'construccion.solicitar_requisiciones', seccion: 'Construcción', label: 'Requisiciones de pago: solicitar', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción') },
+  { id: 'construccion.solicitar_requisiciones', seccion: 'Construcción', label: 'Requisiciones de pago: crearlas (Compras), dar de alta proveedores y asignarlos a las partidas', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Compras') },
+  { id: 'construccion.req_materiales_solicitar', seccion: 'Construcción', label: 'Pedidos de materiales: pedirlos (Construcción)', defecto: roles('Super Admin', 'Admin', 'Sub Admin', 'Construcción', 'Gerente de Construcción') },
+  { id: 'construccion.req_autorizar_rebasa', seccion: 'Construcción', label: 'Requisiciones de pago: autorizar las que rebasan el presupuesto (Gerente de Construcción; también hace falta un Super Admin)', defecto: roles('Super Admin', 'Gerente de Construcción') },
   { id: 'construccion.autorizar_requisiciones', seccion: 'Construcción', label: 'Requisiciones de pago: autorizar o rechazar', defecto: roles('Super Admin', 'Admin') },
 
   // Marketing (cada asesor solo trabaja sus propios leads; los Gerentes, los de sus desarrollos).
