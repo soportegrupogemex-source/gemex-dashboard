@@ -42,7 +42,7 @@ const VACIO = {
   autorizacion_financiera_1_monto: 0, autorizacion_financiera_2_monto: 0,
 };
 
-function calcularEtapa(s) {
+export function calcularEtapa(s) {
   const paso1 = s.dtu && s.lista_avaluo;
   const avaluoListo = !!s.fecha_terminacion_avaluo;
   const paso2 = paso1 && avaluoListo && PASO2.every(p => s[p.campo]);

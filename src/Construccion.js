@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 import { usePuede } from './PermisosContext';
 import { resumen, traerTodo, indexar, nombreFrente, etiquetaAgrupacion } from './ObraTorres';
+import { calcularEtapa } from './Titulacion';
 
 // FIX: módulo de Construcción — reporta el Paso 1 del proceso de
 // Titulación (Avance de obra, DTU, Lista para avalúo) para TODAS las
@@ -20,6 +21,9 @@ import { resumen, traerTodo, indexar, nombreFrente, etiquetaAgrupacion } from '.
 const torreDe = (u) => (String(u.numero || '').trim().match(/^([A-Za-zÁÉÍÓÚÑ]+)/)?.[1] || '').toUpperCase();
 
 const VACIO = { avance_obra_pct: 0, dtu: false, lista_avaluo: false };
+
+// Escriturada = la misma etapa que marca Titulación (paso 1 y paso 2 completos).
+const estaEscriturada = (s) => !!s && calcularEtapa(s) === 'Escriturado';
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -241,6 +245,12 @@ export default function Construccion() {
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {estaEscriturada(seguimientos[u.id]) && (
+                      <div title={seguimientos[u.id].escriturado_en ? `Escriturada el ${new Date(seguimientos[u.id].escriturado_en).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Escriturada'}
+                        style={{ fontSize: '11px', fontWeight: '700', color: '#fff', background: '#10B981', borderRadius: '20px', padding: '4px 12px' }}>
+                        Escriturada
+                      </div>
+                    )}
                     {deObra[u.id] && (
                       <div title={`Avance que marca el programa de obra (${deObra[u.id].frente})`}
                         style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '20px', background: deObra[u.id].pct === Number(s.avance_obra_pct || 0) ? '#f3f3f5' : '#FFF4E5', color: deObra[u.id].pct === Number(s.avance_obra_pct || 0) ? '#888' : '#B45309' }}>
