@@ -1,111 +1,104 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from './supabase';
-import { usePuede } from './PermisosContext';
-import {
-  resumen, progPct, Barra, Tarjeta, traerTodo, useIsMobile, parse, hoyISO, fechaCorta, pct1, $,
-  indexar, hojasDe, etapasDe, rutaDe, nombreTipoFrente, nombreFrente, TOLERANCIA, fechaDe, curvaS,
-} from './ObraTorres';
+import { traerTodo, useIsMobile, $, pct1, Tarjeta } from './ObraTorres';
 import { exportarExcel, exportarPdf } from './obraReportes';
 
-// Dashboard de obra — una sola hoja con el avance real contra el programado de cada proyecto.
-// Solo aparecen los proyectos que tienen al menos un frente con programa capturado
-// (un desarrollo de pura comercialización no trae obra y no aparece).
-const SERIE_REAL = '#2a78d6';
-const SERIE_PROG = '#eb6834';
-const VERDE = '#10B981';
+// Dashboard de obra — ligado al Programa (prog_*): presupuesto, ejecución semanal, pagado por requisiciones
+// y avisos (topes, partidas que rebasan, autorizaciones pendientes) de cada frente de cada proyecto.
+// El avance es en dinero: ejecutado (unidades x precio) entre el presupuesto cargado (cantidad x precio + lo autorizado de más).
+const CATEGORIAS = [
+  { id: 'mano_obra', label: 'Mano de obra' },
+  { id: 'materiales', label: 'Materiales' },
+  { id: 'subcontratos', label: 'Subcontratos' },
+  { id: 'maquinaria', label: 'Maquinaria' },
+  { id: 'indirectos', label: 'Indirectos' },
+];
+const ESTATUS = {
+  presupuesto: { txt: 'Por abrir', color: '#B45309', fondo: '#FFF4E5' },
+  abierta: { txt: 'Abierta', color: '#27500A', fondo: '#EAF3DE' },
+  cerrada: { txt: 'Cerrada', color: '#475569', fondo: '#EEF2F6' },
+};
+const SERIE = '#2a78d6';
 const ROJO = '#C0392B';
+const AMBAR = '#B45309';
 const sel = { padding: '6px 8px', border: '0.5px solid #ddd', borderRadius: 6, fontSize: 12, boxSizing: 'border-box' };
-
-const colorDesv = (d) => (d === null ? '#888' : d >= -TOLERANCIA ? VERDE : ROJO);
-const textoDesv = (d) => (d === null ? '—' : `${d >= 0 ? '+' : ''}${Math.round(d * 10) / 10} pts`);
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const fechaCorta = (s) => { if (!s) return ''; const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return `${d} ${MESES[m - 1]} ${String(y).slice(2)}`; };
+const trozos = (arr, n) => { const r = []; for (let i = 0; i < arr.length; i += n) r.push(arr.slice(i, i + n)); return r; };
+const pct = (a, b) => (Number(b) > 0 ? (Number(a) / Number(b)) * 100 : 0);
 
 function Chip({ children, color = '#555', fondo = '#f3f3f5' }) {
-  return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: fondo, color, whiteSpace: 'nowrap' }}>{children}</span>;
+  return <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: fondo, color, whiteSpace: 'nowrap', fontWeight: 600 }}>{children}</span>;
+}
+const ChipEstatus = ({ estatus }) => { const s = ESTATUS[estatus] || ESTATUS.presupuesto; return <Chip color={s.color} fondo={s.fondo}>{s.txt}</Chip>; };
+
+// Barra de avance: relleno = ejecutado / presupuesto; la marca roja es el tope (si lo hay) y la franja gris claro lo pagado.
+function BarraAvance({ valor, alto = 8 }) {
+  const v = Math.max(0, Math.min(100, valor || 0));
+  return (
+    <div style={{ position: 'relative', height: alto, background: '#eee', borderRadius: alto, overflow: 'hidden' }}>
+      <div style={{ width: `${v}%`, height: '100%', background: (valor || 0) > 100 ? ROJO : (valor || 0) >= 100 ? '#10B981' : '#3B82F6' }} />
+    </div>
+  );
 }
 
-function EstadoChip({ f }) {
-  if (f.r.programado === null) return <Chip color="#856404" fondo="#FFF8E1">{f.arr ? 'Sin calendario' : 'Sin fecha de arranque'}</Chip>;
-  if (f.r.atrasadas > 0 && f.desv < -TOLERANCIA) return <Chip color={ROJO} fondo="#FDECEC">Atrasado</Chip>;
-  if (f.r.real >= 100) return <Chip color="#27500A" fondo="#EAF3DE">Terminado</Chip>;
-  return <Chip color="#27500A" fondo="#EAF3DE">En tiempo</Chip>;
-}
-
-
-// Curva S: avance real contra programado semana a semana. Dos series en un solo eje (0-100%),
-// leyenda siempre, etiquetas directas al final de cada línea, tooltip al pasar y vista de tabla.
-function CurvaS({ curva }) {
+// Ejecución acumulada semana a semana como % del presupuesto del frente. Una sola serie; tooltip al pasar y vista de tabla.
+function CurvaEjecucion({ curva }) {
   const [hover, setHover] = useState(null);
   const [tabla, setTabla] = useState(false);
-  const W = 680, H = 230, ML = 38, MR = 74, MT = 14, MB = 26;
-  const xMax = Math.max(curva.maxSem, curva.proy ? Math.min(curva.proy.semFin, curva.maxSem * 1.6) : 0);
-  const X = (w) => ML + (w / xMax) * (W - ML - MR);
-  const Y = (v) => MT + (1 - v / 100) * (H - MT - MB);
-  const pts = (arr) => arr.map(([w, v]) => `${X(w).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-  const prog = curva.filas.map(f => [f.w, f.prog]);
-  const real = curva.filas.filter(f => f.real !== null && f.w <= curva.xHoy).map(f => [f.w, f.real]);
-  if (curva.realHoy !== null && curva.xHoy >= 0) real.push([Math.min(curva.xHoy, curva.maxSem), curva.realHoy]);
-  const ultimo = real[real.length - 1];
-  const paso = Math.max(1, Math.ceil(curva.maxSem / 8));
-  const ticks = []; for (let w = 0; w <= xMax; w += paso) ticks.push(w);
+  const W = 680, H = 210, ML = 38, MR = 56, MT = 14, MB = 26;
+  const n = curva.length;
+  const yMax = Math.max(100, ...curva.map(c => c.pct));
+  const X = (i) => ML + (n <= 1 ? 0 : (i / (n - 1)) * (W - ML - MR));
+  const Y = (v) => MT + (1 - v / yMax) * (H - MT - MB);
+  const puntos = curva.map((c, i) => `${X(i).toFixed(1)},${Y(c.pct).toFixed(1)}`).join(' ');
   const sobre = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * W;
-    setHover(Math.max(0, Math.min(curva.maxSem, Math.round(((x - ML) / (W - ML - MR)) * xMax))));
+    setHover(Math.max(0, Math.min(n - 1, Math.round(((x - ML) / (W - ML - MR)) * (n - 1)))));
   };
-  const hf = hover !== null ? curva.filas[hover] : null;
+  const hc = hover !== null ? curva[hover] : null;
+  const paso = Math.max(1, Math.ceil(n / 8));
+  const ultimo = curva[n - 1];
+  const ticks = [0, 25, 50, 75, 100].filter(v => v <= yMax);
   return (
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>Curva S · avance acumulado</div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}><span style={{ width: 16, height: 2, background: SERIE_REAL, display: 'inline-block' }} />Avance real</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}><span style={{ width: 16, borderTop: `2px dashed ${SERIE_PROG}`, display: 'inline-block' }} />Programado</span>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e' }}>Ejecución acumulada por semana</div>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#555' }}><span style={{ width: 16, height: 2, background: SERIE, display: 'inline-block' }} />Ejecutado / presupuesto</span>
         <button onClick={() => setTabla(t => !t)} style={{ ...sel, padding: '2px 8px', background: '#fff', cursor: 'pointer', color: '#555', marginLeft: 'auto' }}>{tabla ? 'Ver gráfica' : 'Ver tabla'}</button>
       </div>
-      {curva.proy ? (
-        <div style={{ fontSize: 11, color: '#555', marginBottom: 6 }}>
-          Al ritmo actual terminaría el <b>{fechaCorta(curva.proy.fecha)} {parse(curva.proy.fecha).getFullYear()}</b>
-          {Math.abs(curva.proy.difSem) < 0.5 ? ', en la fecha programada' : curva.proy.difSem > 0 ? `, unas ${Math.round(curva.proy.difSem)} semanas después de lo programado` : `, unas ${Math.round(-curva.proy.difSem)} semanas antes de lo programado`}.
-        </div>
-      ) : <div style={{ fontSize: 11, color: '#aaa', marginBottom: 6 }}>{curva.realHoy > 0 ? '' : 'Sin avance registrado todavía: la proyección aparece en cuanto haya avance.'}</div>}
       {tabla ? (
         <div style={{ maxHeight: 240, overflow: 'auto', border: '0.5px solid #eee', borderRadius: 8 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-            <thead><tr style={{ background: '#f7f7f9', textAlign: 'right' }}><th style={{ textAlign: 'left', padding: '4px 8px' }}>Semana</th><th style={{ padding: '4px 8px' }}>Fin de semana</th><th style={{ padding: '4px 8px' }}>Programado</th><th style={{ padding: '4px 8px' }}>Real</th></tr></thead>
-            <tbody>{curva.filas.map(f => (
-              <tr key={f.w} style={{ borderTop: '0.5px solid #f3f3f3', textAlign: 'right' }}>
-                <td style={{ textAlign: 'left', padding: '3px 8px' }}>{f.w === 0 ? 'Arranque' : `S${f.w}`}</td><td style={{ padding: '3px 8px' }}>{f.fecha ? fechaCorta(f.fecha) : '—'}</td>
-                <td style={{ padding: '3px 8px' }}>{pct1(f.prog)}</td><td style={{ padding: '3px 8px' }}>{f.real === null ? '—' : pct1(f.real)}</td>
+            <thead><tr style={{ background: '#f7f7f9', textAlign: 'right' }}><th style={{ textAlign: 'left', padding: '4px 8px' }}>Semana</th><th style={{ padding: '4px 8px' }}>Fecha</th><th style={{ padding: '4px 8px' }}>Ejecutado en la semana</th><th style={{ padding: '4px 8px' }}>Acumulado</th><th style={{ padding: '4px 8px' }}>% del presupuesto</th></tr></thead>
+            <tbody>{curva.map((c, i) => (
+              <tr key={i} style={{ borderTop: '0.5px solid #f3f3f3', textAlign: 'right' }}>
+                <td style={{ textAlign: 'left', padding: '3px 8px' }}>{c.etiqueta}</td><td style={{ padding: '3px 8px' }}>{c.fecha ? fechaCorta(c.fecha) : '—'}</td>
+                <td style={{ padding: '3px 8px' }}>{$(c.semana)}</td><td style={{ padding: '3px 8px' }}>{$(c.acum)}</td><td style={{ padding: '3px 8px' }}>{pct1(c.pct)}</td>
               </tr>))}</tbody>
           </table>
         </div>
       ) : (
         <div style={{ position: 'relative' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Curva S de avance real contra programado">
-            {[0, 25, 50, 75, 100].map(v => (
-              <g key={v}><line x1={ML} x2={W - MR} y1={Y(v)} y2={Y(v)} stroke="#ececef" strokeWidth="1" />
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} role="img" aria-label="Ejecución acumulada contra el presupuesto del frente">
+            {ticks.map(v => (
+              <g key={v}><line x1={ML} x2={W - MR} y1={Y(v)} y2={Y(v)} stroke={v === 100 ? '#c9c9cf' : '#ececef'} strokeWidth="1" strokeDasharray={v === 100 ? '4 3' : undefined} />
                 <text x={ML - 6} y={Y(v) + 3} textAnchor="end" fontSize="10" fill="#888">{v}%</text></g>
             ))}
-            {ticks.map(w => <text key={w} x={X(w)} y={H - 8} textAnchor="middle" fontSize="10" fill="#888">{w === 0 ? '0' : `S${w}`}</text>)}
-            {curva.xHoy >= 0 && curva.xHoy <= curva.maxSem && (
-              <g><line x1={X(curva.xHoy)} x2={X(curva.xHoy)} y1={MT} y2={H - MB} stroke="#c9c9cf" strokeWidth="1" />
-                <text x={X(curva.xHoy)} y={MT - 3} textAnchor="middle" fontSize="9" fill="#888">hoy</text></g>
-            )}
-            <polyline points={pts(prog)} fill="none" stroke={SERIE_PROG} strokeWidth="2" strokeDasharray="5 4" strokeLinejoin="round" strokeLinecap="round" />
-            {curva.proy && ultimo && <polyline points={pts([ultimo, [Math.min(curva.proy.semFin, xMax), 100]])} fill="none" stroke={SERIE_REAL} strokeOpacity="0.45" strokeWidth="2" strokeDasharray="2 4" strokeLinecap="round" />}
-            {real.length > 1 && <polyline points={pts(real)} fill="none" stroke={SERIE_REAL} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
-            {ultimo && <circle cx={X(ultimo[0])} cy={Y(ultimo[1])} r="4.5" fill={SERIE_REAL} stroke="#fff" strokeWidth="2" />}
-            <text x={W - MR + 6} y={Y(prog[prog.length - 1][1]) + 3} fontSize="10" fill="#555">Programado</text>
-            {ultimo && <text x={Math.min(X(ultimo[0]) + 8, W - 40)} y={Y(ultimo[1]) - 8} fontSize="10" fill="#555">{pct1(ultimo[1])}</text>}
-            {hf && <g><line x1={X(hf.w)} x2={X(hf.w)} y1={MT} y2={H - MB} stroke="#9a9aa2" strokeWidth="1" />
-              <circle cx={X(hf.w)} cy={Y(hf.prog)} r="4" fill={SERIE_PROG} stroke="#fff" strokeWidth="2" />
-              {hf.real !== null && <circle cx={X(hf.w)} cy={Y(hf.real)} r="4" fill={SERIE_REAL} stroke="#fff" strokeWidth="2" />}</g>}
+            {curva.map((c, i) => (i % paso === 0 ? <text key={i} x={X(i)} y={H - 8} textAnchor="middle" fontSize="10" fill="#888">{c.corta}</text> : null))}
+            <text x={W - MR + 6} y={Y(100) + 3} fontSize="10" fill="#888">Presupuesto</text>
+            {n > 1 && <polyline points={puntos} fill="none" stroke={SERIE} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />}
+            <circle cx={X(n - 1)} cy={Y(ultimo.pct)} r="4.5" fill={SERIE} stroke="#fff" strokeWidth="2" />
+            <text x={Math.min(X(n - 1) + 8, W - 40)} y={Y(ultimo.pct) - 8} fontSize="10" fill="#555">{pct1(ultimo.pct)}</text>
+            {hc && <g><line x1={X(hover)} x2={X(hover)} y1={MT} y2={H - MB} stroke="#9a9aa2" strokeWidth="1" /><circle cx={X(hover)} cy={Y(hc.pct)} r="4" fill={SERIE} stroke="#fff" strokeWidth="2" /></g>}
             <rect x={ML} y={MT} width={W - ML - MR} height={H - MT - MB} fill="transparent" onMouseMove={sobre} onMouseLeave={() => setHover(null)} />
           </svg>
-          {hf && (
-            <div style={{ position: 'absolute', top: 6, left: `${Math.min(80, (X(hf.w) / W) * 100 + 2)}%`, background: '#fff', border: '0.5px solid #ddd', borderRadius: 8, padding: '6px 10px', fontSize: 11, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontWeight: 700, marginBottom: 2 }}>{hf.w === 0 ? 'Arranque' : `Semana ${hf.w} · ${fechaCorta(hf.fecha)}`}</div>
-              <div style={{ color: '#555' }}>Programado: <b>{pct1(hf.prog)}</b></div>
-              <div style={{ color: '#555' }}>Real: <b>{hf.real === null ? '—' : pct1(hf.real)}</b></div>
+          {hc && (
+            <div style={{ position: 'absolute', top: 6, left: `${Math.min(75, (X(hover) / W) * 100 + 2)}%`, background: '#fff', border: '0.5px solid #ddd', borderRadius: 8, padding: '6px 10px', fontSize: 11, pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>{hc.etiqueta}{hc.fecha ? ` · ${fechaCorta(hc.fecha)}` : ''}</div>
+              <div style={{ color: '#555' }}>En la semana: <b>{$(hc.semana)}</b></div>
+              <div style={{ color: '#555' }}>Acumulado: <b>{$(hc.acum)}</b> ({pct1(hc.pct)})</div>
             </div>
           )}
         </div>
@@ -114,75 +107,93 @@ function CurvaS({ curva }) {
   );
 }
 
-function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
-  const { t, r, desv } = f;
+function FilaFrente({ f, abierto, onAlternar, isMobile }) {
+  const sinPres = f.pres <= 0;
   return (
     <div style={{ borderTop: '0.5px solid #eee' }}>
       <div onClick={onAlternar} style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap', padding: '12px 14px', cursor: 'pointer' }}>
         <span style={{ fontSize: 10, transform: abierto ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }}>▶</span>
         <div style={{ flex: isMobile ? '1 1 60%' : '0 0 210px' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>{nombreFrente(t)}</div>
-          <div style={{ fontSize: 11, color: '#888' }}>
-            {nombreTipoFrente(t)}{t.tipo === 'tren' && t.num_viviendas ? ` · ${t.num_viviendas} viviendas` : ''}
-          </div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1a1a2e' }}>{f.f.nombre}</div>
+          <div style={{ fontSize: 11, color: '#888' }}>{[f.f.etapa_desarrollo, f.f.viviendas ? `${f.f.viviendas} viviendas` : null].filter(Boolean).join(' · ') || 'Frente'}</div>
         </div>
         <div style={{ flex: '1 1 180px', minWidth: 160 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 3 }}>
-            <b>{pct1(r.real)}</b>
-            <span style={{ color: '#888' }}>{r.programado === null ? 'sin programado' : `prog. ${pct1(r.programado)}`}</span>
+            <b>{sinPres ? '—' : pct1(f.avance)}</b>
+            <span style={{ color: '#888' }}>{$(f.ejc)} de {$(f.pres)}</span>
           </div>
-          <Barra real={r.real} prog={r.programado} />
+          <BarraAvance valor={f.avance} />
         </div>
-        <div style={{ flex: '0 0 90px', textAlign: 'right' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: colorDesv(desv) }}>{textoDesv(desv)}</div>
-          <div style={{ fontSize: 10, color: '#aaa' }}>desviación</div>
+        <div style={{ flex: '0 0 130px', textAlign: 'right', fontSize: 12 }}>
+          <div><b>{f.etapas.filter(e => e.estatus === 'abierta').length}</b><span style={{ color: '#888' }}> abiertas</span></div>
+          <div style={{ fontSize: 10, color: '#aaa' }}>{f.etapas.length} {f.etapas.length === 1 ? 'etapa' : 'etapas'} · {f.etapas.filter(e => e.estatus === 'cerrada').length} cerradas</div>
         </div>
-        <div style={{ flex: '0 0 110px', textAlign: 'right', fontSize: 12 }}>
-          <div><b>{r.terminadas}</b><span style={{ color: '#888' }}> / {r.total} terminadas</span></div>
-          <div style={{ fontSize: 10, color: r.atrasadas > 0 ? ROJO : '#aaa' }}>{r.atrasadas} atrasadas</div>
+        <div style={{ flex: '0 0 150px', textAlign: 'right', fontSize: 11 }}>
+          <div style={{ color: '#555' }}>Pagado {sinPres ? '—' : pct1(pct(f.pagado, f.pres))}</div>
+          <div style={{ color: '#aaa', fontSize: 10 }}>{$(f.pagado)}{f.porPagar > 0 ? ` · por pagar ${$(f.porPagar)}` : ''}</div>
         </div>
-        <div style={{ flex: '0 0 130px', textAlign: 'right', fontSize: 11, color: '#555' }}>
-          {f.semanaTxt}
-          {f.terminaTxt && <div style={{ color: '#aaa', fontSize: 10 }}>{f.terminaTxt}</div>}
-        </div>
-        <EstadoChip f={f} />
-        {verCostos && (
-          <div style={{ flex: '0 0 150px', textAlign: 'right', fontSize: 11 }}>
-            <div style={{ color: '#555' }}>Pagado {f.presupuesto > 0 ? pct1((f.pagado / f.presupuesto) * 100) : '—'}</div>
-            <div style={{ color: '#aaa', fontSize: 10 }}>{$(f.pagado)} de {$(f.presupuesto)}</div>
-          </div>
-        )}
+        {f.avisos.length > 0 ? <Chip color={AMBAR} fondo="#FFF4E5">{f.avisos.length} {f.avisos.length === 1 ? 'aviso' : 'avisos'}</Chip> : <Chip color="#27500A" fondo="#EAF3DE">Sin avisos</Chip>}
       </div>
       {abierto && (
         <div style={{ padding: '4px 14px 16px 40px' }}>
-          {f.curva && <CurvaS curva={f.curva} />}
+          {f.avisos.length > 0 && (
+            <div style={{ background: '#FFF8EC', border: '0.5px solid #F2DDB5', borderRadius: 8, padding: '8px 12px', marginBottom: 14 }}>
+              {f.avisos.map((a, i) => <div key={i} style={{ fontSize: 12, color: '#6b4a0d', padding: '2px 0' }}>{a}</div>)}
+            </div>
+          )}
+          {f.curva.length > 0 ? <CurvaEjecucion curva={f.curva} /> : <div style={{ fontSize: 12, color: '#888', marginBottom: 14 }}>Todavía no hay ejecución capturada: la curva aparece en cuanto Construcción capture la primera semana en Programa.</div>}
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Avance por etapa</div>
-            {f.etapas.map(e => (
-              <div key={e.nombre} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <div style={{ flex: '0 0 150px', fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.nombre}>{e.nombre}</div>
-                <div style={{ flex: 1 }}><Barra real={e.r.real} prog={e.r.programado} alto={6} /></div>
-                <div style={{ flex: '0 0 52px', fontSize: 12, textAlign: 'right' }}><b>{pct1(e.r.real)}</b></div>
-                <div style={{ flex: '0 0 74px', fontSize: 10, color: e.r.atrasadas > 0 ? ROJO : '#aaa', textAlign: 'right' }}>{e.r.atrasadas > 0 ? `${e.r.atrasadas} atrasadas` : `${e.r.terminadas}/${e.r.total} term.`}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Partidas más atrasadas</div>
-            {f.atrasadas.length === 0 ? <div style={{ fontSize: 12, color: '#888' }}>Ninguna partida atrasada.</div> : f.atrasadas.map(x => (
-              <div key={x.p.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '5px 0', borderBottom: '0.5px solid #f3f3f3' }}>
-                <div style={{ flex: 1, fontSize: 12, color: '#333', minWidth: 0 }}>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.ruta}>{x.p.descripcion}</div>
-                  <div style={{ fontSize: 10, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.ruta}</div>
+            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Avance por etapa</div>
+              {f.etapas.length === 0 && <div style={{ fontSize: 12, color: '#888' }}>Sin etapas.</div>}
+              {f.etapas.map(e => (
+                <div key={e.id} style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <div style={{ flex: 1, fontSize: 12, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.nombre}>{e.nombre}</div>
+                    <ChipEstatus estatus={e.estatus} />
+                    <div style={{ flex: '0 0 48px', fontSize: 12, textAlign: 'right' }}><b>{e.pres > 0 ? pct1(e.avance) : '—'}</b></div>
+                  </div>
+                  <BarraAvance valor={e.avance} alto={6} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#aaa', marginTop: 2, gap: 8, flexWrap: 'wrap' }}>
+                    <span>{$(e.ejc)} de {$(e.pres)}{e.ampliado > 0 ? ` (incluye ${$(e.ampliado)} ampliado)` : ''}</span>
+                    <span>Pagado {$(e.pagado)}</span>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <b>{pct1(x.p.avance_pct)}</b> <span style={{ color: '#888' }}>de {pct1(x.pp)}</span>
-                  <div style={{ fontSize: 10, color: ROJO }}>{Math.round((x.pp - Number(x.p.avance_pct)) * 10) / 10} pts abajo</div>
-                </div>
+              ))}
+            </div>
+            <div style={{ flex: '1 1 340px', minWidth: 280 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', marginBottom: 8 }}>Por categoría</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                  <thead><tr style={{ color: '#888', textAlign: 'right' }}><th style={{ textAlign: 'left', padding: '3px 6px', fontWeight: 500 }}>Categoría</th><th style={{ padding: '3px 6px', fontWeight: 500 }}>Presupuesto</th><th style={{ padding: '3px 6px', fontWeight: 500 }}>Ejecutado</th><th style={{ padding: '3px 6px', fontWeight: 500 }}>%</th><th style={{ padding: '3px 6px', fontWeight: 500 }}>Pagado</th></tr></thead>
+                  <tbody>
+                    {f.cats.map(c => (
+                      <tr key={c.id} style={{ borderTop: '0.5px solid #f3f3f3', textAlign: 'right' }}>
+                        <td style={{ textAlign: 'left', padding: '4px 6px', color: '#333' }}>{c.label}</td>
+                        <td style={{ padding: '4px 6px' }}>{$(c.pres)}</td><td style={{ padding: '4px 6px' }}>{$(c.ejc)}</td>
+                        <td style={{ padding: '4px 6px' }}>{c.pres > 0 ? pct1(pct(c.ejc, c.pres)) : '—'}</td><td style={{ padding: '4px 6px' }}>{$(c.pagado)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: '1px solid #ddd', textAlign: 'right', fontWeight: 700 }}>
+                      <td style={{ textAlign: 'left', padding: '4px 6px' }}>Total</td><td style={{ padding: '4px 6px' }}>{$(f.pres)}</td><td style={{ padding: '4px 6px' }}>{$(f.ejc)}</td>
+                      <td style={{ padding: '4px 6px' }}>{f.pres > 0 ? pct1(f.avance) : '—'}</td><td style={{ padding: '4px 6px' }}>{$(f.pagado)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
+              {f.rebasan.length > 0 && (<>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1a2e', margin: '14px 0 6px' }}>Partidas que ya ejecutaron más que su presupuesto</div>
+                {f.rebasan.slice(0, 8).map(x => (
+                  <div key={x.id} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '5px 0', borderBottom: '0.5px solid #f3f3f3' }}>
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#333' }}>
+                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={x.descripcion}>{x.descripcion}</div>
+                      <div style={{ fontSize: 10, color: '#aaa' }}>{x.etapa}</div>
+                    </div>
+                    <div style={{ fontSize: 11, textAlign: 'right', whiteSpace: 'nowrap' }}><b>{$(x.ejc)}</b> <span style={{ color: '#888' }}>de {$(x.pres)}</span><div style={{ fontSize: 10, color: ROJO }}>+{$(x.ejc - x.pres)}</div></div>
+                  </div>
+                ))}
+              </>)}
+            </div>
           </div>
         </div>
       )}
@@ -191,117 +202,131 @@ function FilaFrente({ f, verCostos, abierto, onAlternar, isMobile }) {
 }
 
 export default function ObraDashboard() {
-  const puede = usePuede();
-  const verCostos = puede('construccion.editar_costos_obra') || puede('construccion.registrar_pagos_obra');
   const isMobile = useIsMobile();
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
-  const [datos, setDatos] = useState({ torres: [], partidas: [], programa: [], contratos: [], pagos: [], avances: [], conceptos: [], gastos: [] });
+  const [datos, setDatos] = useState({ frentes: [], etapas: [], semanas: [], partidas: [], ejec: [], ampl: [], cargos: [], pedidos: [] });
   const [filtro, setFiltro] = useState('');
   const [abiertos, setAbiertos] = useState({});
 
   const cargar = useCallback(async () => {
     setCargando(true); setError('');
     try {
-      const [torres, partidas, programa, contratos, pagos, avances, conceptos, gastos] = await Promise.all([
-        traerTodo(() => supabase.from('obra_torres').select('*, desarrollos(id, nombre, estructura)').eq('es_plantilla', false).order('created_at')),
-        traerTodo(() => supabase.from('obra_partidas').select('id, torre_id, parent_id, etapa, etapa_orden, orden, descripcion, avance_pct, cantidad, precio_unitario, terminada_en, contrato_id').order('id')),
-        traerTodo(() => supabase.from('obra_programa').select('partida_id, semana, dia').order('partida_id').order('semana').order('dia')),
-        verCostos ? traerTodo(() => supabase.from('obra_contratos').select('id, torre_id, tipo, monto_fijo').order('id')) : Promise.resolve([]),
-        verCostos ? traerTodo(() => supabase.from('obra_pagos').select('contrato_id, monto').order('id')) : Promise.resolve([]),
-        traerTodo(() => supabase.from('obra_avance').select('partida_id, fecha, pct, created_at').order('partida_id').order('fecha').order('created_at')),
-        verCostos ? traerTodo(() => supabase.from('obra_conceptos').select('id, torre_id, cantidad, precio_unitario').order('id')) : Promise.resolve([]),
-        verCostos ? traerTodo(() => supabase.from('obra_gastos').select('concepto_id, monto').order('id')) : Promise.resolve([]),
+      const [fr, etapas, semanas, partidas, ampl, pedidos] = await Promise.all([
+        supabase.from('prog_frentes').select('*, desarrollos(id, nombre)').order('created_at'),
+        traerTodo(() => supabase.from('prog_etapas').select('id, frente_id, nombre, orden, estatus, tope').order('id')),
+        traerTodo(() => supabase.from('prog_semanas').select('id, frente_id, orden, etiqueta, fecha').order('id')),
+        traerTodo(() => supabase.from('prog_partidas').select('id, etapa_id, categoria, descripcion, cantidad, precio, ampliado').order('id')),
+        traerTodo(() => supabase.from('prog_ampliaciones').select('etapa_id, monto, estatus').order('id')),
+        traerTodo(() => supabase.from('req_materiales').select('id, etapa_id, estatus').in('estatus', ['solicitada', 'en_compra']).order('id')),
       ]);
-      setDatos({ torres, partidas, programa, contratos, pagos, avances, conceptos, gastos });
+      if (fr.error) throw fr.error;
+      let ejec = [], cargos = [];
+      for (const lote of trozos(partidas.map(p => p.id), 120)) {
+        ejec = ejec.concat(await traerTodo(() => supabase.from('prog_ejecucion').select('partida_id, semana_id, unidades, precio').in('partida_id', lote).order('id')));
+        cargos = cargos.concat(await traerTodo(() => supabase.from('obra_requisicion_cargos').select('requisicion_id, prog_partida_id, monto, obra_requisiciones!inner(estatus, rebasa)').in('prog_partida_id', lote).order('id')));
+      }
+      setDatos({ frentes: fr.data || [], etapas, semanas, partidas, ejec, ampl, cargos, pedidos });
     } catch (e) { setError(e.message || String(e)); }
     setCargando(false);
-  }, [verCostos]);
+  }, []);
   useEffect(() => { cargar(); }, [cargar]);
 
-  const hoy = hoyISO();
-  const { proyectos, sinPrograma, global } = useMemo(() => {
-    const { torres, partidas, programa, contratos, pagos, avances, conceptos, gastos } = datos;
-    const gastadoPorConcepto = new Map();
-    gastos.forEach(g => gastadoPorConcepto.set(g.concepto_id, (gastadoPorConcepto.get(g.concepto_id) || 0) + Number(g.monto || 0)));
-    const hist = new Map();
-    avances.forEach(a => { if (!hist.has(a.partida_id)) hist.set(a.partida_id, []); hist.get(a.partida_id).push({ fecha: a.fecha, pct: a.pct }); });
-    const progMap = new Map();
-    programa.forEach(x => { if (!progMap.has(x.partida_id)) progMap.set(x.partida_id, []); progMap.get(x.partida_id).push({ semana: x.semana, dia: x.dia }); });
-    const porTorre = new Map();
-    partidas.forEach(p => { if (!porTorre.has(p.torre_id)) porTorre.set(p.torre_id, []); porTorre.get(p.torre_id).push(p); });
-    const contratoTorre = new Map(contratos.map(c => [c.id, c]));
-    const pagadoPorContrato = new Map();
-    pagos.forEach(g => pagadoPorContrato.set(g.contrato_id, (pagadoPorContrato.get(g.contrato_id) || 0) + Number(g.monto || 0)));
-
-    const frentes = [];
-    let sin = 0;
-    torres.forEach(t => {
-      const ps = porTorre.get(t.id) || [];
-      const hijos = indexar(ps);
-      const hojas = ps.filter(p => !hijos.has(p.id));
-      // Se sigue la obra de un frente si tiene calendario programado o ya lleva avance real capturado.
-      if (!hojas.some(p => (progMap.get(p.id) || []).length > 0 || Number(p.avance_pct) > 0)) { sin++; return; }
-      const arr = t.fecha_arranque || null;
-      const r = resumen(hojas, progMap, arr);
-      const desv = r.programado === null ? null : r.realProgramadas - r.programado;
-      const porId = new Map(ps.map(p => [p.id, p]));
-      let maxSem = 0, maxDia = 0;
-      hojas.forEach(p => (progMap.get(p.id) || []).forEach(x => { if (x.semana > maxSem || (x.semana === maxSem && x.dia > maxDia)) { maxSem = x.semana; maxDia = x.dia; } }));
-      let semanaTxt = maxSem > 0 ? `${maxSem} semanas de programa` : 'Sin calendario (solo avance real)', terminaTxt = '';
-      if (arr && maxSem > 0) {
-        const sem = Math.floor((parse(hoy) - parse(arr)) / 86400000 / 7) + 1;
-        semanaTxt = sem < 1 ? `Arranca ${fechaCorta(arr)}` : sem > maxSem ? `Plazo cumplido (${maxSem} sem.)` : `Semana ${sem} de ${maxSem}`;
-        terminaTxt = `Termina prog. ${fechaCorta(fechaDe(arr, maxSem, maxDia))}`;
+  const proyectos = useMemo(() => {
+    const { frentes, etapas, semanas, partidas, ejec, ampl, cargos, pedidos } = datos;
+    const presP = (p) => Number(p.cantidad || 0) * Number(p.precio || 0) + Number(p.ampliado || 0);
+    const partMap = new Map(partidas.map(p => [p.id, p]));
+    const etMap = new Map(etapas.map(e => [e.id, e]));
+    const ejcPart = new Map(), semFrente = new Map();
+    ejec.forEach(r => {
+      const p = partMap.get(r.partida_id); if (!p) return;
+      const v = Number(r.unidades || 0) * Number(r.precio ?? p.precio ?? 0);
+      ejcPart.set(p.id, (ejcPart.get(p.id) || 0) + v);
+      const fid = etMap.get(p.etapa_id)?.frente_id; if (!fid) return;
+      if (!semFrente.has(fid)) semFrente.set(fid, new Map());
+      semFrente.get(fid).set(r.semana_id, (semFrente.get(fid).get(r.semana_id) || 0) + v);
+    });
+    const pagoPart = new Map(), autorizarFrente = new Map();
+    cargos.forEach(k => {
+      const est = k.obra_requisiciones?.estatus;
+      const v = pagoPart.get(k.prog_partida_id) || { pagado: 0, porPagar: 0 };
+      if (est === 'pagada') v.pagado += Number(k.monto || 0); else if (est === 'solicitada' || est === 'autorizada') v.porPagar += Number(k.monto || 0);
+      pagoPart.set(k.prog_partida_id, v);
+      if (est === 'solicitada' && k.obra_requisiciones?.rebasa) {
+        const fid = etMap.get(partMap.get(k.prog_partida_id)?.etapa_id)?.frente_id;
+        if (fid) { if (!autorizarFrente.has(fid)) autorizarFrente.set(fid, new Set()); autorizarFrente.get(fid).add(k.requisicion_id); }
       }
-      const etapas = etapasDe(ps).map(e => ({ nombre: e.nombre, r: resumen(e.raices.flatMap(x => hojasDe(x, hijos)), progMap, arr) }));
-      const todasAtrasadas = hojas.map(p => ({ p, pp: progPct(p.id, progMap, arr, hoy) }))
-        .filter(x => x.pp !== null && Number(x.p.avance_pct) < x.pp - TOLERANCIA)
-        .sort((a, b) => (b.pp - Number(b.p.avance_pct)) - (a.pp - Number(a.p.avance_pct)))
-        .map(x => ({ ...x, ruta: rutaDe(x.p, porId) }));
-      const atrasadas = todasAtrasadas.slice(0, 8);
-      const susContratos = contratos.filter(c => c.torre_id === t.id);
-      const fijos = susContratos.filter(c => c.tipo === 'monto_fijo');
-      const presupuesto = fijos.reduce((s, c) => s + Number(c.monto_fijo || 0), 0) +
-        hojas.filter(p => contratoTorre.get(p.contrato_id)?.tipo !== 'monto_fijo').reduce((s, p) => s + (Number(p.cantidad) || 0) * (Number(p.precio_unitario) || 0), 0);
-      const susConceptos = conceptos.filter(c => c.torre_id === t.id);
-      const presupuestoTotal = presupuesto + susConceptos.reduce((s, c) => s + (Number(c.cantidad) || 0) * (Number(c.precio_unitario) || 0), 0);
-      const pagado = susContratos.reduce((s, c) => s + (pagadoPorContrato.get(c.id) || 0), 0) + susConceptos.reduce((s, c) => s + (gastadoPorConcepto.get(c.id) || 0), 0);
-      const curva = arr ? curvaS(hojas, progMap, hist, arr, hoy) : null;
-      frentes.push({ t, hojas, r, desv, etapas, atrasadas, todasAtrasadas, semanaTxt, terminaTxt, presupuesto: presupuestoTotal, pagado, arr, curva });
+    });
+
+    const lista = frentes.map(fr => {
+      const ets = etapas.filter(e => e.frente_id === fr.id).sort((a, b) => (a.orden - b.orden) || a.nombre.localeCompare(b.nombre, 'es'));
+      const etIds = new Set(ets.map(e => e.id));
+      const ps = partidas.filter(p => etIds.has(p.etapa_id));
+      const etapasCalc = ets.map(e => {
+        const pe = ps.filter(p => p.etapa_id === e.id);
+        const ampliado = ampl.filter(a => a.etapa_id === e.id && a.estatus === 'autorizada').reduce((s, a) => s + Number(a.monto || 0), 0);
+        const pres = pe.reduce((s, p) => s + presP(p), 0);
+        const ejc = pe.reduce((s, p) => s + (ejcPart.get(p.id) || 0), 0);
+        return { ...e, pres, ejc, avance: pct(ejc, pres), pagado: pe.reduce((s, p) => s + (pagoPart.get(p.id)?.pagado || 0), 0), ampliado,
+          topeTotal: e.estatus === 'presupuesto' ? null : Number(e.tope || 0) + ampliado };
+      });
+      const cats = CATEGORIAS.map(c => {
+        const pc = ps.filter(p => p.categoria === c.id);
+        return { ...c, pres: pc.reduce((s, p) => s + presP(p), 0), ejc: pc.reduce((s, p) => s + (ejcPart.get(p.id) || 0), 0), pagado: pc.reduce((s, p) => s + (pagoPart.get(p.id)?.pagado || 0), 0) };
+      });
+      const pres = ps.reduce((s, p) => s + presP(p), 0);
+      const ejc = ps.reduce((s, p) => s + (ejcPart.get(p.id) || 0), 0);
+      const pagado = ps.reduce((s, p) => s + (pagoPart.get(p.id)?.pagado || 0), 0);
+      const porPagar = ps.reduce((s, p) => s + (pagoPart.get(p.id)?.porPagar || 0), 0);
+      const rebasan = ps.filter(p => (ejcPart.get(p.id) || 0) > presP(p) + 0.005)
+        .map(p => ({ id: p.id, descripcion: p.descripcion, etapa: etMap.get(p.etapa_id)?.nombre, pres: presP(p), ejc: ejcPart.get(p.id) || 0 }))
+        .sort((a, b) => (b.ejc - b.pres) - (a.ejc - a.pres));
+      // curva: semanas en orden, hasta la última con ejecución
+      const sems = semanas.filter(s => s.frente_id === fr.id).sort((a, b) => Number(a.orden) - Number(b.orden));
+      const porSem = semFrente.get(fr.id) || new Map();
+      let ultima = -1; sems.forEach((s, i) => { if ((porSem.get(s.id) || 0) !== 0) ultima = i; });
+      let acum = 0;
+      const curva = sems.slice(0, ultima + 1).map(s => { const v = porSem.get(s.id) || 0; acum += v; return { etiqueta: s.etiqueta, corta: String(s.etiqueta).length > 6 ? String(s.etiqueta).slice(0, 6) : s.etiqueta, fecha: s.fecha, semana: v, acum, pct: pct(acum, pres) }; });
+      // avisos
+      const avisos = [];
+      etapasCalc.filter(e => e.estatus === 'abierta' && e.topeTotal > 0 && e.ejc / e.topeTotal >= 0.9).forEach(e => avisos.push(`${e.nombre}: ya usó ${pct1(pct(e.ejc, e.topeTotal))} de su tope (${$(e.ejc)} de ${$(e.topeTotal)}).`));
+      if (rebasan.length) avisos.push(`${rebasan.length} ${rebasan.length === 1 ? 'partida ejecutó' : 'partidas ejecutaron'} más que su presupuesto.`);
+      const nAut = autorizarFrente.get(fr.id)?.size || 0;
+      if (nAut) avisos.push(`${nAut} ${nAut === 1 ? 'requisición espera' : 'requisiciones esperan'} autorización por rebasar el presupuesto.`);
+      const nAmp = ampl.filter(a => a.estatus === 'solicitada' && etIds.has(a.etapa_id)).length;
+      if (nAmp) avisos.push(`${nAmp} ${nAmp === 1 ? 'ampliación espera' : 'ampliaciones esperan'} al Gerente de Construcción.`);
+      const nPed = pedidos.filter(p => etIds.has(p.etapa_id)).length;
+      if (nPed) avisos.push(`${nPed} ${nPed === 1 ? 'pedido de materiales abierto' : 'pedidos de materiales abiertos'}.`);
+      if (ejc > 0 && pagado > ejc * 1.0001) avisos.push(`Lo pagado (${$(pagado)}) supera lo ejecutado (${$(ejc)}).`);
+      return { f: fr, etapas: etapasCalc, cats, pres, ejc, avance: pct(ejc, pres), pagado, porPagar, rebasan, curva, avisos, nAut, nAmp, nPed };
     });
 
     const grupos = new Map();
-    frentes.forEach(f => {
-      const id = f.t.desarrollo_id || 'sin';
-      if (!grupos.has(id)) grupos.set(id, { id, nombre: f.t.desarrollos?.nombre || 'Sin desarrollo', frentes: [] });
+    lista.forEach(f => {
+      const id = f.f.desarrollo_id || 'sin';
+      if (!grupos.has(id)) grupos.set(id, { id, nombre: f.f.desarrollos?.nombre || 'Sin desarrollo', frentes: [] });
       grupos.get(id).frentes.push(f);
     });
-    const proyectos = [...grupos.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(g => {
-      const hojas = g.frentes.flatMap(f => f.hojas);
-      const arrPorTorre = new Map(g.frentes.map(f => [f.t.id, f.arr]));
-      const r = resumen(hojas, progMap, (p) => arrPorTorre.get(p.torre_id));
-      return { ...g, hojas, r, desv: r.programado === null ? null : r.realProgramadas - r.programado,
-        presupuesto: g.frentes.reduce((s, f) => s + f.presupuesto, 0), pagado: g.frentes.reduce((s, f) => s + f.pagado, 0) };
+    return [...grupos.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')).map(g => {
+      const s = (k) => g.frentes.reduce((t, f) => t + f[k], 0);
+      return { ...g, pres: s('pres'), ejc: s('ejc'), pagado: s('pagado'), porPagar: s('porPagar'), avance: pct(s('ejc'), s('pres')), nAut: s('nAut'), nAmp: s('nAmp'), nPed: s('nPed') };
     });
-    return { proyectos, sinPrograma: sin, global: { progMap, frentes } };
-  }, [datos, hoy]);
+  }, [datos]);
 
   const visibles = proyectos.filter(p => !filtro || p.id === filtro);
-  const todas = visibles.flatMap(p => p.hojas);
-  const arrPorTorre = new Map(visibles.flatMap(p => p.frentes).map(f => [f.t.id, f.arr]));
-  const rg = todas.length ? resumen(todas, global.progMap, (p) => arrPorTorre.get(p.torre_id)) : null;
-  const desvG = rg && rg.programado !== null ? rg.realProgramadas - rg.programado : null;
+  const tot = (k) => visibles.reduce((s, p) => s + p[k], 0);
+  const pres = tot('pres'), ejc = tot('ejc'), pagado = tot('pagado'), porPagar = tot('porPagar');
   const nFrentes = visibles.reduce((s, p) => s + p.frentes.length, 0);
-  const presupG = visibles.reduce((s, p) => s + p.presupuesto, 0);
-  const pagadoG = visibles.reduce((s, p) => s + p.pagado, 0);
+  const nEtapasAbiertas = visibles.reduce((s, p) => s + p.frentes.reduce((t, f) => t + f.etapas.filter(e => e.estatus === 'abierta').length, 0), 0);
+  const pendientes = tot('nAut') + tot('nAmp') + tot('nPed');
+  const resumenG = { pres, ejc, pagado, porPagar, avance: pct(ejc, pres), nFrentes };
 
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: '1rem' }}>
         <div>
           <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Dashboard de obra</h2>
-          <div style={{ fontSize: '12px', color: '#888' }}>Avance real contra programado de cada proyecto con obra. Solo aparecen los proyectos que ya tienen programa capturado.</div>
+          <div style={{ fontSize: '12px', color: '#888' }}>Ligado al Programa: presupuesto, ejecución semanal y pagos por requisición de cada frente. El avance es el ejecutado entre el presupuesto cargado.</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select value={filtro} onChange={e => setFiltro(e.target.value)} style={sel}>
@@ -310,58 +335,51 @@ export default function ObraDashboard() {
           </select>
           <button onClick={cargar} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>Actualizar</button>
           {visibles.length > 0 && (<>
-            <button onClick={() => exportarExcel(visibles, verCostos)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>Excel</button>
-            <button onClick={() => exportarPdf(visibles, rg, verCostos)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>PDF</button>
+            <button onClick={() => exportarExcel(visibles)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>Excel</button>
+            <button onClick={() => exportarPdf(visibles, resumenG)} style={{ ...sel, background: '#fff', cursor: 'pointer', color: '#555' }}>PDF</button>
           </>)}
         </div>
       </div>
 
       {error && <div style={{ padding: '10px 14px', background: '#FDECEC', color: ROJO, borderRadius: 8, fontSize: 13, marginBottom: 12 }}>No se pudo cargar el dashboard: {error}</div>}
       {cargando ? <div style={{ color: '#888', fontSize: 13 }}>Cargando...</div> : proyectos.length === 0 ? (
-        <div style={{ color: '#888', fontSize: 13 }}>Todavía no hay proyectos con programa de obra. Captura el programa en Construcción → Programa.</div>
+        <div style={{ color: '#888', fontSize: 13 }}>Todavía no hay frentes en el Programa. Crea el primero en Construcción → Programa.</div>
       ) : (<>
-        {rg && (
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : `repeat(${verCostos ? 6 : 5}, 1fr)`, gap: 10, marginBottom: 18 }}>
-            <Tarjeta titulo="Frentes en obra" valor={nFrentes} sub={`${visibles.length} ${visibles.length === 1 ? 'proyecto' : 'proyectos'}`} />
-            <Tarjeta titulo="Avance real" valor={pct1(rg.real)} sub={`${rg.terminadas} de ${rg.total} partidas terminadas`} />
-            <Tarjeta titulo="Programado a hoy" valor={rg.programado === null ? '—' : pct1(rg.programado)} sub={rg.programado === null ? 'falta fecha de arranque' : 'según el programa'} />
-            <Tarjeta titulo="Desviación" valor={textoDesv(desvG)} color={desvG === null ? '#1a1a2e' : colorDesv(desvG)} sub="avance real vs programado" />
-            <Tarjeta titulo="Partidas atrasadas" valor={rg.atrasadas} color={rg.atrasadas > 0 ? ROJO : VERDE} sub={rg.usaPresupuesto ? 'ponderado por presupuesto' : 'ponderado por días programados'} />
-            {verCostos && <Tarjeta titulo="Pagado a contratistas" valor={$(pagadoG)} sub={presupG > 0 ? `${pct1((pagadoG / presupG) * 100)} de ${$(presupG)}` : 'sin presupuesto capturado'} />}
-          </div>
-        )}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(6, 1fr)', gap: 10, marginBottom: 18 }}>
+          <Tarjeta titulo="Frentes" valor={nFrentes} sub={`${nEtapasAbiertas} ${nEtapasAbiertas === 1 ? 'etapa abierta' : 'etapas abiertas'} · ${visibles.length} ${visibles.length === 1 ? 'proyecto' : 'proyectos'}`} />
+          <Tarjeta titulo="Presupuesto cargado" valor={$(pres)} sub="incluye lo autorizado de más" />
+          <Tarjeta titulo="Ejecutado" valor={$(ejc)} sub={pres > 0 ? `${pct1(pct(ejc, pres))} del presupuesto` : 'sin presupuesto cargado'} />
+          <Tarjeta titulo="Pagado" valor={$(pagado)} sub={pres > 0 ? `${pct1(pct(pagado, pres))} del presupuesto` : 'sin presupuesto cargado'} />
+          <Tarjeta titulo="Por pagar" valor={$(porPagar)} sub="requisiciones por autorizar o pagar" />
+          <Tarjeta titulo="Pendientes" valor={pendientes} color={pendientes > 0 ? AMBAR : '#1a1a2e'} sub="autorizaciones, ampliaciones y pedidos abiertos" />
+        </div>
 
         {visibles.map(p => (
           <div key={p.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
             <div style={{ padding: '14px 16px', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', background: '#f7f7f9' }}>
               <div style={{ flex: '0 0 210px' }}>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#1a1a2e' }}>{p.nombre}</div>
-                <div style={{ fontSize: 11, color: '#888' }}>{p.frentes.length} {p.frentes.length === 1 ? 'frente' : 'frentes'} · {p.r.total} partidas</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{p.frentes.length} {p.frentes.length === 1 ? 'frente' : 'frentes'}</div>
               </div>
               <div style={{ flex: '1 1 220px', minWidth: 200 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <b>Avance real {pct1(p.r.real)}</b>
-                  <span style={{ color: '#888' }}>{p.r.programado === null ? 'sin programado' : `programado ${pct1(p.r.programado)}`}</span>
+                  <b>Avance {p.pres > 0 ? pct1(p.avance) : '—'}</b>
+                  <span style={{ color: '#888' }}>{$(p.ejc)} de {$(p.pres)}</span>
                 </div>
-                <Barra real={p.r.real} prog={p.r.programado} alto={10} />
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: colorDesv(p.desv) }}>{textoDesv(p.desv)}</div>
-                <div style={{ fontSize: 10, color: '#aaa' }}>desviación</div>
+                <BarraAvance valor={p.avance} alto={10} />
               </div>
               <div style={{ textAlign: 'right', fontSize: 12 }}>
-                <div><b>{p.r.terminadas}</b><span style={{ color: '#888' }}> / {p.r.total} terminadas</span></div>
-                <div style={{ fontSize: 10, color: p.r.atrasadas > 0 ? ROJO : '#aaa' }}>{p.r.atrasadas} atrasadas</div>
+                <div><b>{$(p.pagado)}</b><span style={{ color: '#888' }}> pagado</span></div>
+                <div style={{ fontSize: 10, color: '#aaa' }}>{p.porPagar > 0 ? `por pagar ${$(p.porPagar)}` : 'sin pagos pendientes'}</div>
               </div>
             </div>
             {p.frentes.map(f => (
-              <FilaFrente key={f.t.id} f={f} verCostos={verCostos} isMobile={isMobile} abierto={!!abiertos[f.t.id]}
-                onAlternar={() => setAbiertos(a => ({ ...a, [f.t.id]: !a[f.t.id] }))} />
+              <FilaFrente key={f.f.id} f={f} isMobile={isMobile} abierto={!!abiertos[f.f.id]}
+                onAlternar={() => setAbiertos(a => ({ ...a, [f.f.id]: !a[f.f.id] }))} />
             ))}
           </div>
         ))}
-        {sinPrograma > 0 && <div style={{ fontSize: 11, color: '#aaa' }}>{sinPrograma} {sinPrograma === 1 ? 'frente' : 'frentes'} sin programa capturado no se muestra{sinPrograma === 1 ? '' : 'n'}.</div>}
-        <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>La línea roja de cada barra marca el avance programado a hoy. Una partida se considera atrasada si va más de {TOLERANCIA} puntos por debajo de lo programado.</div>
+        <div style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>Los datos salen del Programa (Construcción → Programa) y de las requisiciones de pago ligadas a sus partidas. El Programa no tiene una fecha programada por partida, por eso no se compara contra un calendario: se mide contra el presupuesto cargado y su tope.</div>
       </>)}
     </div>
   );
