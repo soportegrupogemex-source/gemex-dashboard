@@ -79,6 +79,17 @@ begin
   return v_rol = any (v_def);
 end $function$;
 
+-- Cargos de requisición ligados a partidas del Programa
+alter table public.obra_requisicion_cargos alter column torre_id drop not null;
+alter table public.obra_requisicion_cargos add column if not exists frente_id uuid references public.prog_frentes(id);
+alter table public.obra_requisicion_cargos add column if not exists prog_partida_id uuid references public.prog_partidas(id);
+alter table public.obra_requisicion_cargos drop constraint if exists obra_requisicion_cargos_check;
+alter table public.obra_requisicion_cargos add constraint obra_requisicion_cargos_check
+  check ((concepto_id is not null)::int + (contrato_id is not null)::int + (prog_partida_id is not null)::int = 1);
+alter table public.obra_requisicion_cargos add constraint obra_requisicion_cargos_destino_check
+  check ((prog_partida_id is not null and frente_id is not null) or (prog_partida_id is null and torre_id is not null));
+create index if not exists obra_requisicion_cargos_partida_idx on public.obra_requisicion_cargos (prog_partida_id);
+
 -- Presupuesto de una partida = cantidad x precio + lo que se le haya autorizado de más
 alter table public.prog_partidas add column if not exists ampliado numeric not null default 0 check (ampliado >= 0);
 
@@ -142,15 +153,6 @@ alter table public.obra_requisiciones add column if not exists aut_super_en time
 alter table public.obra_requisiciones add column if not exists pedido_id uuid references public.req_materiales(id);
 alter table public.obra_requisicion_lineas add column if not exists prog_partida_id uuid references public.prog_partidas(id);
 
-alter table public.obra_requisicion_cargos alter column torre_id drop not null;
-alter table public.obra_requisicion_cargos add column if not exists frente_id uuid references public.prog_frentes(id);
-alter table public.obra_requisicion_cargos add column if not exists prog_partida_id uuid references public.prog_partidas(id);
-alter table public.obra_requisicion_cargos drop constraint if exists obra_requisicion_cargos_check;
-alter table public.obra_requisicion_cargos add constraint obra_requisicion_cargos_check
-  check ((concepto_id is not null)::int + (contrato_id is not null)::int + (prog_partida_id is not null)::int = 1);
-alter table public.obra_requisicion_cargos add constraint obra_requisicion_cargos_destino_check
-  check ((prog_partida_id is not null and frente_id is not null) or (prog_partida_id is null and torre_id is not null));
-create index if not exists obra_requisicion_cargos_partida_idx on public.obra_requisicion_cargos (prog_partida_id);
 
 -- Crear pedido de materiales
 create or replace function public.req_materiales_crear(p_etapa uuid, p_notas text, p_lineas jsonb)
