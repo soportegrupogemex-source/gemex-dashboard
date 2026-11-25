@@ -6,7 +6,7 @@ import { usePuede } from './PermisosContext';
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
 const TIEMPO_COMPRA_OPCIONES = ['Inmediato', '1 a 3 meses', '3 a 6 meses', '6 a 12 meses', 'Más de 1 año'];
-const TIPO_COMPRA_OPCIONES = ['Contado', 'Crédito hipotecario', 'Infonavit', 'Fovissste', 'Caja Popular'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Crédito hipotecario', 'Infonavit', 'Fovissste', 'Caja Popular', 'Banjercito'];
 const RAZON_NO_COMPRA = ['Precio alto', 'Ya compró otro', 'Sin financiamiento', 'No le gustó', 'Sin respuesta'];
 
 // FIX: mismas etapas que Negocios.js (no se exportan de ahí, así que se

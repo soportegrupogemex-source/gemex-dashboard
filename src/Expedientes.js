@@ -62,6 +62,13 @@ const DOC_DEFS_FINANCIADO = {
   validacion_credito_sofom: { label: 'Validación Crédito SOFOM' },
   ultimo_talon_pago: { label: 'Último Talón de Pago' },
   recibo_nomina: { label: 'Recibo de Nómina' },
+  solicitud_credito: { label: 'Solicitud de Crédito' },
+  cfdi_nomina: { label: '2 últimos Comprobantes Fiscales Digitales de Nómina (CFDI)', opcional: true, multiple: true, maxArchivos: 2, nota: 'Solo para la Armada; anteriores a la fecha de la Solicitud de Crédito' },
+  identificacion_militar: { label: 'Identificación Militar', nota: 'La sucursal cotejará la copia contra el original' },
+  validacion_identidad_ine: { label: 'Comprobante de Validación de Identidad "INE"', opcional: true, nota: 'Lo genera la sucursal, solo cuando el cliente se identifique con INE' },
+  anexo_datos_inmueble: { label: 'Formato de Anexo de Datos del Inmueble a Adquirir y Datos del Vendedor' },
+  carta_designacion_notario: { label: 'Formato de Carta de Designación de Notario', nota: 'Domicilio completo: calle, número, colonia, estado, C.P., teléfonos. La fecha de emisión debe ser posterior a la pre-autorización' },
+  certificado_servicios: { label: 'Certificado de Servicios', nota: 'Cofinanciamiento ISSFAM-Banjercito' },
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
   cotizacion: { label: 'Cotización del día del apartado (a nombre del cliente)', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
@@ -97,6 +104,14 @@ const DOCS_FINANCIADO_ESPECIFICOS = {
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
+  // Banjercito (checklist Banje-Terreno). Los documentos de identidad del titular y,
+  // si está casado, del cónyuge salen de la base de identidad (INE, acta, CURP, constancia fiscal,
+  // comprobante de domicilio, acta de matrimonio).
+  Banjercito: {
+    comunes: [],
+    soloTitular: ['solicitud_credito', 'cfdi_nomina', 'identificacion_militar', 'validacion_identidad_ine', 'anexo_datos_inmueble', 'carta_designacion_notario', 'cotizacion', 'liquidacion_gemex', 'documentos_generales'],
+    referenciasPersonales: false,
+  },
   Cofinavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
     soloTitular: ['carta_autorizacion_cofinavit', 'cotizacion', 'liquidacion_gemex', 'documentos_generales'],
@@ -107,8 +122,14 @@ const DOCS_FINANCIADO_ESPECIFICOS = {
 // Lista de documentos a pedir para una persona (titular/coacreditado) de
 // un movimiento, según su tipo_compra. Contado (o sin tipo_compra, para
 // movimientos viejos de antes de este cambio) sigue usando DOCS_ASESOR.
-const docsRequeridos = (movimiento, persona = 'titular') => {
+// Banjercito con la casilla "+ ISSFAM" (cofinanciamiento ISSFAM-Banjercito) pide, además, el Certificado de Servicios.
+const cfgFinanciadoDe = (movimiento) => {
   const cfg = DOCS_FINANCIADO_ESPECIFICOS[movimiento?.tipo_compra];
+  if (cfg && movimiento.tipo_compra === 'Banjercito' && movimiento.tiene_issfam) return { ...cfg, soloTitular: ['certificado_servicios', ...cfg.soloTitular] };
+  return cfg;
+};
+const docsRequeridos = (movimiento, persona = 'titular') => {
+  const cfg = cfgFinanciadoDe(movimiento);
   if (!cfg) return persona === 'titular' ? DOCS_ASESOR : [];
   const prefix = persona === 'coacreditado' ? 'coac_' : '';
   const base = docsBaseIdentidad(prefix);
@@ -122,6 +143,7 @@ const docsRequeridos = (movimiento, persona = 'titular') => {
 const hayOtraPersona = (m) => !!(m?.tiene_coacreditado || m?.tiene_conyugal);
 const etiquetaCredito = (m) => {
   if (!m?.tipo_compra) return '';
+  if (m.tipo_compra === 'Banjercito' && m.tiene_issfam) return 'Banjercito + ISSFAM' + (m.tiene_conyugal ? ' conyugal' : m.tiene_coacreditado ? ' coacreditado' : '');
   if (m.tiene_conyugal) return `${m.tipo_compra} conyugal`;
   if (m.tiene_coacreditado) return `${m.tipo_compra} coacreditado`;
   return m.tipo_compra;
@@ -483,6 +505,15 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     setMovSel(data);
     setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
     setFormCoacreditado(f => ({ ...f, tiene_coacreditado: !!data.tiene_coacreditado, coacreditado_nombre: data.coacreditado_nombre || '' }));
+  };
+
+  // Casilla "+ ISSFAM" (solo Banjercito): guarda al instante y cambia la lista de documentos.
+  const handleToggleIssfam = async (valor) => {
+    if (!movSel) return;
+    const { data, error } = await supabase.from('movimientos').update({ tiene_issfam: valor }).eq('id', movSel.id).select().single();
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
   };
 
   // FIX: el nombre del coacreditado sí se edita en memoria y se guarda
@@ -944,7 +975,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
       m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
       m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
     (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo) &&
-    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra || etiquetaCredito(m) === filtroTipoCompra) &&
+    (!filtroTipoCompra || m.tipo_compra === filtroTipoCompra || etiquetaCredito(m) === filtroTipoCompra || (filtroTipoCompra === 'Banjercito + ISSFAM' && m.tipo_compra === 'Banjercito' && !!m.tiene_issfam)) &&
     (!filtroCompleto || (filtroCompleto === 'completos' ? m.expediente_completo === true : m.expediente_completo !== true))
   );
 
@@ -996,7 +1027,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
     // documentos, ni se tocan las casillas "Expediente completo"/"Enviar
     // a Titulación", solo se puede ver y descargar.
     const puedoRevisar = tab === 'descargar' && !soloEnviadosATitulacion && puedeRevisarDocs;
-    const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
+    const cfgFinanciado = cfgFinanciadoDe(movSel);
     const esFinanciado = !!cfgFinanciado;
     const docsTitular = docsRequeridos(movSel, 'titular');
     const docsCoacreditado = hayOtraPersona(movSel) ? docsRequeridos(movSel, 'coacreditado') : [];
@@ -1299,6 +1330,13 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
                     onChange={e => handleToggleCoacreditado('tiene_conyugal', e.target.checked)} />
                   ¿Es conyugal?
                 </label>
+                {movSel.tipo_compra === 'Banjercito' && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
+                    <input type='checkbox' disabled={!esMio || archivado} checked={!!movSel.tiene_issfam}
+                      onChange={e => handleToggleIssfam(e.target.checked)} />
+                    + ISSFAM
+                  </label>
+                )}
               </div>
               {hayOtraPersona(movSel) && (
                 <>
@@ -1601,7 +1639,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <select value={filtroTipoCompra} onChange={e => setFiltroTipoCompra(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
           <option value=''>Todos los tipos de crédito</option>
-          {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit', 'Caja Popular'].map(t => <option key={t} value={t}>{t}</option>)}
+          {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit', 'Caja Popular', 'Banjercito', 'Banjercito + ISSFAM'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={filtroCompleto} onChange={e => setFiltroCompleto(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: filtroCompleto ? '#EAF3DE' : '#fff', boxSizing: 'border-box' }}>
