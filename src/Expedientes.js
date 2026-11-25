@@ -61,6 +61,7 @@ const DOC_DEFS_FINANCIADO = {
   estado_cuenta_afore: { label: 'Estado de Cuenta de AFORE' },
   validacion_credito_sofom: { label: 'Validación Crédito SOFOM' },
   ultimo_talon_pago: { label: 'Último Talón de Pago' },
+  recibo_nomina: { label: 'Recibo de Nómina' },
   carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
   carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
   cotizacion: { label: 'Cotización del día del apartado (a nombre del cliente)', multiple: true, maxArchivos: 3, nota: 'Hasta 3 archivos', avisoRojo: 'DESCARGADA EN PDF' },
@@ -90,9 +91,9 @@ const DOCS_FINANCIADO_ESPECIFICOS = {
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
-  // Caja Popular: se pide lo mismo que Bancario (carta de autorización de la institución).
+  // Caja Popular: identidad (INE, acta, CURP, constancia fiscal, comprobante de domicilio) + recibo de nómina.
   'Caja Popular': {
-    comunes: ['carta_autorizacion_banco'],
+    comunes: ['recibo_nomina'],
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
