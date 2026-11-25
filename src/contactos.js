@@ -9,7 +9,7 @@ import { usePuede } from './PermisosContext';
 const ESTATUS_OPCIONES = ['Prospecto', 'Prospecto Calificado', 'Cliente', 'No interesado'];
 const MEDIO_OPCIONES = ['Autogeneración', 'Mensaje WhatsApp', 'Campañas digitales', 'Referido', 'Portal inmobiliario', 'Showroom'];
 const TIEMPO_COMPRA_OPCIONES = ['Inmediato', '1 a 3 meses', '3 a 6 meses', '6 a 12 meses', 'Más de 1 año'];
-const TIPO_COMPRA_OPCIONES = ['Contado', 'Crédito hipotecario', 'Infonavit', 'Fovissste'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Crédito hipotecario', 'Infonavit', 'Fovissste', 'Caja Popular'];
 const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 // FIX: para elegir libremente el asesor de ventas al crear un contacto,
 // el requisito es más estricto que ROLES_VER_TODOS — excluye a Sub Admin.

@@ -17,7 +17,7 @@ const ESTATUS_POR_TIPO = { Apartado: 'Apartado', Vendida: 'Vendido', 'Cancelaci�
 // FIX: se agrega "Especial" — misma lista que Movimientos.js, para que el
 // panel de edición del historial pueda mostrar/asignar este plan también.
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
-const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit', 'Caja Popular'];
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const colorTipo = { 'Apartado': '#F59E0B', 'Vendida': '#10B981', 'Cancelación': '#EF4444', 'Cambio de Unidad': '#8B5CF6' };
 const bgTipo = { 'Apartado': '#FFF8E1', 'Vendida': '#EAF3DE', 'Cancelación': '#FCEBEB', 'Cambio de Unidad': '#F3F0FF' };

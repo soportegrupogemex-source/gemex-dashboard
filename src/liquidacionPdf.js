@@ -22,6 +22,7 @@ const ETIQUETAS_CREDITO = {
   Fovissste: { f1: 'Crédito Fovissste', f2: 'Crédito bancario' },
   Cofinavit: { f1: 'Crédito Infonavit', f2: 'Crédito bancario' },
   Bancario: { f1: 'Crédito bancario', f2: 'Otro crédito' },
+  'Caja Popular': { f1: 'Crédito Caja Popular', f2: 'Otro crédito' },
 };
 export const etiquetasCredito = (tipo) => ETIQUETAS_CREDITO[tipo] || { f1: 'Financiera 1', f2: 'Financiera 2' };
 

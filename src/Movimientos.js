@@ -16,7 +16,7 @@ const TIPOS_POST_VENTA = ['Titulación', 'Cobranza'];
 // políticas de los demás planes (caso a caso).
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
 const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario', 'Showroom'];
-const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit', 'Caja Popular'];
 // FIX: Mesa de Control entra a la misma ventana martes-lunes que los demás Gerentes
 
 function useIsMobile() {

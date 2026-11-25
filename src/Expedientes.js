@@ -90,6 +90,12 @@ const DOCS_FINANCIADO_ESPECIFICOS = {
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
+  // Caja Popular: se pide lo mismo que Bancario (carta de autorización de la institución).
+  'Caja Popular': {
+    comunes: ['carta_autorizacion_banco'],
+    soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
+    referenciasPersonales: false,
+  },
   Cofinavit: {
     comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
     soloTitular: ['carta_autorizacion_cofinavit', 'cotizacion', 'liquidacion_gemex', 'documentos_generales'],
@@ -1594,7 +1600,7 @@ export default function Expedientes({ miRol, miAgente, soloEnviadosATitulacion =
         <select value={filtroTipoCompra} onChange={e => setFiltroTipoCompra(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
           <option value=''>Todos los tipos de crédito</option>
-          {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit'].map(t => <option key={t} value={t}>{t}</option>)}
+          {['Contado', 'Infonavit', 'Infonavit coacreditado', 'Infonavit conyugal', 'Fovissste', 'Bancario', 'Cofinavit', 'Caja Popular'].map(t => <option key={t} value={t}>{t}</option>)}
         </select>
         <select value={filtroCompleto} onChange={e => setFiltroCompleto(e.target.value)}
           style={{ width: isMobile ? '100%' : '200px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: filtroCompleto ? '#EAF3DE' : '#fff', boxSizing: 'border-box' }}>
