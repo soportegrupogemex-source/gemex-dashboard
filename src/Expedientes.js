@@ -91,9 +91,9 @@ const DOCS_FINANCIADO_ESPECIFICOS = {
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
-  // Caja Popular: identidad (INE, acta, CURP, constancia fiscal, comprobante de domicilio) + recibo de nómina.
+  // Caja Popular: todo lo de Bancario + recibo de nómina.
   'Caja Popular': {
-    comunes: ['recibo_nomina'],
+    comunes: ['carta_autorizacion_banco', 'recibo_nomina'],
     soloTitular: ['cotizacion', 'liquidacion_gemex', 'documentos_generales'],
     referenciasPersonales: false,
   },
